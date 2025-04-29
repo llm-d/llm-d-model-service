@@ -1,0 +1,6 @@
+{
+  "dev-version": "0.0.6",
+  "dev-registry": "quay.io/llm-d/modelservice-dev",
+  "prod-version": "0.0.5",
+  "prod-registry": "quay.io/llm-d/modelservice"
+}
