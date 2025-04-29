@@ -1,5 +1,5 @@
 # Defaults
-PROJECT_NAME ?= modelservice
+PROJECT_NAME ?= llm-d-model-service
 DEV_VERSION ?= 0.0.1
 PROD_VERSION ?= 0.0.0
 IMAGE_TAG_BASE ?= quay.io/llm-d/$(PROJECT_NAME)
