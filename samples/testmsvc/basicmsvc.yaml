@@ -1,0 +1,26 @@
+apiVersion: llm-d.ai/v1alpha1
+kind: ModelService
+metadata:
+  name: busybox
+spec:
+  decoupleScaling: false
+
+  baseConfigMapRef:
+    name: basic-basic-conf
+
+  routing: 
+    modelName: llama-2075
+
+  modelArtifacts:
+    uri: pvc://llama-of-the-future/path/to/llama-2075
+
+  # describe decode pods
+  decode:
+    replicas: 1
+    containers:
+    - name: "llm"
+      image: busybox
+      args:
+      - "50000"
+
+
