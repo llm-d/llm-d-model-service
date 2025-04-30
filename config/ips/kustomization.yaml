@@ -1,0 +1,9 @@
+resources:
+- ../default
+
+patches:
+# [MANAGER] The following patch provides access to image
+- target:
+    kind: Deployment
+  path: manager_patch.yaml
+

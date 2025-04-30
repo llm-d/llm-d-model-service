@@ -1,0 +1,9 @@
+apiVersion: llm-d.ai/v1alpha1
+kind: ModelService
+metadata:
+  labels:
+    app.kubernetes.io/name: modelservice
+    app.kubernetes.io/managed-by: kustomize
+  name: modelservice-sample
+spec:
+  # TODO(user): Add fields here

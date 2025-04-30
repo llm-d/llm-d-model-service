@@ -1,0 +1,21 @@
+apiVersion: llm-d.ai/v1alpha1
+kind: ModelService
+metadata:
+  name: test-modelservice
+  namespace: test-namespace
+spec:
+  routing:
+    modelName: repo/model
+    inferencePoolRef: inferencepool
+  modelArtifacts:
+    uri: "hf://repo/model"
+  decoupleScaling: false
+  decode:
+    vllmProxyContainer:
+      name: llm-proxy
+      image: "quay.io/vllm-d/vllmdroutingsidecar-dev:0.0.5"
+      imagePullPolicy: "Always"
+    vllmContainer:
+      name: llm-container
+      image: "quay.io/vllm-d/vllm-d-dev:0.0.2"
+

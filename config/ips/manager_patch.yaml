@@ -1,0 +1,11 @@
+
+# Make image pull policy always
+- op: add
+  path: /spec/template/spec/containers/0/imagePullPolicy
+  value: Always
+
+# Add image pull secret
+- op: add
+  path: /spec/template/spec/imagePullSecrets
+  value: 
+  - name: quay-secret
