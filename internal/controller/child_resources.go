@@ -453,16 +453,19 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 	// create of update inference model
 	childResource.createOrUpdateInferenceModel(ctx, r)
 
-	err := childResource.createEppDeployment(ctx, r.Client, *childResource.EPPDeployment)
-	if err != nil {
-		log.FromContext(ctx).Error(err, "unable to create epp deployment")
+	if childResource.EPPDeployment != nil {
+		err := childResource.createEppDeployment(ctx, r.Client, *childResource.EPPDeployment)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "unable to create epp deployment")
+		}
 	}
 
-	err = childResource.createEppService(ctx, r.Client, *childResource.EPPService)
-	if err != nil {
-		log.FromContext(ctx).Error(err, "unable to create epp service")
+	if childResource.EPPService != nil {
+		err := childResource.createEppService(ctx, r.Client, *childResource.EPPService)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "unable to create epp service")
+		}
 	}
-
 	return nil
 }
 
