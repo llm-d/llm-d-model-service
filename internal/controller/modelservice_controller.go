@@ -100,9 +100,25 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		childResources.updatePDService(ctx, modelService, DECODE_ROLE, r.Scheme)
 	}
 
-	log.FromContext(ctx).Info("attempting to update inference model")
-	childResources.updateInferenceModel(ctx, modelService, r.Scheme)
+	if childResources.InferencePool != nil {
+		log.FromContext(ctx).Info("attempting to update inference pool")
+		childResources.updateInferencePool(ctx, modelService, r.Scheme)
+	}
 
+	if childResources.InferenceModel != nil {
+		log.FromContext(ctx).Info("attempting to update inference model")
+		childResources.updateInferenceModel(ctx, modelService, r.Scheme)
+	}
+
+	if childResources.EPPDeployment != nil {
+		log.FromContext(ctx).Info("attempting to update epp deployment")
+		childResources.updateEppDeployment(ctx, modelService, r.Scheme)
+	}
+
+	if childResources.EPPDeployment != nil || childResources.EPPService != nil {
+		log.FromContext(ctx).Info("attempting to update epp service")
+		childResources.updateEppService(ctx, modelService, r.Scheme)
+	}
 	// and so on
 	// TODO: update other objects here
 

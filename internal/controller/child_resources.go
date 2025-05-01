@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
@@ -140,7 +141,11 @@ func (childResource *BaseConfig) UpdateChildResources(ctx context.Context, msvc 
 	}
 	if childResource.EPPDeployment != nil {
 		log.FromContext(ctx).Info("update EPP Deployment and Service")
-		// TBD update epp deployment, service
+		childResource = childResource.updateEppDeployment(ctx, msvc, scheme)
+	}
+	if childResource.EPPService != nil {
+		log.FromContext(ctx).Info("update EPP Deployment and Service")
+		childResource = childResource.updateEppService(ctx, msvc, scheme)
 	}
 	if childResource.InferencePool != nil {
 		log.FromContext(ctx).Info("update InferencePool")
@@ -452,6 +457,19 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 	// create of update inference model
 	childResource.createOrUpdateInferenceModel(ctx, r)
 
+	if childResource.EPPDeployment != nil {
+		err := childResource.createEppDeployment(ctx, r.Client)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "unable to create epp deployment")
+		}
+	}
+
+	if childResource.EPPService != nil {
+		err := childResource.createEppService(ctx, r.Client, *childResource.EPPService)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "unable to create epp service")
+		}
+	}
 	return nil
 }
 
@@ -528,6 +546,79 @@ func getInferencePoolLabels(labels map[string]string) map[giev1alpha2.LabelKey]g
 	return m
 }
 
+func (childResources *BaseConfig) updateEppDeployment(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
+
+	if childResources == nil || childResources.EPPDeployment == nil {
+		return childResources
+	}
+	eppLabels := map[string]string{
+		"llm-d.ai/epp": eppDeploymentName(msvc),
+	}
+	dest := *childResources.EPPDeployment
+
+	src := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      eppDeploymentName(msvc),
+			Namespace: msvc.Namespace,
+		},
+	}
+
+	src.Labels = eppLabels
+
+	src.Spec.Selector = &metav1.LabelSelector{
+		MatchLabels: eppLabels,
+	}
+
+	src.Spec.Template.ObjectMeta = metav1.ObjectMeta{
+		Labels: eppLabels,
+	}
+
+	if err := mergo.Merge(&dest, src, mergo.WithOverride); err != nil {
+		log.FromContext(ctx).Error(err, "problem with epp deployment merge")
+		return childResources
+	}
+
+	// Set owner reference for the merged service
+	if err := controllerutil.SetOwnerReference(msvc, &dest, scheme); err != nil {
+		log.FromContext(ctx).Error(err, "unable to set owner ref for inferencepool")
+		return childResources
+	}
+	log.FromContext(ctx).Info("deployment", "post-merge-label", dest.Labels, "post-merge-spec", dest.Spec)
+	// Set the merged epp deployment in the child resource
+	childResources.EPPDeployment = &dest
+
+	return childResources
+}
+
+func (childResources *BaseConfig) updateEppService(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
+	if childResources == nil || childResources.EPPService == nil {
+		return childResources
+	}
+	eppLabels := map[string]string{
+		"llm-d.ai/epp": eppDeploymentName(msvc),
+	}
+	dest := *childResources.EPPService
+	src := corev1.Service{ObjectMeta: metav1.ObjectMeta{
+		Name:      eppServiceName(msvc),
+		Namespace: msvc.Namespace,
+		Labels:    eppLabels,
+	}}
+
+	src.Spec.Selector = eppLabels
+	if err := mergo.Merge(&dest, src, mergo.WithOverride); err != nil {
+		log.FromContext(ctx).Error(err, "problem with epp service merge")
+		return childResources
+	}
+	if err := controllerutil.SetOwnerReference(msvc, &dest, scheme); err != nil {
+		log.FromContext(ctx).Error(err, "unable to set owner ref for inferencepool")
+		return childResources
+	}
+
+	// Set the merged epp service in the child resource
+	childResources.EPPService = &dest
+	return childResources
+}
+
 // updateInferencePool uses msvc fields to update childResource InferencePool resource.
 func (childResources *BaseConfig) updateInferencePool(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
 
@@ -551,7 +642,7 @@ func (childResources *BaseConfig) updateInferencePool(ctx context.Context, msvc 
 			EndpointPickerConfig: giev1alpha2.EndpointPickerConfig{
 				ExtensionRef: &giev1alpha2.Extension{
 					ExtensionReference: giev1alpha2.ExtensionReference{
-						Name: giev1alpha2.ObjectName(msvc.Name + "-epp"),
+						Name: giev1alpha2.ObjectName(eppDeploymentName(msvc)),
 					},
 				},
 			},
@@ -588,7 +679,7 @@ func (childResource *BaseConfig) createOrUpdateInferencePool(ctx context.Context
 			Namespace: childResource.InferencePool.Namespace,
 		},
 	}
-
+	log.FromContext(ctx).Info("merged inf pool", "data", childResource.InferencePool)
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, inferencePoolInCluster, func() error {
 		inferencePoolInCluster.Labels = childResource.InferenceModel.Labels
 		inferencePoolInCluster.Annotations = childResource.InferenceModel.Annotations
@@ -601,4 +692,63 @@ func (childResource *BaseConfig) createOrUpdateInferencePool(ctx context.Context
 		log.FromContext(ctx).Error(err, "unable to create inference pool")
 	}
 
+}
+
+// createEppDeployment spawns epp deployment from immutable configmap
+func (childResource *BaseConfig) createEppDeployment(ctx context.Context, kubeClient client.Client) error {
+
+	if childResource == nil || childResource.EPPDeployment == nil {
+		return nil
+	}
+
+	deploymentTobeCreatedOrUpdated := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			//baseconfig should have corret epp args for
+			// poolname and namespaces
+			// poolname format: <model-name>-modelservice
+			// eg: facebook-opt-125m-model-service
+			// namespace should be the namespace of msvc
+			Name:        childResource.EPPDeployment.Name,
+			Namespace:   childResource.EPPDeployment.Namespace,
+			Labels:      childResource.EPPDeployment.Labels,
+			Annotations: childResource.EPPDeployment.Annotations,
+		},
+	}
+
+	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, deploymentTobeCreatedOrUpdated, func() error {
+		deploymentTobeCreatedOrUpdated.Spec = childResource.EPPDeployment.Spec
+		return nil
+	})
+
+	if err != nil {
+		log.FromContext(ctx).Error(err, "unable to create epp deployment from immutable base configmap ")
+		return err
+	}
+	return nil
+}
+
+// createEppDeployment spawns epp service from immutable configmap
+func (childResource *BaseConfig) createEppService(ctx context.Context, kubeClient client.Client, eppService corev1.Service) error {
+
+	if childResource == nil || childResource.EPPService == nil {
+		return nil
+	}
+
+	serviceTobeCreatedOrUpdated := corev1.Service{ObjectMeta: metav1.ObjectMeta{
+		Name:        childResource.EPPService.Name,
+		Namespace:   childResource.EPPService.Namespace,
+		Labels:      childResource.EPPService.Labels,
+		Annotations: childResource.EPPService.Annotations,
+	}}
+
+	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &eppService, func() error {
+		serviceTobeCreatedOrUpdated.Spec = childResource.EPPService.Spec
+		return nil
+	})
+
+	if err != nil {
+		log.FromContext(ctx).Error(err, "unable to create epp service from immutable base configmap ")
+		return err
+	}
+	return nil
 }
