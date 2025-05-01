@@ -122,7 +122,7 @@ data:
         spec:
           containers:
             - name: vllm
-              image: vllm-openai
+              image: quay.io/llm-d/llm-d-dev:0.0.4
               securityContext:
                 allowPrivilegeEscalation: false
               args:
