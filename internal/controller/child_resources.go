@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
@@ -452,6 +453,16 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 	// create of update inference model
 	childResource.createOrUpdateInferenceModel(ctx, r)
 
+	err := childResource.createEppDeployment(ctx, r.Client, *childResource.EPPDeployment)
+	if err != nil {
+		log.FromContext(ctx).Error(err, "unable to create epp deployment")
+	}
+
+	err = childResource.createEppService(ctx, r.Client, *childResource.EPPService)
+	if err != nil {
+		log.FromContext(ctx).Error(err, "unable to create epp service")
+	}
+
 	return nil
 }
 
@@ -601,4 +612,32 @@ func (childResource *BaseConfig) createOrUpdateInferencePool(ctx context.Context
 		log.FromContext(ctx).Error(err, "unable to create inference pool")
 	}
 
+}
+
+// createEppDeployment spawns epp deployment from immutable configmap
+func (childResource *BaseConfig) createEppDeployment(ctx context.Context, kubeClient client.Client, eppDeployment appsv1.Deployment) error {
+
+	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &eppDeployment, func() error {
+		return nil
+	})
+
+	if err != nil {
+		log.FromContext(ctx).Error(err, "unable to create epp deployment from immutable base configmap ")
+		return err
+	}
+	return nil
+}
+
+// createEppDeployment spawns epp service from immutable configmap
+func (childResource *BaseConfig) createEppService(ctx context.Context, kubeClient client.Client, eppService corev1.Service) error {
+
+	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &eppService, func() error {
+		return nil
+	})
+
+	if err != nil {
+		log.FromContext(ctx).Error(err, "unable to create epp service from immutable base configmap ")
+		return err
+	}
+	return nil
 }
