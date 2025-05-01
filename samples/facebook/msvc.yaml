@@ -1,7 +1,7 @@
 apiVersion: llm-d.ai/v1alpha1
 kind: ModelService
 metadata:
-  name: facebook-opt-125m-model-service
+  name: facebook-opt-125m
 spec:
   decoupleScaling: false
 

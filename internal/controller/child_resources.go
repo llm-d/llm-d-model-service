@@ -162,6 +162,12 @@ func (childResource *BaseConfig) UpdateChildResources(ctx context.Context, msvc 
 // updateConfigMaps updates childResource configmaps
 func (childResource *BaseConfig) updateConfigMaps(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
 	for i := range childResource.ConfigMaps {
+		// if there's no namespace, set it to msvc's
+		if strings.TrimSpace(childResource.ConfigMaps[i].Namespace) == "" {
+			childResource.ConfigMaps[i].Namespace = msvc.Namespace
+		}
+		// Note: there seems to be a controllerutil bug here ...
+		// Setting owner ref before setting namespace seems problematic
 		err := controllerutil.SetOwnerReference(msvc, &childResource.ConfigMaps[i], scheme)
 		if err != nil {
 			log.FromContext(ctx).Error(err, "unable to set owner reference")
@@ -405,7 +411,17 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 	// create or update configmaps
 	log.FromContext(ctx).Info("attempting to createOrUpdate configmaps")
 	for i := range childResource.ConfigMaps {
-		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, &childResource.ConfigMaps[i], func() error {
+		cm := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      childResource.ConfigMaps[i].Name,
+				Namespace: childResource.ConfigMaps[i].Namespace,
+			}}
+
+		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, cm, func() error {
+			cm.OwnerReferences = childResource.ConfigMaps[i].OwnerReferences
+			cm.Labels = childResource.ConfigMaps[i].Labels
+			cm.Annotations = childResource.ConfigMaps[i].Annotations
+			cm.Data = childResource.ConfigMaps[i].Data
 			return nil
 		})
 		if err != nil {
@@ -414,9 +430,19 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 	}
 
 	log.FromContext(ctx).Info("attempting to createOrUpdate prefill deployment")
-	// create prefill deployment
-	if childResource.PrefillDeployment != nil {
-		op, err := controllerutil.CreateOrUpdate(ctx, r.Client, childResource.PrefillDeployment, func() error {
+	// create decode deployment
+	desired := childResource.PrefillDeployment
+	if desired != nil {
+		deploy := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      desired.Name,
+				Namespace: desired.Namespace,
+			}}
+		op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deploy, func() error {
+			deploy.OwnerReferences = desired.OwnerReferences
+			deploy.Labels = desired.Labels
+			deploy.Annotations = desired.Annotations
+			deploy.Spec = desired.Spec
 			return nil
 		})
 		log.FromContext(ctx).Info("from CreateOrUpdate", "op", op)
@@ -427,17 +453,19 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 
 	log.FromContext(ctx).Info("attempting to createOrUpdate decode deployment")
 	log.FromContext(ctx).Info("printing decode info", "deployment", childResource.DecodeDeployment)
+
 	// create decode deployment
-	desired := childResource.DecodeDeployment
+	desired = childResource.DecodeDeployment
 	if desired != nil {
 		deploy := &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:        desired.Name,
-				Namespace:   desired.Namespace,
-				Labels:      desired.Labels,
-				Annotations: desired.Annotations,
+				Name:      desired.Name,
+				Namespace: desired.Namespace,
 			}}
 		op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deploy, func() error {
+			deploy.OwnerReferences = desired.OwnerReferences
+			deploy.Labels = desired.Labels
+			deploy.Annotations = desired.Annotations
 			deploy.Spec = desired.Spec
 			return nil
 		})
@@ -519,14 +547,14 @@ func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.
 
 		svcInCluster := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:            service.Name,
-				Namespace:       service.Namespace,
-				Labels:          service.Labels,
-				Annotations:     service.Annotations,
-				OwnerReferences: service.OwnerReferences,
+				Name:      service.Name,
+				Namespace: service.Namespace,
 			}}
 
 		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, svcInCluster, func() error {
+			svcInCluster.Labels = service.Labels
+			svcInCluster.Annotations = service.Annotations
+			svcInCluster.OwnerReferences = service.OwnerReferences
 			svcInCluster.Spec = service.Spec
 			return nil
 		})
@@ -708,14 +736,15 @@ func (childResource *BaseConfig) createEppDeployment(ctx context.Context, kubeCl
 			// poolname format: <model-name>-modelservice
 			// eg: facebook-opt-125m-model-service
 			// namespace should be the namespace of msvc
-			Name:        childResource.EPPDeployment.Name,
-			Namespace:   childResource.EPPDeployment.Namespace,
-			Labels:      childResource.EPPDeployment.Labels,
-			Annotations: childResource.EPPDeployment.Annotations,
+			Name:      childResource.EPPDeployment.Name,
+			Namespace: childResource.EPPDeployment.Namespace,
 		},
 	}
 
 	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, deploymentTobeCreatedOrUpdated, func() error {
+		deploymentTobeCreatedOrUpdated.Labels = childResource.EPPDeployment.Labels
+		deploymentTobeCreatedOrUpdated.Annotations = childResource.EPPDeployment.Annotations
+		deploymentTobeCreatedOrUpdated.OwnerReferences = childResource.EPPDeployment.OwnerReferences
 		deploymentTobeCreatedOrUpdated.Spec = childResource.EPPDeployment.Spec
 		return nil
 	})
@@ -735,13 +764,14 @@ func (childResource *BaseConfig) createEppService(ctx context.Context, kubeClien
 	}
 
 	serviceTobeCreatedOrUpdated := corev1.Service{ObjectMeta: metav1.ObjectMeta{
-		Name:        childResource.EPPService.Name,
-		Namespace:   childResource.EPPService.Namespace,
-		Labels:      childResource.EPPService.Labels,
-		Annotations: childResource.EPPService.Annotations,
+		Name:      childResource.EPPService.Name,
+		Namespace: childResource.EPPService.Namespace,
 	}}
 
 	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &eppService, func() error {
+		serviceTobeCreatedOrUpdated.Labels = childResource.EPPService.Labels
+		serviceTobeCreatedOrUpdated.Annotations = childResource.EPPService.Annotations
+		serviceTobeCreatedOrUpdated.OwnerReferences = childResource.EPPService.OwnerReferences
 		serviceTobeCreatedOrUpdated.Spec = childResource.EPPService.Spec
 		return nil
 	})
