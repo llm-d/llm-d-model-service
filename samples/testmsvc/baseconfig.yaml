@@ -36,3 +36,7 @@ data:
   inferenceModel: |
     spec:
       criticality: standard    
+  
+  inferencePool: |
+    spec:
+      targetPortNumber: 9376
