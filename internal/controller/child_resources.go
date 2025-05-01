@@ -198,7 +198,10 @@ func (childResource *BaseConfig) updatePDService(ctx context.Context, msvc *msv1
 	}
 
 	// Set owner reference for the merged service
-	controllerutil.SetOwnerReference(msvc, &destService, scheme)
+	if err := controllerutil.SetOwnerReference(msvc, &destService, scheme); err != nil {
+		log.FromContext(ctx).Error(err, "unable to set owner ref for service "+role)
+		return childResource
+	}
 
 	// Set the merged service for child resource
 	if role == PREFILL_ROLE {
@@ -387,7 +390,7 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 	return nil
 }
 
-func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.Context, r *ModelServiceReconciler, role string) error {
+func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.Context, r *ModelServiceReconciler, role string) {
 
 	var service *corev1.Service
 	var deployment *appsv1.Deployment
@@ -420,10 +423,6 @@ func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.
 
 		if err != nil {
 			log.FromContext(ctx).Error(err, "unable to create service for "+role)
-			return err
 		}
 	}
-
-	return nil
-
 }
