@@ -137,12 +137,15 @@ func (childResource *BaseConfig) UpdateChildResources(ctx context.Context, msvc 
 		// update decode service
 	}
 	if childResource.EPPDeployment != nil {
+		log.FromContext(ctx).Info("update EPP Deployment and Service")
 		// TBD update epp deployment, service
 	}
 	if childResource.InferencePool != nil {
+		log.FromContext(ctx).Info("update InferencePool")
 		// TBD update inference pool
 	}
 	if childResource.InferenceModel != nil {
+		log.FromContext(ctx).Info("update EPP InferenceModel")
 		// TBD update inference model
 	}
 
