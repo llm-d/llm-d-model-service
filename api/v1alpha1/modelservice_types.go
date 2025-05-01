@@ -224,6 +224,7 @@ func ConvertToContainerSlice(c []ContainerSpec) []corev1.Container {
 	for i, containerSpec := range c {
 		containerSlice[i] = corev1.Container{
 			Name:      containerSpec.Name,
+			Args:      containerSpec.Args,
 			Env:       containerSpec.Env,
 			EnvFrom:   containerSpec.EnvFrom,
 			Resources: containerSpec.Resources,
