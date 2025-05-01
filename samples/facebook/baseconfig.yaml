@@ -2,12 +2,13 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: facebook-base-config
+immutable: true
 data:
   configMaps: |
     - apiVersion: v1
       kind: ConfigMap
       metadata:
-        name: config-decoder
+        name: facebook-opt-125m-config-decoder
       data:
         lmcache-decoder-config.yaml: |
           local_cpu: False
@@ -26,7 +27,7 @@ data:
     - apiVersion: v1
       kind: ConfigMap
       metadata:
-        name: config-prefiller
+        name: facebook-opt-125m-config-prefiller
       data:
         lmcache-prefiller-config.yaml: |
           local_cpu: False
@@ -37,7 +38,7 @@ data:
 
           enable_nixl: True
           nixl_role: "sender"
-          nixl_peer_host: "qwen-decoder"
+          nixl_peer_host: "facebook-opt-125m-decoder"
           nixl_peer_port: 55555
           nixl_buffer_size: 524288
           nixl_buffer_device: "cuda"
@@ -46,22 +47,8 @@ data:
   decodeDeployment: |
     apiVersion: apps/v1
     kind: Deployment
-    metadata:
-      name: qwen-decoder
-      labels:
-        app: qwen-decoder
-        llm-d.ai/inferenceServing: "true"
-        llm-d.ai/model: "qwen2-0-5b"
-        llm-d.ai/role: "decode"
     spec:
-      replicas: 1
-      selector:
-        matchLabels:
-          app: qwen-decoder
       template:
-        metadata:
-          labels:
-            app: qwen-decoder
         spec:
           initContainers:
             - name: routing-proxy
@@ -82,8 +69,6 @@ data:
               securityContext:
                 allowPrivilegeEscalation: false
               args:
-                # - "--model"
-                # - "Qwen/Qwen2-0.5B"
                 - "--port"
                 - "8200"
                 - "--kv-transfer-config"
@@ -108,7 +93,7 @@ data:
                 - containerPort: 55555
                   protocol: TCP
               volumeMounts:
-                - name: config-decoder
+                - name: facebook-opt-125m-config-decoder
                   mountPath: /vllm-workspace
                 - name: model-cache
                   mountPath: /vllm-workspace/models
@@ -132,22 +117,8 @@ data:
   prefillDeployment: |
     apiVersion: apps/v1
     kind: Deployment
-    metadata:
-      name: qwen-prefiller
-      labels:
-        app: qwen-prefiller
-        llm-d.ai/inferenceServing: "true"
-        llm-d.ai/model: "qwen2-0-5b"
-        llm-d.ai/role: "prefill"
     spec:
-      replicas: 1
-      selector:
-        matchLabels:
-          app: qwen-decoder
       template:
-        metadata:
-          labels:
-            app: qwen-decoder
         spec:
           containers:
             - name: vllm
@@ -155,8 +126,6 @@ data:
               securityContext:
                 allowPrivilegeEscalation: false
               args:
-                # - "--model"
-                # - "Qwen/Qwen2-0.5B"
                 - "--port"
                 - "8000"
                 - "--kv-transfer-config"
@@ -177,7 +146,7 @@ data:
                 - name: HF_HUB_CACHE
                   value: /vllm-workspace/models
               volumeMounts:
-                - name: config-prefiller
+                - name: facebook-opt-125m-config-prefiller
                   mountPath: /vllm-workspace
                 - name: model-cache
                   mountPath: /vllm-workspace/models
@@ -194,7 +163,7 @@ data:
           volumes:
             - name: config-prefiller
               configMap:
-                name: config-prefiller
+                name: facebook-opt-125m-config-prefiller
             
             # TODO: should be model-storage?
             - name: model-cache
@@ -204,8 +173,6 @@ data:
   decodeService: |
     apiVersion: v1
     kind: Service
-    metadata:
-      name: qwen-decoder-service
     spec:
       clusterIP: None
       ports:
@@ -215,14 +182,10 @@ data:
       - name: vllm
         port: 8000
         protocol: TCP
-      selector:
-        app: qwen-decoder
   
   prefillService: |
     apiVersion: v1
     kind: Service
-    metadata:
-      name: qwen-prefiller-service
     spec:
       clusterIP: None
       ports:
@@ -232,44 +195,28 @@ data:
       - name: vllm
         port: 8000
         protocol: TCP
-      selector:
-        app: qwen-prefiller
   
   eppService: |
     apiVersion: v1
     kind: Service
-    metadata:
-      name: qwen2-0-5b-epp
     spec:
       ports:
         - port: 9002    # Needs to match the port of the eppDeployment
           protocol: TCP
-      selector:
-        app: qwen2-0-5b
       type: NodePort
   
   eppDeployment: |
     apiVersion: apps/v1
     kind: Deployment
-    metadata:
-      name: qwen2-0-5b-epp
-      labels:
-        app: qwen2-0-5b
     spec:
-      selector:
-        matchLabels:
-          app: qwen2-0-5b
       template:
-        metadata:
-          labels:
-            app: qwen2-0-5b
         spec:
           containers:
             - args:
                 - -poolName
-                - qwen2-0-5b
+                - facebook-opt-125m
                 - -poolNamespace
-                - e2e-solution
+                - default
                 - -v
                 - "4"
                 - --zap-encoder
@@ -319,29 +266,9 @@ data:
   inferencePool: |
     apiVersion: inference.networking.x-k8s.io/v1alpha2
     kind: InferencePool
-    metadata:
-      name: qwen2-0-5b
     spec:
-      extensionRef:
-        failureMode: FailClose
-        group: ""
-        kind: Service
-        name: qwen2-0-5b-epp
-      selector:
-        llm-d.ai/inferenceServing: "true"
-        llm-d.ai/model: qwen2-0-5b
-        # MSVC controller: set this so that the request doesn't route to prefill pods
-        llm-d.ai/role: "decode"
       targetPortNumber: 8000
   
   inferenceModel: |
     apiVersion: inference.networking.x-k8s.io/v1alpha2
     kind: InferenceModel
-    metadata:
-      name: qwen2-0-5b
-    spec:
-      modelName: "Qwen/Qwen2-0.5B"
-      poolRef:
-        group: inference.networking.x-k8s.io
-        kind: InferencePool
-        name: qwen2-0-5b
