@@ -163,20 +163,45 @@ func (childResource *BaseConfig) updateConfigMaps(ctx context.Context, msvc *msv
 	return childResource
 }
 
-func getPodLabels(ctx context.Context, msvc *msv1alpha1.ModelService, role string) map[string]string {
+// getCommonLabels that are applicable to all resources owned by msvc
+func getCommonLabels(ctx context.Context, msvc *msv1alpha1.ModelService) map[string]string {
 	// Step 3: Define object meta
 	// Sanitize modelName into a valid label
 	// TODO: this is not a good approach. Confirm with routing team on what label they need
 	modelLabel, err := SanitizeModelName(msvc.Spec.Routing.ModelName)
 	if err != nil {
-		log.FromContext(ctx).Error(err, "unable to set owner reference")
+		log.FromContext(ctx).Error(err, "unable to sanitize model name")
 	}
 
 	return map[string]string{
 		"llm-d.ai/inferenceServing": "true",
 		"llm-d.ai/model":            modelLabel,
-		"llm-d.ai/role":             role,
 	}
+}
+
+// getPodLabels adds a role on top of the common labels
+func getPodLabels(ctx context.Context, msvc *msv1alpha1.ModelService, role string) map[string]string {
+	labels := getCommonLabels(ctx, msvc)
+	labels["llm-d.ai/role"] = role
+	return labels
+}
+
+// updateInferenceModel uses msvc fields to update childResource inference model
+func (childResources *BaseConfig) updateInferenceModel(ctx context.Context, msvc *msv1alpha1.ModelService) *BaseConfig {
+	// there's nothing to update
+	if childResources.InferenceModel == nil {
+		return childResources
+	}
+
+	im := childResources.InferenceModel
+
+	im.Name = infModelName(msvc)
+	im.Namespace = msvc.Namespace
+	im.Labels = getCommonLabels(ctx, msvc)
+	im.Spec.ModelName = msvc.Spec.Routing.ModelName
+	im.Spec.PoolRef.Name = giev1alpha2.ObjectName(infPoolName(msvc))
+
+	return childResources
 }
 
 // updatePDService uses msvc fields to update childResource P/D Service
@@ -413,7 +438,37 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 	childResource.createOrUpdateServiceForDeployment(ctx, r, PREFILL_ROLE)
 	childResource.createOrUpdateServiceForDeployment(ctx, r, DECODE_ROLE)
 
+	// create of update inference model
+	childResource.createOrUpdateInferenceModel(ctx, r)
+
 	return nil
+}
+
+func (childResource *BaseConfig) createOrUpdateInferenceModel(ctx context.Context, r *ModelServiceReconciler) {
+	// nothing to do without inf model
+	if childResource == nil || childResource.InferenceModel == nil {
+		return
+	}
+
+	infModelInCluster := &giev1alpha2.InferenceModel{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      childResource.InferenceModel.Name,
+			Namespace: childResource.InferenceModel.Namespace,
+		},
+	}
+
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, infModelInCluster, func() error {
+		infModelInCluster.Labels = childResource.InferenceModel.Labels
+		infModelInCluster.Annotations = childResource.InferenceModel.Annotations
+		infModelInCluster.OwnerReferences = childResource.InferenceModel.OwnerReferences
+		infModelInCluster.Spec = childResource.InferenceModel.Spec
+		return nil
+	})
+
+	if err != nil {
+		log.FromContext(ctx).Error(err, "unable to create inference model")
+	}
+
 }
 
 func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.Context, r *ModelServiceReconciler, role string) {
