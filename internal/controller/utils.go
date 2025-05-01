@@ -42,6 +42,16 @@ func deploymentName(modelService *msv1alpha1.ModelService, role string) string {
 	return modelService.Name + "-" + role
 }
 
+// infPoolName returns the name of the inference pool object
+func infPoolName(modelService *msv1alpha1.ModelService) string {
+	return modelService.Name
+}
+
+// infModelName returns the name of the inference model object
+func infModelName(modelService *msv1alpha1.ModelService) string {
+	return modelService.Name
+}
+
 func isHFURI(uri string) bool {
 	return strings.HasPrefix(uri, MODEL_ARTIFACT_URI_HF_PREFIX)
 }

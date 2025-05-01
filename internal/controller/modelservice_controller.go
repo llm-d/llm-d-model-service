@@ -99,6 +99,10 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		childResources.updatePDDeployment(ctx, modelService, DECODE_ROLE, r.Scheme)
 		childResources.updatePDService(ctx, modelService, DECODE_ROLE, r.Scheme)
 	}
+
+	log.FromContext(ctx).Info("attempting to update inference model")
+	childResources.updateInferenceModel(ctx, modelService)
+
 	// and so on
 	// TODO: update other objects here
 
