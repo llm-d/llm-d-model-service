@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	msv1alpha1 "github.com/neuralmagic/modelservice/api/v1alpha1"
+	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
 )
 
 // TODO: Decide where to requeue and where to requeueAfter
@@ -101,7 +101,7 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	log.FromContext(ctx).Info("attempting to update inference model")
-	childResources.updateInferenceModel(ctx, modelService)
+	childResources.updateInferenceModel(ctx, modelService, r.Scheme)
 
 	// and so on
 	// TODO: update other objects here

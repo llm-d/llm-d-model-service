@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"dario.cat/mergo"
-	msv1alpha1 "github.com/neuralmagic/modelservice/api/v1alpha1"
+	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -129,12 +129,14 @@ func BaseConfigFromCM(cm *corev1.ConfigMap) (*BaseConfig, error) {
 func (childResource *BaseConfig) UpdateChildResources(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
 	childResource = childResource.updateConfigMaps(ctx, msvc, scheme)
 	if msvc.Spec.Prefill != nil {
-		childResource = childResource.updatePDDeployment(ctx, msvc, PREFILL_ROLE, scheme)
-		// TBD update prefill service
+		log.FromContext(ctx).Info("update Prefill Deployment and Service")
+		childResource = childResource.updatePDDeployment(ctx, msvc, PREFILL_ROLE, scheme).
+			updatePDService(ctx, msvc, PREFILL_ROLE, scheme)
 	}
 	if msvc.Spec.Decode != nil {
-		childResource = childResource.updatePDDeployment(ctx, msvc, DECODE_ROLE, scheme)
-		// update decode service
+		log.FromContext(ctx).Info("update Decode Deployment and Service")
+		childResource = childResource.updatePDDeployment(ctx, msvc, DECODE_ROLE, scheme).
+			updatePDService(ctx, msvc, DECODE_ROLE, scheme)
 	}
 	if childResource.EPPDeployment != nil {
 		log.FromContext(ctx).Info("update EPP Deployment and Service")
@@ -142,11 +144,11 @@ func (childResource *BaseConfig) UpdateChildResources(ctx context.Context, msvc 
 	}
 	if childResource.InferencePool != nil {
 		log.FromContext(ctx).Info("update InferencePool")
-		// TBD update inference pool
+		childResource = childResource.updateInferencePool(ctx, msvc, scheme)
 	}
 	if childResource.InferenceModel != nil {
 		log.FromContext(ctx).Info("update EPP InferenceModel")
-		childResource = childResource.updateInferenceModel(ctx, msvc)
+		childResource = childResource.updateInferenceModel(ctx, msvc, scheme)
 	}
 
 	return childResource
@@ -187,7 +189,7 @@ func getPodLabels(ctx context.Context, msvc *msv1alpha1.ModelService, role strin
 }
 
 // updateInferenceModel uses msvc fields to update childResource inference model
-func (childResources *BaseConfig) updateInferenceModel(ctx context.Context, msvc *msv1alpha1.ModelService) *BaseConfig {
+func (childResources *BaseConfig) updateInferenceModel(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
 	// there's nothing to update
 	if childResources.InferenceModel == nil {
 		return childResources
@@ -200,6 +202,12 @@ func (childResources *BaseConfig) updateInferenceModel(ctx context.Context, msvc
 	im.Labels = getCommonLabels(ctx, msvc)
 	im.Spec.ModelName = msvc.Spec.Routing.ModelName
 	im.Spec.PoolRef.Name = giev1alpha2.ObjectName(infPoolName(msvc))
+
+	// Set owner reference for the merged service
+	if err := controllerutil.SetOwnerReference(msvc, im, scheme); err != nil {
+		log.FromContext(ctx).Error(err, "unable to set owner ref for inferencepool")
+		return childResources
+	}
 
 	return childResources
 }
@@ -438,6 +446,9 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 	childResource.createOrUpdateServiceForDeployment(ctx, r, PREFILL_ROLE)
 	childResource.createOrUpdateServiceForDeployment(ctx, r, DECODE_ROLE)
 
+	// create of update inference pool
+	childResource.createOrUpdateInferencePool(ctx, r)
+
 	// create of update inference model
 	childResource.createOrUpdateInferenceModel(ctx, r)
 
@@ -506,4 +517,88 @@ func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.
 			log.FromContext(ctx).Error(err, "unable to create service for "+role)
 		}
 	}
+}
+
+func getInferencePoolLabels(labels map[string]string) map[giev1alpha2.LabelKey]giev1alpha2.LabelValue {
+	m := make(map[giev1alpha2.LabelKey]giev1alpha2.LabelValue, len(labels))
+	for k, v := range labels {
+		m[giev1alpha2.LabelKey(k)] = giev1alpha2.LabelValue(v)
+	}
+	m["llm-d.ai/role"] = DECODE_ROLE
+	return m
+}
+
+// updateInferencePool uses msvc fields to update childResource InferencePool resource.
+func (childResources *BaseConfig) updateInferencePool(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
+
+	if childResources == nil || childResources.InferencePool == nil {
+		return childResources
+	}
+
+	// Get dest Service
+	dest := *childResources.InferencePool
+
+	// At this point, we are going to create a service for role
+	// srcService contains ownerRef, name for service, and selector labels
+	// srcService contains the stuff we want to override destService with
+	src := &giev1alpha2.InferencePool{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      infPoolName(msvc),
+			Namespace: msvc.Namespace,
+		},
+		Spec: giev1alpha2.InferencePoolSpec{
+			Selector: getInferencePoolLabels(getCommonLabels(ctx, msvc)),
+			EndpointPickerConfig: giev1alpha2.EndpointPickerConfig{
+				ExtensionRef: &giev1alpha2.Extension{
+					ExtensionReference: giev1alpha2.ExtensionReference{
+						Name: giev1alpha2.ObjectName(msvc.Name + "-epp"),
+					},
+				},
+			},
+		},
+	}
+
+	// Mergo merge src into dst
+	if err := mergo.Merge(&dest, src, mergo.WithOverride); err != nil {
+		log.FromContext(ctx).Error(err, "problem with inferencepool merge")
+		return childResources
+	}
+
+	// Set owner reference for the merged service
+	if err := controllerutil.SetOwnerReference(msvc, &dest, scheme); err != nil {
+		log.FromContext(ctx).Error(err, "unable to set owner ref for inferencepool")
+		return childResources
+	}
+
+	// Set the merged inferncepool in the child resource
+	childResources.InferencePool = &dest
+
+	return childResources
+}
+
+func (childResource *BaseConfig) createOrUpdateInferencePool(ctx context.Context, r *ModelServiceReconciler) {
+	// nothing to do without inf model
+	if childResource == nil || childResource.InferencePool == nil {
+		return
+	}
+
+	inferencePoolInCluster := &giev1alpha2.InferencePool{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      childResource.InferencePool.Name,
+			Namespace: childResource.InferencePool.Namespace,
+		},
+	}
+
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, inferencePoolInCluster, func() error {
+		inferencePoolInCluster.Labels = childResource.InferenceModel.Labels
+		inferencePoolInCluster.Annotations = childResource.InferenceModel.Annotations
+		inferencePoolInCluster.OwnerReferences = childResource.InferenceModel.OwnerReferences
+		inferencePoolInCluster.Spec = childResource.InferencePool.Spec
+		return nil
+	})
+
+	if err != nil {
+		log.FromContext(ctx).Error(err, "unable to create inference pool")
+	}
+
 }
