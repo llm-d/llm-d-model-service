@@ -572,7 +572,7 @@ func (childResources *BaseConfig) updateEppDeployment(ctx context.Context, msvc 
 		return childResources
 	}
 
-	// Set the merged inferncepool in the child resource
+	// Set the merged epp deployment in the child resource
 	childResources.EPPDeployment = &dest
 
 	return childResources
