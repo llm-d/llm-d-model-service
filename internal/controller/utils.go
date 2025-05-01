@@ -21,7 +21,7 @@ import (
 	"regexp"
 	"strings"
 
-	msv1alpha1 "github.com/neuralmagic/modelservice/api/v1alpha1"
+	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
@@ -40,6 +40,26 @@ const ENV_HF_TOKEN = "HF_TOKEN"
 // deploymentName returns the name that should be used for a deployment object
 func deploymentName(modelService *msv1alpha1.ModelService, role string) string {
 	return modelService.Name + "-" + role
+}
+
+// infPoolName returns the name of the inference pool object
+func infPoolName(modelService *msv1alpha1.ModelService) string {
+	return modelService.Name
+}
+
+// eppDeploymentName returns the name of the epp deployment object
+func eppDeploymentName(modelService *msv1alpha1.ModelService) string {
+	return modelService.Name + "-epp"
+}
+
+// eppServiceName returns the name of the epp service object
+func eppServiceName(modelService *msv1alpha1.ModelService) string {
+	return modelService.Name + "-epp-service"
+}
+
+// infModelName returns the name of the inference model object
+func infModelName(modelService *msv1alpha1.ModelService) string {
+	return modelService.Name
 }
 
 func isHFURI(uri string) bool {

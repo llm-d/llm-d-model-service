@@ -209,7 +209,7 @@ type PDSpec struct {
 	// InitContainers holds vllm init container details that will be overriden from base config when present.
 	//
 	// +optional
-	InitContainers []ContainerSpec `json:"vllmProxyContainer,omitempty"`
+	InitContainers []ContainerSpec `json:"initContainers,omitempty"`
 	// EmphemeralContainers holds vllm ephemeral container details that will be overriden from base config when present.
 	//
 	// +optional
@@ -224,6 +224,7 @@ func ConvertToContainerSlice(c []ContainerSpec) []corev1.Container {
 	for i, containerSpec := range c {
 		containerSlice[i] = corev1.Container{
 			Name:      containerSpec.Name,
+			Args:      containerSpec.Args,
 			Env:       containerSpec.Env,
 			EnvFrom:   containerSpec.EnvFrom,
 			Resources: containerSpec.Resources,

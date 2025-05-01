@@ -16,7 +16,7 @@ limitations under the License.
 
 package main
 
-import "github.com/neuralmagic/modelservice/cmd"
+import "github.com/neuralmagic/llm-d-model-service/cmd"
 
 func main() {
 	cmd.Execute()

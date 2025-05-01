@@ -116,6 +116,27 @@ func TestMergeContainerSlices(t *testing.T) {
 			},
 			expectError: false,
 		},
+		{
+			name: "with args append",
+			destSlice: []corev1.Container{
+				{
+					Name: "c1",
+				},
+			},
+			srcSlice: []corev1.Container{
+				{
+					Name: "c1", // note name is same as dest
+					Args: []string{"--arg1"},
+				},
+			},
+			expectedMergedSlice: []corev1.Container{
+				{
+					Name: "c1",
+					Args: []string{"--arg1"},
+				},
+			},
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -140,6 +161,14 @@ func TestMergeContainerSlices(t *testing.T) {
 
 					// Assert image
 					assert.Equal(t, expectedContainer.Image, actualContainer.Image)
+
+					// Assert args
+					assert.Equal(t, len(expectedContainer.Args), len(actualContainer.Args))
+
+					for j, expectedArg := range expectedContainer.Args {
+						actualArg := actualContainer.Args[j]
+						assert.Equal(t, expectedArg, actualArg)
+					}
 
 					// Assert env var list
 					assert.Equal(t, len(expectedContainer.Env), len(actualContainer.Env))

@@ -1,0 +1,347 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: facebook-base-config
+data:
+  configMaps: |
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: config-decoder
+      data:
+        lmcache-decoder-config.yaml: |
+          local_cpu: False
+          max_local_cpu_size: 0
+          #local_disk:
+          max_local_disk_size: 0
+          remote_serde: NULL
+
+          enable_nixl: True
+          nixl_role: "receiver"
+          nixl_peer_host: "0.0.0.0"
+          nixl_peer_port: 55555
+          nixl_buffer_size: 524288
+          nixl_buffer_device: "cuda"
+          nixl_enable_gc: True
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: config-prefiller
+      data:
+        lmcache-prefiller-config.yaml: |
+          local_cpu: False
+          max_local_cpu_size: 0
+          #local_disk:
+          max_local_disk_size: 0
+          remote_serde: NULL
+
+          enable_nixl: True
+          nixl_role: "sender"
+          nixl_peer_host: "qwen-decoder"
+          nixl_peer_port: 55555
+          nixl_buffer_size: 524288
+          nixl_buffer_device: "cuda"
+          nixl_enable_gc: True
+
+  decodeDeployment: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: qwen-decoder
+      labels:
+        app: qwen-decoder
+        llm-d.ai/inferenceServing: "true"
+        llm-d.ai/model: "qwen2-0-5b"
+        llm-d.ai/role: "decode"
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: qwen-decoder
+      template:
+        metadata:
+          labels:
+            app: qwen-decoder
+        spec:
+          initContainers:
+            - name: routing-proxy
+              image: quay.io/llm-d/llm-d-routing-sidecar-dev:0.0.5
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+              args:
+                - "--port=8000"
+                - "--vllm-port=8200"
+              ports:
+                - containerPort: 8000
+                  protocol: TCP
+              restartPolicy: Always
+          containers:
+            - name: vllm
+              image: quay.io/llm-d/llm-d-dev:0.0.4
+              securityContext:
+                allowPrivilegeEscalation: false
+              args:
+                # - "--model"
+                # - "Qwen/Qwen2-0.5B"
+                - "--port"
+                - "8200"
+                - "--kv-transfer-config"
+                - '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_consumer","kv_connector_extra_config": {"discard_partial_chunks": false, "lmcache_rpc_port": "consumer1"}}'
+              env:
+                # TODO: rm this env for llama
+                - name: CUDA_VISIBLE_DEVICES
+                  value: "0"
+                - name: UCX_TLS
+                  value: "cuda_ipc,cuda_copy,tcp"
+                - name: LMCACHE_CONFIG_FILE
+                  value: /vllm-workspace/lmcache-decoder-config.yaml
+                - name: LMCACHE_USE_EXPERIMENTAL
+                  value: "True"
+                - name: VLLM_ENABLE_V1_MULTIPROCESSING
+                  value: "1"
+                - name: VLLM_WORKER_MULTIPROC_METHOD
+                  value: spawn
+                - name: HF_HUB_CACHE
+                  value: /vllm-workspace/models
+              ports:
+                - containerPort: 55555
+                  protocol: TCP
+              volumeMounts:
+                - name: config-decoder
+                  mountPath: /vllm-workspace
+                - name: model-cache
+                  mountPath: /vllm-workspace/models
+              resources:
+                limits:
+                  # TODO: inc this for llama
+                  nvidia.com/gpu: 1
+                requests:
+                  cpu: "16"
+                  memory: 16Gi
+                  nvidia.com/gpu: 1
+          volumes:
+            - name: config-decoder
+              configMap:
+                name: config-decoder
+            # Should be model-storage?
+            - name: model-cache
+              emptyDir:
+                sizeLimit: 1Gi
+
+  prefillDeployment: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: qwen-prefiller
+      labels:
+        app: qwen-prefiller
+        llm-d.ai/inferenceServing: "true"
+        llm-d.ai/model: "qwen2-0-5b"
+        llm-d.ai/role: "prefill"
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: qwen-decoder
+      template:
+        metadata:
+          labels:
+            app: qwen-decoder
+        spec:
+          containers:
+            - name: vllm
+              image: vllm-openai
+              securityContext:
+                allowPrivilegeEscalation: false
+              args:
+                # - "--model"
+                # - "Qwen/Qwen2-0.5B"
+                - "--port"
+                - "8000"
+                - "--kv-transfer-config"
+                - '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_producer","kv_connector_extra_config": {"discard_partial_chunks": false, "lmcache_rpc_port": "producer1"}}'
+              env:
+                - name: CUDA_VISIBLE_DEVICES
+                  value: "0"
+                - name: UCX_TLS
+                  value: "cuda_ipc,cuda_copy,tcp"
+                - name: LMCACHE_CONFIG_FILE
+                  value: /vllm-workspace/lmcache-prefiller-config.yaml
+                - name: LMCACHE_USE_EXPERIMENTAL
+                  value: "True"
+                - name: VLLM_ENABLE_V1_MULTIPROCESSING
+                  value: "1"
+                - name: VLLM_WORKER_MULTIPROC_METHOD
+                  value: spawn
+                - name: HF_HUB_CACHE
+                  value: /vllm-workspace/models
+              volumeMounts:
+                - name: config-prefiller
+                  mountPath: /vllm-workspace
+                - name: model-cache
+                  mountPath: /vllm-workspace/models
+              ports:
+                - containerPort: 8000
+                  protocol: TCP
+              resources:
+                limits:
+                  nvidia.com/gpu: 1
+                requests:
+                  cpu: "16"
+                  memory: 16Gi
+                  nvidia.com/gpu: 1
+          volumes:
+            - name: config-prefiller
+              configMap:
+                name: config-prefiller
+            
+            # TODO: should be model-storage?
+            - name: model-cache
+              emptyDir:
+                sizeLimit: 1Gi
+
+  decodeService: |
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: qwen-decoder-service
+    spec:
+      clusterIP: None
+      ports:
+      - name: nixl
+        port: 55555
+        protocol: TCP
+      - name: vllm
+        port: 8000
+        protocol: TCP
+      selector:
+        app: qwen-decoder
+  
+  prefillService: |
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: qwen-prefiller-service
+    spec:
+      clusterIP: None
+      ports:
+      - name: nixl
+        port: 55555
+        protocol: TCP
+      - name: vllm
+        port: 8000
+        protocol: TCP
+      selector:
+        app: qwen-prefiller
+  
+  eppService: |
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: qwen2-0-5b-epp
+    spec:
+      ports:
+        - port: 9002    # Needs to match the port of the eppDeployment
+          protocol: TCP
+      selector:
+        app: qwen2-0-5b
+      type: NodePort
+  
+  eppDeployment: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: qwen2-0-5b-epp
+      labels:
+        app: qwen2-0-5b
+    spec:
+      selector:
+        matchLabels:
+          app: qwen2-0-5b
+      template:
+        metadata:
+          labels:
+            app: qwen2-0-5b
+        spec:
+          containers:
+            - args:
+                - -poolName
+                - qwen2-0-5b
+                - -poolNamespace
+                - e2e-solution
+                - -v
+                - "4"
+                - --zap-encoder
+                - json
+                - -grpcPort
+                - "9002"
+                - -grpcHealthPort
+                - "9003"
+              env:
+                - name: KVCACHE_INDEXER_REDIS_ADDR
+                  value: vllm-p2p-lookup-server-service:8100
+                - name: HF_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      key: hf_token_llama3-8b-instruct
+                      name: vllm-p2p-secrets
+              image: quay.io/llm-d/llm-d-gateway-api-inference-extension:0.0.4
+              imagePullPolicy: Always
+              livenessProbe:
+                failureThreshold: 3
+                grpc:
+                  port: 9003
+                  service: inference-extension
+                initialDelaySeconds: 5
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              name: epp
+              ports:
+                - containerPort: 9002
+                  protocol: TCP
+                - containerPort: 9003
+                  protocol: TCP
+                - containerPort: 9090
+                  name: metrics
+                  protocol: TCP
+              readinessProbe:
+                failureThreshold: 3
+                grpc:
+                  port: 9003
+                  service: inference-extension
+                initialDelaySeconds: 5
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+  
+  inferencePool: |
+    apiVersion: inference.networking.x-k8s.io/v1alpha2
+    kind: InferencePool
+    metadata:
+      name: qwen2-0-5b
+    spec:
+      extensionRef:
+        failureMode: FailClose
+        group: ""
+        kind: Service
+        name: qwen2-0-5b-epp
+      selector:
+        llm-d.ai/inferenceServing: "true"
+        llm-d.ai/model: qwen2-0-5b
+        # MSVC controller: set this so that the request doesn't route to prefill pods
+        llm-d.ai/role: "decode"
+      targetPortNumber: 8000
+  
+  inferenceModel: |
+    apiVersion: inference.networking.x-k8s.io/v1alpha2
+    kind: InferenceModel
+    metadata:
+      name: qwen2-0-5b
+    spec:
+      modelName: "Qwen/Qwen2-0.5B"
+      poolRef:
+        group: inference.networking.x-k8s.io
+        kind: InferencePool
+        name: qwen2-0-5b

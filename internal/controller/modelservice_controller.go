@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	msv1alpha1 "github.com/neuralmagic/modelservice/api/v1alpha1"
+	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
 )
 
 // TODO: Decide where to requeue and where to requeueAfter
@@ -98,6 +98,26 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if modelService.Spec.Decode != nil || childResources.DecodeDeployment != nil {
 		childResources.updatePDDeployment(ctx, modelService, DECODE_ROLE, r.Scheme)
 		childResources.updatePDService(ctx, modelService, DECODE_ROLE, r.Scheme)
+	}
+
+	if childResources.InferencePool != nil {
+		log.FromContext(ctx).Info("attempting to update inference pool")
+		childResources.updateInferencePool(ctx, modelService, r.Scheme)
+	}
+
+	if childResources.InferenceModel != nil {
+		log.FromContext(ctx).Info("attempting to update inference model")
+		childResources.updateInferenceModel(ctx, modelService, r.Scheme)
+	}
+
+	if childResources.EPPDeployment != nil {
+		log.FromContext(ctx).Info("attempting to update epp deployment")
+		childResources.updateEppDeployment(ctx, modelService, r.Scheme)
+	}
+
+	if childResources.EPPDeployment != nil || childResources.EPPService != nil {
+		log.FromContext(ctx).Info("attempting to update epp service")
+		childResources.updateEppService(ctx, modelService, r.Scheme)
 	}
 	// and so on
 	// TODO: update other objects here

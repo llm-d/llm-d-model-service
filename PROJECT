@@ -6,7 +6,7 @@ domain: llm-d.ai
 layout:
 - go.kubebuilder.io/v4
 projectName: modelservice
-repo: github.com/neuralmagic/modelservice
+repo: github.com/neuralmagic/llm-d-model-service
 resources:
 - api:
     crdVersion: v1
@@ -15,6 +15,6 @@ resources:
   domain: llm-d.ai
   group: llmd
   kind: ModelService
-  path: github.com/neuralmagic/modelservice/api/v1alpha1
+  path: github.com/neuralmagic/llm-d-model-service/api/v1alpha1
   version: v1alpha1
 version: "3"
