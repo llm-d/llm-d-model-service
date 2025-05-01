@@ -209,7 +209,7 @@ type PDSpec struct {
 	// InitContainers holds vllm init container details that will be overriden from base config when present.
 	//
 	// +optional
-	InitContainers []ContainerSpec `json:"vllmProxyContainer,omitempty"`
+	InitContainers []ContainerSpec `json:"initContainers,omitempty"`
 	// EmphemeralContainers holds vllm ephemeral container details that will be overriden from base config when present.
 	//
 	// +optional
