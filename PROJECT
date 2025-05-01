@@ -15,6 +15,6 @@ resources:
   domain: llm-d.ai
   group: llmd
   kind: ModelService
-  path: github.com/neuralmagic/llm-d-models-service/api/v1alpha1
+  path: github.com/neuralmagic/llm-d-model-service/api/v1alpha1
   version: v1alpha1
 version: "3"
