@@ -146,7 +146,7 @@ func (childResource *BaseConfig) UpdateChildResources(ctx context.Context, msvc 
 	}
 	if childResource.InferenceModel != nil {
 		log.FromContext(ctx).Info("update EPP InferenceModel")
-		// TBD update inference model
+		childResource = childResource.updateInferenceModel(ctx, msvc)
 	}
 
 	return childResource
