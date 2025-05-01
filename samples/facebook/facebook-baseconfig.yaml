@@ -44,7 +44,7 @@ data:
           nixl_enable_gc: True
 
   decodeDeployment: |
-    apiVersion: v1
+    apiVersion: apps/v1
     kind: Deployment
     metadata:
       name: qwen-decoder
@@ -131,7 +131,7 @@ data:
           restartPolicy: Never
 
   prefillDeployment: |
-    apiVersion: v1
+    apiVersion: apps/v1
     kind: Deployment
     metadata:
       name: qwen-prefiller
