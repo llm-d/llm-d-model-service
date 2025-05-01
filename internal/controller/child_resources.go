@@ -126,6 +126,29 @@ func BaseConfigFromCM(cm *corev1.ConfigMap) (*BaseConfig, error) {
 	return bc, nil
 }
 
+func (childResource *BaseConfig) UpdateChildResources(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
+	childResource = childResource.updateConfigMaps(ctx, msvc, scheme)
+	if msvc.Spec.Prefill != nil {
+		childResource = childResource.updatePDDeployment(ctx, msvc, PREFILL_ROLE, scheme)
+		// TBD update prefill service
+	}
+	if msvc.Spec.Decode != nil {
+		childResource = childResource.updatePDDeployment(ctx, msvc, DECODE_ROLE, scheme)
+		// update decode service
+	}
+	if childResource.EPPDeployment != nil {
+		// TBD update epp deployment, service
+	}
+	if childResource.InferencePool != nil {
+		// TBD update inference pool
+	}
+	if childResource.InferenceModel != nil {
+		// TBD update inference model
+	}
+
+	return childResource
+}
+
 // updateConfigMaps updates childResource configmaps
 func (childResource *BaseConfig) updateConfigMaps(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
 	for i := range childResource.ConfigMaps {
