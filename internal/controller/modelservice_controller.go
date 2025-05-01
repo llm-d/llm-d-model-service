@@ -99,14 +99,24 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		childResources.updatePDDeployment(ctx, modelService, DECODE_ROLE, r.Scheme)
 		childResources.updatePDService(ctx, modelService, DECODE_ROLE, r.Scheme)
 	}
-
-	log.FromContext(ctx).Info("attempting to update inference model")
-	childResources.updateInferenceModel(ctx, modelService)
-
 	// and so on
 	// TODO: update other objects here
 
 	// TODO: Post-process for decoupled Scaling
+	// eppDeployment := &appsv1.Deployment{}
+	// typeNamespacedName := types.NamespacedName{Name: childResources.EPPDeployment.Name, Namespace: childResources.EPPDeployment.Namespace}
+	// err = r.Get(ctx, typeNamespacedName, eppDeployment)
+	// if !errors.IsNotFound(err) {
+	// 	//log error and move on as we do not recreate epp deployment
+	// 	log.FromContext(ctx).Error(err, "obtaining already existing epp deployment")
+	// }
+	// eppService := &corev1.Service{}
+	// typeNamespacedName = types.NamespacedName{Name: childResources.EPPService.Name, Namespace: childResources.EPPService.Name}
+	// err = r.Get(ctx, typeNamespacedName, eppService)
+	// if !errors.IsNotFound(err) {
+	// 	//log error and move on as we do not recreate epp deployment
+	// 	log.FromContext(ctx).Error(err, "obtaining already existing epp service")
+	// }
 	log.FromContext(ctx).Info("attempting to createOrUpdate child resources")
 	err = childResources.createOrUpdate(ctx, r)
 

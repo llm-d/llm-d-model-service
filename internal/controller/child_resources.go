@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
@@ -146,7 +147,7 @@ func (childResource *BaseConfig) UpdateChildResources(ctx context.Context, msvc 
 	}
 	if childResource.InferenceModel != nil {
 		log.FromContext(ctx).Info("update EPP InferenceModel")
-		childResource = childResource.updateInferenceModel(ctx, msvc)
+		// TBD update inference model
 	}
 
 	return childResource
@@ -163,45 +164,20 @@ func (childResource *BaseConfig) updateConfigMaps(ctx context.Context, msvc *msv
 	return childResource
 }
 
-// getCommonLabels that are applicable to all resources owned by msvc
-func getCommonLabels(ctx context.Context, msvc *msv1alpha1.ModelService) map[string]string {
+func getPodLabels(ctx context.Context, msvc *msv1alpha1.ModelService, role string) map[string]string {
 	// Step 3: Define object meta
 	// Sanitize modelName into a valid label
 	// TODO: this is not a good approach. Confirm with routing team on what label they need
 	modelLabel, err := SanitizeModelName(msvc.Spec.Routing.ModelName)
 	if err != nil {
-		log.FromContext(ctx).Error(err, "unable to sanitize model name")
+		log.FromContext(ctx).Error(err, "unable to set owner reference")
 	}
 
 	return map[string]string{
 		"llm-d.ai/inferenceServing": "true",
 		"llm-d.ai/model":            modelLabel,
+		"llm-d.ai/role":             role,
 	}
-}
-
-// getPodLabels adds a role on top of the common labels
-func getPodLabels(ctx context.Context, msvc *msv1alpha1.ModelService, role string) map[string]string {
-	labels := getCommonLabels(ctx, msvc)
-	labels["llm-d.ai/role"] = role
-	return labels
-}
-
-// updateInferenceModel uses msvc fields to update childResource inference model
-func (childResources *BaseConfig) updateInferenceModel(ctx context.Context, msvc *msv1alpha1.ModelService) *BaseConfig {
-	// there's nothing to update
-	if childResources.InferenceModel == nil {
-		return childResources
-	}
-
-	im := childResources.InferenceModel
-
-	im.Name = infModelName(msvc)
-	im.Namespace = msvc.Namespace
-	im.Labels = getCommonLabels(ctx, msvc)
-	im.Spec.ModelName = msvc.Spec.Routing.ModelName
-	im.Spec.PoolRef.Name = giev1alpha2.ObjectName(infPoolName(msvc))
-
-	return childResources
 }
 
 // updatePDService uses msvc fields to update childResource P/D Service
@@ -435,40 +411,21 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 	}
 
 	// Create or update services only if corresponding deployment exists in childResources
+	// TODO: evaluate if we need to pass entire reconciler to funcs
 	childResource.createOrUpdateServiceForDeployment(ctx, r, PREFILL_ROLE)
 	childResource.createOrUpdateServiceForDeployment(ctx, r, DECODE_ROLE)
 
-	// create of update inference model
-	childResource.createOrUpdateInferenceModel(ctx, r)
+	err := childResource.createEppDeployment(ctx, r.Client, *childResource.EPPDeployment)
+	if err != nil {
+		log.FromContext(ctx).Error(err, "unable to create epp deployment")
+	}
+
+	err = childResource.createEppService(ctx, r.Client, *childResource.EPPService)
+	if err != nil {
+		log.FromContext(ctx).Error(err, "unable to create epp service")
+	}
 
 	return nil
-}
-
-func (childResource *BaseConfig) createOrUpdateInferenceModel(ctx context.Context, r *ModelServiceReconciler) {
-	// nothing to do without inf model
-	if childResource == nil || childResource.InferenceModel == nil {
-		return
-	}
-
-	infModelInCluster := &giev1alpha2.InferenceModel{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      childResource.InferenceModel.Name,
-			Namespace: childResource.InferenceModel.Namespace,
-		},
-	}
-
-	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, infModelInCluster, func() error {
-		infModelInCluster.Labels = childResource.InferenceModel.Labels
-		infModelInCluster.Annotations = childResource.InferenceModel.Annotations
-		infModelInCluster.OwnerReferences = childResource.InferenceModel.OwnerReferences
-		infModelInCluster.Spec = childResource.InferenceModel.Spec
-		return nil
-	})
-
-	if err != nil {
-		log.FromContext(ctx).Error(err, "unable to create inference model")
-	}
-
 }
 
 func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.Context, r *ModelServiceReconciler, role string) {
@@ -506,4 +463,32 @@ func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.
 			log.FromContext(ctx).Error(err, "unable to create service for "+role)
 		}
 	}
+}
+
+// createEppDeployment spawns epp deployment from immutable configmap
+func (childResource *BaseConfig) createEppDeployment(ctx context.Context, kubeClient client.Client, eppDeployment appsv1.Deployment) error {
+
+	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &eppDeployment, func() error {
+		return nil
+	})
+
+	if err != nil {
+		log.FromContext(ctx).Error(err, "unable to create epp deployment from immutable base configmap ")
+		return err
+	}
+	return nil
+}
+
+// createEppDeployment spawns epp service from immutable configmap
+func (childResource *BaseConfig) createEppService(ctx context.Context, kubeClient client.Client, eppService corev1.Service) error {
+
+	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &eppService, func() error {
+		return nil
+	})
+
+	if err != nil {
+		log.FromContext(ctx).Error(err, "unable to create epp service from immutable base configmap ")
+		return err
+	}
+	return nil
 }
