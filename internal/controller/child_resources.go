@@ -420,7 +420,6 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, cm, func() error {
 			cm.OwnerReferences = childResource.ConfigMaps[i].OwnerReferences
 			cm.Labels = childResource.ConfigMaps[i].Labels
-			cm.Annotations = childResource.ConfigMaps[i].Annotations
 			cm.Data = childResource.ConfigMaps[i].Data
 			return nil
 		})
@@ -441,7 +440,6 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 		op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deploy, func() error {
 			deploy.OwnerReferences = desired.OwnerReferences
 			deploy.Labels = desired.Labels
-			deploy.Annotations = desired.Annotations
 			deploy.Spec = desired.Spec
 			return nil
 		})
@@ -465,7 +463,6 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 		op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deploy, func() error {
 			deploy.OwnerReferences = desired.OwnerReferences
 			deploy.Labels = desired.Labels
-			deploy.Annotations = desired.Annotations
 			deploy.Spec = desired.Spec
 			return nil
 		})
@@ -516,7 +513,6 @@ func (childResource *BaseConfig) createOrUpdateInferenceModel(ctx context.Contex
 
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, infModelInCluster, func() error {
 		infModelInCluster.Labels = childResource.InferenceModel.Labels
-		infModelInCluster.Annotations = childResource.InferenceModel.Annotations
 		infModelInCluster.OwnerReferences = childResource.InferenceModel.OwnerReferences
 		infModelInCluster.Spec = childResource.InferenceModel.Spec
 		return nil
@@ -553,7 +549,6 @@ func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.
 
 		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, svcInCluster, func() error {
 			svcInCluster.Labels = service.Labels
-			svcInCluster.Annotations = service.Annotations
 			svcInCluster.OwnerReferences = service.OwnerReferences
 			svcInCluster.Spec = service.Spec
 			return nil
@@ -710,7 +705,6 @@ func (childResource *BaseConfig) createOrUpdateInferencePool(ctx context.Context
 	log.FromContext(ctx).Info("merged inf pool", "data", childResource.InferencePool)
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, inferencePoolInCluster, func() error {
 		inferencePoolInCluster.Labels = childResource.InferenceModel.Labels
-		inferencePoolInCluster.Annotations = childResource.InferenceModel.Annotations
 		inferencePoolInCluster.OwnerReferences = childResource.InferenceModel.OwnerReferences
 		inferencePoolInCluster.Spec = childResource.InferencePool.Spec
 		return nil
@@ -743,7 +737,6 @@ func (childResource *BaseConfig) createEppDeployment(ctx context.Context, kubeCl
 
 	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, deploymentTobeCreatedOrUpdated, func() error {
 		deploymentTobeCreatedOrUpdated.Labels = childResource.EPPDeployment.Labels
-		deploymentTobeCreatedOrUpdated.Annotations = childResource.EPPDeployment.Annotations
 		deploymentTobeCreatedOrUpdated.OwnerReferences = childResource.EPPDeployment.OwnerReferences
 		deploymentTobeCreatedOrUpdated.Spec = childResource.EPPDeployment.Spec
 		return nil
@@ -770,7 +763,6 @@ func (childResource *BaseConfig) createEppService(ctx context.Context, kubeClien
 
 	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &eppService, func() error {
 		serviceTobeCreatedOrUpdated.Labels = childResource.EPPService.Labels
-		serviceTobeCreatedOrUpdated.Annotations = childResource.EPPService.Annotations
 		serviceTobeCreatedOrUpdated.OwnerReferences = childResource.EPPService.OwnerReferences
 		serviceTobeCreatedOrUpdated.Spec = childResource.EPPService.Spec
 		return nil
