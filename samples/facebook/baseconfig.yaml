@@ -93,7 +93,7 @@ data:
                 - containerPort: 55555
                   protocol: TCP
               volumeMounts:
-                - name: facebook-opt-125m-config-decoder
+                - name: config-decoder
                   mountPath: /vllm-workspace
                 - name: model-cache
                   mountPath: /vllm-workspace/models
@@ -108,7 +108,7 @@ data:
           volumes:
             - name: config-decoder
               configMap:
-                name: config-decoder
+                name: facebook-opt-125m-config-decoder
             # Should be model-storage?
             - name: model-cache
               emptyDir:
@@ -146,7 +146,7 @@ data:
                 - name: HF_HUB_CACHE
                   value: /vllm-workspace/models
               volumeMounts:
-                - name: facebook-opt-125m-config-prefiller
+                - name: config-prefiller
                   mountPath: /vllm-workspace
                 - name: model-cache
                   mountPath: /vllm-workspace/models
