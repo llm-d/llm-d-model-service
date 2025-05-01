@@ -3,7 +3,7 @@ kind: ConfigMap
 metadata:
   name: facebook-base-config
 data:
-  configMap: |
+  configMaps: |
     - apiVersion: v1
       kind: ConfigMap
       metadata:
