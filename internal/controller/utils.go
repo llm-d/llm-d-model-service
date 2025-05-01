@@ -49,12 +49,12 @@ func infPoolName(modelService *msv1alpha1.ModelService) string {
 
 // eppDeploymentName returns the name of the epp deployment object
 func eppDeploymentName(modelService *msv1alpha1.ModelService) string {
-	return modelService.Name
+	return modelService.Name + "-epp"
 }
 
 // eppServiceName returns the name of the epp service object
 func eppServiceName(modelService *msv1alpha1.ModelService) string {
-	return modelService.Name
+	return modelService.Name + "-epp-service"
 }
 
 // infModelName returns the name of the inference model object

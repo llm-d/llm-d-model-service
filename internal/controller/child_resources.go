@@ -458,7 +458,7 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 	childResource.createOrUpdateInferenceModel(ctx, r)
 
 	if childResource.EPPDeployment != nil {
-		err := childResource.createEppDeployment(ctx, r.Client, *childResource.EPPDeployment)
+		err := childResource.createEppDeployment(ctx, r.Client)
 		if err != nil {
 			log.FromContext(ctx).Error(err, "unable to create epp deployment")
 		}
@@ -558,6 +558,7 @@ func (childResources *BaseConfig) updateEppDeployment(ctx context.Context, msvc 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      eppDeploymentName(msvc),
 			Namespace: msvc.Namespace,
+			Labels:    msvc.Labels,
 		},
 	}
 
@@ -587,6 +588,7 @@ func (childResources *BaseConfig) updateEppService(ctx context.Context, msvc *ms
 	src := corev1.Service{ObjectMeta: metav1.ObjectMeta{
 		Name:      eppServiceName(msvc),
 		Namespace: msvc.Namespace,
+		Labels:    msvc.Labels,
 	}}
 	if err := mergo.Merge(&dest, src, mergo.WithOverride); err != nil {
 		log.FromContext(ctx).Error(err, "problem with epp service merge")
@@ -625,7 +627,7 @@ func (childResources *BaseConfig) updateInferencePool(ctx context.Context, msvc 
 			EndpointPickerConfig: giev1alpha2.EndpointPickerConfig{
 				ExtensionRef: &giev1alpha2.Extension{
 					ExtensionReference: giev1alpha2.ExtensionReference{
-						Name: giev1alpha2.ObjectName(msvc.Name + "-epp"),
+						Name: giev1alpha2.ObjectName(eppDeploymentName(msvc)),
 					},
 				},
 			},
@@ -678,9 +680,23 @@ func (childResource *BaseConfig) createOrUpdateInferencePool(ctx context.Context
 }
 
 // createEppDeployment spawns epp deployment from immutable configmap
-func (childResource *BaseConfig) createEppDeployment(ctx context.Context, kubeClient client.Client, eppDeployment appsv1.Deployment) error {
+func (childResource *BaseConfig) createEppDeployment(ctx context.Context, kubeClient client.Client) error {
 
-	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &eppDeployment, func() error {
+	if childResource == nil || childResource.EPPDeployment == nil {
+		return nil
+	}
+
+	deploymentTobeCreatedOrUpdated := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        childResource.EPPDeployment.Name,
+			Namespace:   childResource.EPPDeployment.Namespace,
+			Labels:      childResource.EPPDeployment.Labels,
+			Annotations: childResource.EPPDeployment.Annotations,
+		},
+	}
+
+	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, deploymentTobeCreatedOrUpdated, func() error {
+		deploymentTobeCreatedOrUpdated.Spec = childResource.EPPDeployment.Spec
 		return nil
 	})
 
@@ -694,7 +710,19 @@ func (childResource *BaseConfig) createEppDeployment(ctx context.Context, kubeCl
 // createEppDeployment spawns epp service from immutable configmap
 func (childResource *BaseConfig) createEppService(ctx context.Context, kubeClient client.Client, eppService corev1.Service) error {
 
+	if childResource == nil || childResource.EPPService == nil {
+		return nil
+	}
+
+	serviceTobeCreatedOrUpdated := corev1.Service{ObjectMeta: metav1.ObjectMeta{
+		Name:        childResource.EPPService.Name,
+		Namespace:   childResource.EPPService.Namespace,
+		Labels:      childResource.EPPService.Labels,
+		Annotations: childResource.EPPService.Annotations,
+	}}
+
 	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &eppService, func() error {
+		serviceTobeCreatedOrUpdated.Spec = childResource.EPPService.Spec
 		return nil
 	})
 
