@@ -141,7 +141,11 @@ func (childResource *BaseConfig) UpdateChildResources(ctx context.Context, msvc 
 	}
 	if childResource.EPPDeployment != nil {
 		log.FromContext(ctx).Info("update EPP Deployment and Service")
-		// TBD update epp deployment, service
+		childResource = childResource.updateEppDeployment(ctx, msvc, scheme)
+	}
+	if childResource.EPPService != nil {
+		log.FromContext(ctx).Info("update EPP Deployment and Service")
+		childResource = childResource.updateEppService(ctx, msvc, scheme)
 	}
 	if childResource.InferencePool != nil {
 		log.FromContext(ctx).Info("update InferencePool")
@@ -540,6 +544,62 @@ func getInferencePoolLabels(labels map[string]string) map[giev1alpha2.LabelKey]g
 	}
 	m["llm-d.ai/role"] = DECODE_ROLE
 	return m
+}
+
+func (childResources *BaseConfig) updateEppDeployment(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
+
+	if childResources == nil || childResources.EPPDeployment == nil {
+		return childResources
+	}
+
+	dest := *childResources.EPPDeployment
+
+	src := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      eppDeploymentName(msvc),
+			Namespace: msvc.Namespace,
+		},
+	}
+
+	if err := mergo.Merge(&dest, src, mergo.WithOverride); err != nil {
+		log.FromContext(ctx).Error(err, "problem with epp deployment merge")
+		return childResources
+	}
+
+	// Set owner reference for the merged service
+	if err := controllerutil.SetOwnerReference(msvc, &dest, scheme); err != nil {
+		log.FromContext(ctx).Error(err, "unable to set owner ref for inferencepool")
+		return childResources
+	}
+
+	// Set the merged inferncepool in the child resource
+	childResources.EPPDeployment = &dest
+
+	return childResources
+}
+
+func (childResources *BaseConfig) updateEppService(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
+	if childResources == nil || childResources.EPPService == nil {
+		return childResources
+	}
+
+	dest := *childResources.EPPService
+	src := corev1.Service{ObjectMeta: metav1.ObjectMeta{
+		Name:      eppServiceName(msvc),
+		Namespace: msvc.Namespace,
+	}}
+	if err := mergo.Merge(&dest, src, mergo.WithOverride); err != nil {
+		log.FromContext(ctx).Error(err, "problem with epp service merge")
+		return childResources
+	}
+	if err := controllerutil.SetOwnerReference(msvc, &dest, scheme); err != nil {
+		log.FromContext(ctx).Error(err, "unable to set owner ref for inferencepool")
+		return childResources
+	}
+
+	// Set the merged epp service in the child resource
+	childResources.EPPService = &dest
+	return childResources
 }
 
 // updateInferencePool uses msvc fields to update childResource InferencePool resource.

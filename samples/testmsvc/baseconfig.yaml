@@ -101,11 +101,11 @@ data:
     apiVersion: v1
     kind: Service
     metadata:
-      name: vllm-llama3-8b-instruct-epp
+      name: llm-llama3-8b-instruct-epp
       namespace: default
     spec:
       selector:
-        app: vllm-llama3-8b-instruct-epp
+        app: llm-llama3-8b-instruct-epp
       ports:
       - protocol: TCP
         port: 9002
