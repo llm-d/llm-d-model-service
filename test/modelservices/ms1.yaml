@@ -1,4 +1,4 @@
-apiVersion: vllmd.org/v1alpha1
+apiVersion: llm-d.ai/v1alpha1
 kind: ModelService
 metadata:
   name: test-modelservice
