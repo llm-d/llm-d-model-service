@@ -113,31 +113,31 @@ func generateManifests(ctx context.Context, manifestFile string, configFile stri
 	// generate yaml for chile resources
 	allYaml := ""
 	for _, cm := range cR.ConfigMaps {
-		allYaml = fmt.Sprintf("%s\n---\n%s", allYaml, toYaml(cm))
+		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cm))
 	}
 	if cR.PrefillDeployment != nil {
-		allYaml = fmt.Sprintf("%s\n---\n%s", allYaml, toYaml(cR.PrefillDeployment))
+		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.PrefillDeployment))
 	}
 	if cR.DecodeDeployment != nil {
-		allYaml = fmt.Sprintf("%s\n---\n%s", allYaml, toYaml(cR.DecodeDeployment))
+		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.DecodeDeployment))
 	}
 	if cR.PrefillService != nil {
-		allYaml = fmt.Sprintf("%s\n---\n%s", allYaml, toYaml(cR.PrefillService))
+		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.PrefillService))
 	}
 	if cR.DecodeService != nil {
-		allYaml = fmt.Sprintf("%s\n---\n%s", allYaml, toYaml(cR.DecodeService))
+		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.DecodeService))
 	}
 	if cR.InferencePool != nil {
-		allYaml = fmt.Sprintf("%s\n---\n%s", allYaml, toYaml(cR.InferencePool))
+		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.InferencePool))
 	}
 	if cR.InferenceModel != nil {
-		allYaml = fmt.Sprintf("%s\n---\n%s", allYaml, toYaml(cR.InferenceModel))
+		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.InferenceModel))
 	}
 	if cR.EPPDeployment != nil {
-		allYaml = fmt.Sprintf("%s\n---\n%s", allYaml, toYaml(cR.EPPDeployment))
+		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.EPPDeployment))
 	}
 	if cR.EPPService != nil {
-		allYaml = fmt.Sprintf("%s\n---\n%s", allYaml, toYaml(cR.EPPService))
+		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.EPPService))
 	}
 
 	logger.Info("generateManifest", "yaml", allYaml)
