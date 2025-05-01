@@ -551,15 +551,26 @@ func (childResources *BaseConfig) updateEppDeployment(ctx context.Context, msvc 
 	if childResources == nil || childResources.EPPDeployment == nil {
 		return childResources
 	}
-
+	eppLabels := map[string]string{
+		"llm-d.ai/epp": eppDeploymentName(msvc),
+	}
 	dest := *childResources.EPPDeployment
 
 	src := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      eppDeploymentName(msvc),
 			Namespace: msvc.Namespace,
-			Labels:    msvc.Labels,
 		},
+	}
+
+	src.Labels = eppLabels
+
+	src.Spec.Selector = &metav1.LabelSelector{
+		MatchLabels: eppLabels,
+	}
+
+	src.Spec.Template.ObjectMeta = metav1.ObjectMeta{
+		Labels: eppLabels,
 	}
 
 	if err := mergo.Merge(&dest, src, mergo.WithOverride); err != nil {
@@ -572,7 +583,7 @@ func (childResources *BaseConfig) updateEppDeployment(ctx context.Context, msvc 
 		log.FromContext(ctx).Error(err, "unable to set owner ref for inferencepool")
 		return childResources
 	}
-
+	log.FromContext(ctx).Info("deployment", "post-merge-label", dest.Labels, "post-merge-spec", dest.Spec)
 	// Set the merged epp deployment in the child resource
 	childResources.EPPDeployment = &dest
 
@@ -583,13 +594,17 @@ func (childResources *BaseConfig) updateEppService(ctx context.Context, msvc *ms
 	if childResources == nil || childResources.EPPService == nil {
 		return childResources
 	}
-
+	eppLabels := map[string]string{
+		"llm-d.ai/epp": eppDeploymentName(msvc),
+	}
 	dest := *childResources.EPPService
 	src := corev1.Service{ObjectMeta: metav1.ObjectMeta{
 		Name:      eppServiceName(msvc),
 		Namespace: msvc.Namespace,
-		Labels:    msvc.Labels,
+		Labels:    eppLabels,
 	}}
+
+	src.Spec.Selector = eppLabels
 	if err := mergo.Merge(&dest, src, mergo.WithOverride); err != nil {
 		log.FromContext(ctx).Error(err, "problem with epp service merge")
 		return childResources
@@ -664,7 +679,7 @@ func (childResource *BaseConfig) createOrUpdateInferencePool(ctx context.Context
 			Namespace: childResource.InferencePool.Namespace,
 		},
 	}
-
+	log.FromContext(ctx).Info("merged inf pool", "data", childResource.InferencePool)
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, inferencePoolInCluster, func() error {
 		inferencePoolInCluster.Labels = childResource.InferenceModel.Labels
 		inferencePoolInCluster.Annotations = childResource.InferenceModel.Annotations

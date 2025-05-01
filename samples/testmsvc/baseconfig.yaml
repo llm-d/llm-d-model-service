@@ -35,7 +35,7 @@ data:
 
   inferenceModel: |
     spec:
-      criticality: standard    
+      criticality: Standard    
   
   inferencePool: |
     spec:
@@ -46,17 +46,9 @@ data:
     metadata:
       name: epp
       namespace: default
-      labels:
-        app: epp
     spec:
       replicas: 1
-      selector:
-        matchLabels:
-          app: epp
       template:
-        metadata:
-          labels:
-            app: epp
         spec:
           # Conservatively, this timeout should mirror the longest grace period of the pods within the pool
           terminationGracePeriodSeconds: 130
