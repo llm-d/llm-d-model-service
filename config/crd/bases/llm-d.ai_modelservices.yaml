@@ -671,30 +671,7 @@ spec:
                       - name
                       type: object
                     type: array
-                  parallelism:
-                    description: |-
-                      vllm
-                      Parallelism specifies vllm parallelism that will be overriden from base config when present.
-                    properties:
-                      tensor:
-                        default: 1
-                        description: |-
-                          TensorParallelism corresponds to the same argument in vllm
-                          This also corresponds to number of GPUs
-                        format: int32
-                        minimum: 0
-                        nullable: true
-                        type: integer
-                    type: object
-                  replicas:
-                    default: 1
-                    description: Replicas defines the desired number of replicas for
-                      this deployment.
-                    format: int32
-                    minimum: 0
-                    nullable: true
-                    type: integer
-                  vllmProxyContainer:
+                  initContainers:
                     description: InitContainers holds vllm init container details
                       that will be overriden from base config when present.
                     items:
@@ -971,6 +948,29 @@ spec:
                       - name
                       type: object
                     type: array
+                  parallelism:
+                    description: |-
+                      vllm
+                      Parallelism specifies vllm parallelism that will be overriden from base config when present.
+                    properties:
+                      tensor:
+                        default: 1
+                        description: |-
+                          TensorParallelism corresponds to the same argument in vllm
+                          This also corresponds to number of GPUs
+                        format: int32
+                        minimum: 0
+                        nullable: true
+                        type: integer
+                    type: object
+                  replicas:
+                    default: 1
+                    description: Replicas defines the desired number of replicas for
+                      this deployment.
+                    format: int32
+                    minimum: 0
+                    nullable: true
+                    type: integer
                 type: object
               decoupleScaling:
                 description: |-
@@ -1587,30 +1587,7 @@ spec:
                       - name
                       type: object
                     type: array
-                  parallelism:
-                    description: |-
-                      vllm
-                      Parallelism specifies vllm parallelism that will be overriden from base config when present.
-                    properties:
-                      tensor:
-                        default: 1
-                        description: |-
-                          TensorParallelism corresponds to the same argument in vllm
-                          This also corresponds to number of GPUs
-                        format: int32
-                        minimum: 0
-                        nullable: true
-                        type: integer
-                    type: object
-                  replicas:
-                    default: 1
-                    description: Replicas defines the desired number of replicas for
-                      this deployment.
-                    format: int32
-                    minimum: 0
-                    nullable: true
-                    type: integer
-                  vllmProxyContainer:
+                  initContainers:
                     description: InitContainers holds vllm init container details
                       that will be overriden from base config when present.
                     items:
@@ -1887,6 +1864,29 @@ spec:
                       - name
                       type: object
                     type: array
+                  parallelism:
+                    description: |-
+                      vllm
+                      Parallelism specifies vllm parallelism that will be overriden from base config when present.
+                    properties:
+                      tensor:
+                        default: 1
+                        description: |-
+                          TensorParallelism corresponds to the same argument in vllm
+                          This also corresponds to number of GPUs
+                        format: int32
+                        minimum: 0
+                        nullable: true
+                        type: integer
+                    type: object
+                  replicas:
+                    default: 1
+                    description: Replicas defines the desired number of replicas for
+                      this deployment.
+                    format: int32
+                    minimum: 0
+                    nullable: true
+                    type: integer
                 type: object
               routing:
                 description: Routing provides information needed to create configuration
