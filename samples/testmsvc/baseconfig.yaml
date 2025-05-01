@@ -12,3 +12,23 @@ data:
           - name: llm
             command:
             - sleep
+
+  # Note that this label is preserved and our labels are added
+  decodeService: |
+    spec:
+      selector:
+        app.kubernetes.io/name: decodeServiceLabelInBaseConfig
+      ports:
+        - protocol: TCP
+          port: 80
+          targetPort: 9376
+  
+  # This service should not be created bc prefill doesn't exist in basemsvc.yaml
+  prefillService: |
+    spec:
+      selector:
+        app.kubernetes.io/name: prefillServiceLabelInBaseConfig
+      ports:
+        - protocol: TCP
+          port: 80
+          targetPort: 9376

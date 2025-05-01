@@ -137,6 +137,79 @@ func (childResource *BaseConfig) updateConfigMaps(ctx context.Context, msvc *msv
 	return childResource
 }
 
+func getPodLabels(ctx context.Context, msvc *msv1alpha1.ModelService, role string) map[string]string {
+	// Step 3: Define object meta
+	// Sanitize modelName into a valid label
+	// TODO: this is not a good approach. Confirm with routing team on what label they need
+	modelLabel, err := SanitizeModelName(msvc.Spec.Routing.ModelName)
+	if err != nil {
+		log.FromContext(ctx).Error(err, "unable to set owner reference")
+	}
+
+	return map[string]string{
+		"llm-d.ai/inferenceServing": "true",
+		"llm-d.ai/model":            modelLabel,
+		"llm-d.ai/role":             role,
+	}
+}
+
+// updatePDService uses msvc fields to update childResource P/D Service
+func (childResource *BaseConfig) updatePDService(ctx context.Context, msvc *msv1alpha1.ModelService, role string, scheme *runtime.Scheme) *BaseConfig {
+
+	// Get dest Service
+	destService := corev1.Service{}
+
+	if role == PREFILL_ROLE {
+		if childResource.PrefillService != nil {
+			destService = *childResource.PrefillService
+
+		} else {
+			// prefillService is not specified in baseConfig, so we are not going to create a service. Return
+			return childResource
+		}
+	} else {
+		if childResource.DecodeService != nil {
+			destService = *childResource.DecodeService
+		} else {
+			// decodeService is not specified in baseConfig, so we are not going to create a service. Return
+			return childResource
+		}
+	}
+
+	// At this point, we are going to create a service for role
+	// srcService contains ownerRef, name for service, and selector labels
+	// srcService contains the stuff we want to override destService with
+	srcService := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      msvc.Name + "-service-" + role,
+			Namespace: msvc.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			// If destService contains labels, it will do a override based on key
+			// otherwise, just add to the map
+			Selector: getPodLabels(ctx, msvc, role),
+		},
+	}
+
+	// Mergo merge src into dst
+	if err := mergo.Merge(&destService, srcService, mergo.WithOverride); err != nil {
+		log.FromContext(ctx).Error(err, "problem with service merge for "+role)
+		return childResource
+	}
+
+	// Set owner reference for the merged service
+	controllerutil.SetOwnerReference(msvc, &destService, scheme)
+
+	// Set the merged service for child resource
+	if role == PREFILL_ROLE {
+		childResource.PrefillService = &destService
+	} else {
+		childResource.DecodeService = &destService
+	}
+
+	return childResource
+}
+
 // updatePDDeployment uses msvc fields to update childResource prefill deployment
 func (childResource *BaseConfig) updatePDDeployment(ctx context.Context, msvc *msv1alpha1.ModelService, role string, scheme *runtime.Scheme) *BaseConfig {
 	pdSpec := &msv1alpha1.PDSpec{}
@@ -304,6 +377,50 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 		log.FromContext(ctx).Info("from CreateOrUpdate", "op", op)
 		if err != nil {
 			log.FromContext(ctx).Error(err, "unable to create configmap")
+		}
+	}
+
+	// Create or update services only if corresponding deployment exists in childResources
+	childResource.createOrUpdateServiceForDeployment(ctx, r, PREFILL_ROLE)
+	childResource.createOrUpdateServiceForDeployment(ctx, r, DECODE_ROLE)
+
+	return nil
+}
+
+func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.Context, r *ModelServiceReconciler, role string) error {
+
+	var service *corev1.Service
+	var deployment *appsv1.Deployment
+
+	if role == PREFILL_ROLE {
+		service = childResource.PrefillService
+		deployment = childResource.PrefillDeployment
+	} else {
+		service = childResource.DecodeService
+		deployment = childResource.DecodeDeployment
+	}
+
+	// Create service for the deployment iff deployment exists and service is defined in baseConfig
+	if deployment != nil && service != nil {
+		log.FromContext(ctx).Info("service for "+role, "service", service)
+
+		svcInCluster := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            service.Name,
+				Namespace:       service.Namespace,
+				Labels:          service.Labels,
+				Annotations:     service.Annotations,
+				OwnerReferences: service.OwnerReferences,
+			}}
+
+		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, svcInCluster, func() error {
+			svcInCluster.Spec = service.Spec
+			return nil
+		})
+
+		if err != nil {
+			log.FromContext(ctx).Error(err, "unable to create service for "+role)
+			return err
 		}
 	}
 

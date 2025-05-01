@@ -92,10 +92,12 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Idea: updates do the mergo merge
 	if modelService.Spec.Prefill != nil || childResources.PrefillDeployment != nil {
 		childResources.updatePDDeployment(ctx, modelService, PREFILL_ROLE, r.Scheme)
+		childResources.updatePDService(ctx, modelService, PREFILL_ROLE, r.Scheme)
 	}
 	log.FromContext(ctx).Info("attempting to update decode deployment")
 	if modelService.Spec.Decode != nil || childResources.DecodeDeployment != nil {
 		childResources.updatePDDeployment(ctx, modelService, DECODE_ROLE, r.Scheme)
+		childResources.updatePDService(ctx, modelService, DECODE_ROLE, r.Scheme)
 	}
 	// and so on
 	// TODO: update other objects here
