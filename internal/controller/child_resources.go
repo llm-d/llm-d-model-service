@@ -688,6 +688,11 @@ func (childResource *BaseConfig) createEppDeployment(ctx context.Context, kubeCl
 
 	deploymentTobeCreatedOrUpdated := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
+			//baseconfig should have corret epp args for
+			// poolname and namespaces
+			// poolname format: <model-name>-modelservice
+			// eg: facebook-opt-125m-model-service
+			// namespace should be the namespace of msvc
 			Name:        childResource.EPPDeployment.Name,
 			Namespace:   childResource.EPPDeployment.Namespace,
 			Labels:      childResource.EPPDeployment.Labels,
