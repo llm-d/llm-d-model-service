@@ -86,40 +86,40 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	log.FromContext(ctx).V(1).Info("attempting to update configmaps")
 	// Step: update configmaps
 	if childResources.ConfigMaps != nil {
-		childResources.updateConfigMaps(ctx, modelService, r.Scheme)
+		childResources.mergeConfigMaps(ctx, modelService, r.Scheme)
 	}
 
 	log.FromContext(ctx).V(1).Info("attempting to update prefill deployment")
 	// Step 3: update the child resources
 	// Idea: updates do the mergo merge
 	if modelService.Spec.Prefill != nil || childResources.PrefillDeployment != nil {
-		childResources.updatePDDeployment(ctx, modelService, PREFILL_ROLE, r.Scheme)
-		childResources.updatePDService(ctx, modelService, PREFILL_ROLE, r.Scheme)
+		childResources.mergePDDeployment(ctx, modelService, PREFILL_ROLE, r.Scheme)
+		childResources.mergePDService(ctx, modelService, PREFILL_ROLE, r.Scheme)
 	}
 	log.FromContext(ctx).V(1).Info("attempting to update decode deployment")
 	if modelService.Spec.Decode != nil || childResources.DecodeDeployment != nil {
-		childResources.updatePDDeployment(ctx, modelService, DECODE_ROLE, r.Scheme)
-		childResources.updatePDService(ctx, modelService, DECODE_ROLE, r.Scheme)
+		childResources.mergePDDeployment(ctx, modelService, DECODE_ROLE, r.Scheme)
+		childResources.mergePDService(ctx, modelService, DECODE_ROLE, r.Scheme)
 	}
 
 	if childResources.InferencePool != nil {
 		log.FromContext(ctx).V(1).Info("attempting to update inference pool")
-		childResources.updateInferencePool(ctx, modelService, r.Scheme)
+		childResources.mergeInferencePool(ctx, modelService, r.Scheme)
 	}
 
 	if childResources.InferenceModel != nil {
 		log.FromContext(ctx).V(1).Info("attempting to update inference model")
-		childResources.updateInferenceModel(ctx, modelService, r.Scheme)
+		childResources.mergeInferenceModel(ctx, modelService, r.Scheme)
 	}
 
 	if childResources.EPPDeployment != nil {
 		log.FromContext(ctx).V(1).Info("attempting to update epp deployment")
-		childResources.updateEppDeployment(ctx, modelService, r.Scheme)
+		childResources.mergeEppDeployment(ctx, modelService, r.Scheme)
 	}
 
 	if childResources.EPPDeployment != nil || childResources.EPPService != nil {
 		log.FromContext(ctx).V(1).Info("attempting to update epp service")
-		childResources.updateEppService(ctx, modelService, r.Scheme)
+		childResources.mergeEppService(ctx, modelService, r.Scheme)
 	}
 	// and so on
 	// TODO: update other objects here

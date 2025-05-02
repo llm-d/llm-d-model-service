@@ -109,7 +109,7 @@ func generateManifests(ctx context.Context, manifestFile string, configFile stri
 	}
 
 	// update child resources
-	cR := config.UpdateChildResources(ctx, msvc, scheme.Scheme)
+	cR := config.MergeChildResources(ctx, msvc, scheme.Scheme)
 	logger.Info("generateManifest", "baseResources", cR)
 
 	// generate yaml for chile resources
