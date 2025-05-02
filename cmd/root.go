@@ -102,7 +102,7 @@ func runController() {
 		Development: false,
 		TimeEncoder: zapcore.RFC3339NanoTimeEncoder,
 		ZapOpts:     []zaplog.Option{zaplog.AddCaller()},
-		Level:       zapcore.DebugLevel,
+		Level:       parseZapLogLevel(logLevel),
 	}
 	// +kubebuilder:scaffold:scheme
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
@@ -281,5 +281,26 @@ func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
 		os.Exit(1)
+	}
+}
+
+func parseZapLogLevel(levelStr string) zapcore.Level {
+	switch levelStr {
+	case "debug":
+		return zapcore.DebugLevel
+	case "info":
+		return zapcore.InfoLevel
+	case "warn":
+		return zapcore.WarnLevel
+	case "error":
+		return zapcore.ErrorLevel
+	case "dpanic":
+		return zapcore.DPanicLevel
+	case "panic":
+		return zapcore.PanicLevel
+	case "fatal":
+		return zapcore.FatalLevel
+	default:
+		return zapcore.InfoLevel
 	}
 }
