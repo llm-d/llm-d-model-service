@@ -129,7 +129,15 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// we will deal with status later
 	// err = r.updateStatus(modelService)
-
+	populateStatus(ctx, modelService, r.Client, childResources.PrefillDeployment,
+		childResources.DecodeDeployment,
+		childResources.EPPDeployment,
+		childResources.InferenceModel,
+		childResources.InferencePool)
+	if err := r.Status().Update(ctx, modelService); err != nil {
+		log.FromContext(ctx).Error(err, "unable to update ModelService status")
+		return ctrl.Result{}, err
+	}
 	return ctrl.Result{}, err
 }
 

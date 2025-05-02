@@ -17,13 +17,19 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
 
 	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 )
 
 const modelStorageVolumeName = "model-storage"
@@ -171,4 +177,77 @@ func SanitizeModelName(s string) (string, error) {
 	}
 
 	return s, nil
+}
+
+func populateStatus(ctx context.Context, ms *msv1alpha1.ModelService, k8sClient client.Client,
+	prefillDeployment, decodeDeployment, eppDeployment *appsv1.Deployment,
+	inferenceModel *giev1alpha2.InferenceModel,
+	inferencePool *giev1alpha2.InferencePool) {
+	var conditions []metav1.Condition
+
+	if inferenceModel != nil {
+		ms.Status.InferenceModelRef = &inferenceModel.Name
+	}
+
+	if inferencePool != nil {
+		ms.Status.InferencePoolRef = &inferencePool.Name
+	}
+	if prefillDeployment != nil {
+		ms.Status.PrefillDeploymentRef = &prefillDeployment.Name
+		prefillDeploymentFromCluster := &appsv1.Deployment{}
+		// Mirror conditions with "Prefill" prefix
+		err := k8sClient.Get(ctx, client.ObjectKey{Name: prefillDeployment.Name, Namespace: prefillDeployment.Namespace}, prefillDeploymentFromCluster)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "unable to get prefill deployment")
+		}
+		for _, c := range prefillDeploymentFromCluster.Status.Conditions {
+			conditions = append(conditions, metav1.Condition{
+				Type:               "Prefill" + string(c.Type),
+				Status:             metav1.ConditionStatus(c.Status),
+				Reason:             c.Reason,
+				Message:            c.Message,
+				LastTransitionTime: c.LastUpdateTime,
+			})
+		}
+	}
+
+	if decodeDeployment != nil {
+		ms.Status.DecodeDeploymentRef = &decodeDeployment.Name
+		decodeDeploymentFromCluster := &appsv1.Deployment{}
+		err := k8sClient.Get(ctx, client.ObjectKey{Name: decodeDeployment.Name, Namespace: decodeDeployment.Namespace}, decodeDeploymentFromCluster)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "unable to get prefill deployment")
+		}
+		// Mirror conditions with "Decode" prefix
+		for _, c := range decodeDeploymentFromCluster.Status.Conditions {
+			conditions = append(conditions, metav1.Condition{
+				Type:               "Decode" + string(c.Type),
+				Status:             metav1.ConditionStatus(c.Status),
+				Reason:             c.Reason,
+				Message:            c.Message,
+				LastTransitionTime: c.LastUpdateTime,
+			})
+		}
+	}
+
+	if eppDeployment != nil {
+		ms.Status.DecodeDeploymentRef = &eppDeployment.Name
+		eppDeploymentFromCluster := &appsv1.Deployment{}
+		err := k8sClient.Get(ctx, client.ObjectKey{Name: eppDeployment.Name, Namespace: eppDeployment.Namespace}, eppDeploymentFromCluster)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "unable to get prefill deployment")
+		}
+		// Mirror conditions with "Decode" prefix
+		for _, c := range eppDeploymentFromCluster.Status.Conditions {
+			conditions = append(conditions, metav1.Condition{
+				Type:               "Epp" + string(c.Type),
+				Status:             metav1.ConditionStatus(c.Status),
+				Reason:             c.Reason,
+				Message:            c.Message,
+				LastTransitionTime: c.LastUpdateTime,
+			})
+		}
+	}
+
+	ms.Status.Conditions = conditions
 }

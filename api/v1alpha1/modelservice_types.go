@@ -286,11 +286,21 @@ type ModelServiceStatus struct {
 	// this reference will be nil
 	//
 	DecodeDeploymentRef *string `json:"decodeDeploymentRef,omitempty"`
+	// EppDeploymentRef identifies the epp deployment
+	// if epp deployment is yet to be created,
+	// this reference will be nil
+	//
+	EppDeploymentRef *string `json:"eppDeploymentRef,omitempty"`
 	// InferenceModelRef identifies the inference model resource
 	// if inference model is yet to be created,
 	// this reference will be nil
 	//
 	InferenceModelRef *string `json:"inferenceModelRef,omitempty"`
+	// InferencePoolRef identifies the inference pool resource
+	// if inference pool is yet to be created,
+	// this reference will be nil
+	//
+	InferencePoolRef *string `json:"inferencePoolRef,omitempty"`
 	// Combined deployment conditions from prefill and decode deployments
 	// Condition types should be prefixed to indicate their origin
 	// Example types: "PrefillAvailable", "DecodeProgressing", etc.

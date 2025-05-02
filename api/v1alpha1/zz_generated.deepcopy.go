@@ -215,8 +215,18 @@ func (in *ModelServiceStatus) DeepCopyInto(out *ModelServiceStatus) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.EppDeploymentRef != nil {
+		in, out := &in.EppDeploymentRef, &out.EppDeploymentRef
+		*out = new(string)
+		**out = **in
+	}
 	if in.InferenceModelRef != nil {
 		in, out := &in.InferenceModelRef, &out.InferenceModelRef
+		*out = new(string)
+		**out = **in
+	}
+	if in.InferencePoolRef != nil {
+		in, out := &in.InferencePoolRef, &out.InferencePoolRef
 		*out = new(string)
 		**out = **in
 	}
