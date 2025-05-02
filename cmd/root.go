@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"crypto/tls"
-	stdflag "flag"
 	"os"
 	"path/filepath"
 
@@ -28,7 +27,6 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -36,13 +34,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	zaplog "go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	msv1alpha1 "github.com/neuralmagic/modelservice/api/v1alpha1"
-	"github.com/neuralmagic/modelservice/internal/controller"
+	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
+	"github.com/neuralmagic/llm-d-model-service/internal/controller"
+	"go.uber.org/zap/zapcore"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 	// +kubebuilder:scaffold:imports
 )
@@ -60,9 +60,10 @@ var probeAddr string
 var secureMetrics bool
 var enableHTTP2 bool
 var tlsOpts []func(*tls.Config)
-var opts = zap.Options{
-	Development: true,
-}
+
+// Flags for zap logger
+var logLevel string
+var logOutput string
 
 func init() {
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
@@ -86,9 +87,8 @@ func init() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	rootCmd.Flags().StringVar(&defaultsYAMLPath, "defaults-yaml-path", "", "The YAML file containing the controller defaults.")
 
-	// pFlag to Flg
-	pflag.CommandLine.AddFlagSet(rootCmd.PersistentFlags())
-	opts.BindFlags(stdflag.CommandLine)
+	rootCmd.Flags().StringVarP(&logLevel, "log-level", "l", "info", "Set the logging level (debug, info, warn, error, etc.)")
+	rootCmd.Flags().StringVarP(&logOutput, "log-output", "o", "stdout", "Set the log output (stdout, file, etc.)")
 }
 
 // nolint:gocyclo
@@ -98,6 +98,12 @@ func runController() {
 
 	utilruntime.Must(msv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(giev1alpha2.Install(scheme))
+	var opts = zap.Options{
+		Development: false,
+		TimeEncoder: zapcore.RFC3339NanoTimeEncoder,
+		ZapOpts:     []zaplog.Option{zaplog.AddCaller()},
+		Level:       parseZapLogLevel(logLevel),
+	}
 	// +kubebuilder:scaffold:scheme
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
@@ -275,5 +281,26 @@ func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
 		os.Exit(1)
+	}
+}
+
+func parseZapLogLevel(levelStr string) zapcore.Level {
+	switch levelStr {
+	case "debug":
+		return zapcore.DebugLevel
+	case "info":
+		return zapcore.InfoLevel
+	case "warn":
+		return zapcore.WarnLevel
+	case "error":
+		return zapcore.ErrorLevel
+	case "dpanic":
+		return zapcore.DPanicLevel
+	case "panic":
+		return zapcore.PanicLevel
+	case "fatal":
+		return zapcore.FatalLevel
+	default:
+		return zapcore.InfoLevel
 	}
 }
