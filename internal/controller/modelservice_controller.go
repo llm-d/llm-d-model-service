@@ -113,14 +113,11 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if childResources.EPPDeployment != nil {
-		log.FromContext(ctx).V(1).Info("attempting to update epp deployment")
+		log.FromContext(ctx).V(1).Info("attempting to update epp deployment and service")
 		childResources.mergeEppDeployment(ctx, modelService, r.Scheme)
-	}
-
-	if childResources.EPPDeployment != nil || childResources.EPPService != nil {
-		log.FromContext(ctx).V(1).Info("attempting to update epp service")
 		childResources.mergeEppService(ctx, modelService, r.Scheme)
 	}
+
 	// and so on
 	// TODO: update other objects here
 

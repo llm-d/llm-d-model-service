@@ -159,7 +159,7 @@ var generateCmd = &cobra.Command{
 			Development: false,
 			TimeEncoder: zapcore.RFC3339NanoTimeEncoder,
 			ZapOpts:     []zaplog.Option{zaplog.AddCaller()},
-			Level:       zapcore.DebugLevel,
+			Level:       parseZapLogLevel(logLevel),
 		}
 		logger := zap.New(zap.UseFlagOptions(&opts))
 		log.SetLogger(logger)
