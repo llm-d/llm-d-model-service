@@ -27,7 +27,6 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -35,13 +34,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	zaplog "go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
 	"github.com/neuralmagic/llm-d-model-service/internal/controller"
+	"go.uber.org/zap/zapcore"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 	// +kubebuilder:scaffold:imports
 )
@@ -59,9 +60,6 @@ var probeAddr string
 var secureMetrics bool
 var enableHTTP2 bool
 var tlsOpts []func(*tls.Config)
-var opts = zap.Options{
-	Development: true,
-}
 
 // Flags for zap logger
 var logLevel string
@@ -91,9 +89,6 @@ func init() {
 
 	rootCmd.Flags().StringVarP(&logLevel, "log-level", "l", "info", "Set the logging level (debug, info, warn, error, etc.)")
 	rootCmd.Flags().StringVarP(&logOutput, "log-output", "o", "stdout", "Set the log output (stdout, file, etc.)")
-
-	// pFlag to Flg
-	pflag.CommandLine.AddFlagSet(rootCmd.Flags())
 }
 
 // nolint:gocyclo
@@ -103,6 +98,11 @@ func runController() {
 
 	utilruntime.Must(msv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(giev1alpha2.Install(scheme))
+	var opts = zap.Options{
+		Development: false,
+		TimeEncoder: zapcore.RFC3339NanoTimeEncoder,
+		ZapOpts:     []zaplog.Option{zaplog.AddCaller()},
+	}
 	// +kubebuilder:scaffold:scheme
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 

@@ -153,7 +153,9 @@ var generateCmd = &cobra.Command{
 	Long:  `Generate manifest for objects created by ModelService controller`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-
+		var opts = zap.Options{
+			Development: true,
+		}
 		logger := zap.New(zap.UseFlagOptions(&opts))
 		log.SetLogger(logger)
 		log.IntoContext(ctx, logger)
