@@ -51,3 +51,17 @@ make uninstall && make undeploy
 kind delete cluster
 ```
 
+### ModelService dry run
+View the components that ModelService will create given a ModelService CR and a base config ConfigMap.
+
+```
+go run main.go generate --modelservice <path-to-msvc-cr> --baseConfiguration <path-to-baseconfig>
+```
+
+For example
+
+```
+go run main.go generate --modelservice samples/facebook/msvc.yaml --baseConfiguration samples/facebook/baseconfig.yaml > output.yaml
+```
+
+And `output.yaml` will contain the YAML manifest for the resources that ModelService will create in the cluster. This feature purely for development purposes only, and is intended to provide a quick way of debugging without a cluster. Note that some fields will not be included, such as `owner references` and `name` which requires a cluster.
