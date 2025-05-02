@@ -183,7 +183,7 @@ func getCommonLabels(ctx context.Context, msvc *msv1alpha1.ModelService) map[str
 	// Step 3: Define object meta
 	// Sanitize modelName into a valid label
 	// TODO: this is not a good approach. Confirm with routing team on what label they need
-	modelLabel, err := SanitizeModelName(msvc.Spec.Routing.ModelName)
+	modelLabel, err := sanitizeName(msvc.Spec.Routing.ModelName)
 	if err != nil {
 		log.FromContext(ctx).V(1).Error(err, "unable to sanitize model name")
 	}
@@ -225,6 +225,27 @@ func (childResources *BaseConfig) mergeInferenceModel(ctx context.Context, msvc 
 	return childResources
 }
 
+// sanitizeSvcName returns the
+func sanitizeSvcName(msvc *msv1alpha1.ModelService, role string) string {
+	sanitizedName, err := sanitizeName(msvc.Name + "-service-" + role)
+	if err != nil {
+		// TODO: don't return a default name?
+		return "default-service-" + role
+	}
+
+	return sanitizedName
+}
+
+func sanitizeModelName(msvc *msv1alpha1.ModelService) string {
+	sanitizedModelName, err := sanitizeName(msvc.Spec.Routing.ModelName)
+	if err != nil {
+		// TODO: don't return a default model name?
+		return "default-modelName"
+	}
+
+	return sanitizedModelName
+}
+
 // mergePDService uses msvc fields to update childResource P/D Service
 func (childResource *BaseConfig) mergePDService(ctx context.Context, msvc *msv1alpha1.ModelService, role string, scheme *runtime.Scheme) *BaseConfig {
 
@@ -251,9 +272,10 @@ func (childResource *BaseConfig) mergePDService(ctx context.Context, msvc *msv1a
 	// At this point, we are going to create a service for role
 	// srcService contains ownerRef, name for service, and selector labels
 	// srcService contains the stuff we want to override destService with
+
 	srcService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      msvc.Name + "-service-" + role,
+			Name:      sanitizeSvcName(msvc, role),
 			Namespace: msvc.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
@@ -313,14 +335,10 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 	// Step 3: Define object meta
 	// Sanitize modelName into a valid label
 	// TODO: this is not a good approach. Confirm with routing team on what label they need
-	modelLabel, err := SanitizeModelName(msvc.Spec.Routing.ModelName)
-	if err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to set owner reference")
-	}
 
 	labels := map[string]string{
 		"llm-d.ai/inferenceServing": "true",
-		"llm-d.ai/model":            modelLabel,
+		"llm-d.ai/model":            sanitizeModelName(msvc),
 		"llm-d.ai/role":             role,
 	}
 
