@@ -102,6 +102,7 @@ func runController() {
 		Development: false,
 		TimeEncoder: zapcore.RFC3339NanoTimeEncoder,
 		ZapOpts:     []zaplog.Option{zaplog.AddCaller()},
+		Level:       zapcore.DebugLevel,
 	}
 	// +kubebuilder:scaffold:scheme
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
