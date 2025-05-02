@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"crypto/tls"
-	stdflag "flag"
 	"os"
 	"path/filepath"
 
@@ -64,6 +63,10 @@ var opts = zap.Options{
 	Development: true,
 }
 
+// Flags for zap logger
+var logLevel string
+var logOutput string
+
 func init() {
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
@@ -86,9 +89,11 @@ func init() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	rootCmd.Flags().StringVar(&defaultsYAMLPath, "defaults-yaml-path", "", "The YAML file containing the controller defaults.")
 
+	rootCmd.Flags().StringVarP(&logLevel, "log-level", "l", "info", "Set the logging level (debug, info, warn, error, etc.)")
+	rootCmd.Flags().StringVarP(&logOutput, "log-output", "o", "stdout", "Set the log output (stdout, file, etc.)")
+
 	// pFlag to Flg
-	pflag.CommandLine.AddFlagSet(rootCmd.PersistentFlags())
-	opts.BindFlags(stdflag.CommandLine)
+	pflag.CommandLine.AddFlagSet(rootCmd.Flags())
 }
 
 // nolint:gocyclo
