@@ -24,6 +24,7 @@ import (
 
 // ModelService is the Schema for the modelservices API.
 //
+// +kubebuilder:resource:shortName=msvc,scope=Namespaced
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Decouple Scaling",type=boolean,JSONPath=`.spec.decoupleScaling`

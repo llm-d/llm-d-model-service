@@ -11,6 +11,8 @@ spec:
     kind: ModelService
     listKind: ModelServiceList
     plural: modelservices
+    shortNames:
+    - msvc
     singular: modelservice
   scope: Namespaced
   versions:
