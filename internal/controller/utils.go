@@ -45,22 +45,40 @@ const ENV_HF_TOKEN = "HF_TOKEN"
 
 // deploymentName returns the name that should be used for a deployment object
 func deploymentName(modelService *msv1alpha1.ModelService, role string) string {
-	return modelService.Name + "-" + role
+	sanitizedName, err := sanitizeName(modelService.Name + "-" + role)
+	if err != nil {
+		return "deployment-" + role
+	}
+	return sanitizedName
 }
 
 // infPoolName returns the name of the inference pool object
 func infPoolName(modelService *msv1alpha1.ModelService) string {
-	return modelService.Name
+	sanitizedName, err := sanitizeName(modelService.Name + "-inference-pool")
+	if err != nil {
+		return "inference-pool"
+	}
+
+	return sanitizedName
 }
 
 // eppDeploymentName returns the name of the epp deployment object
 func eppDeploymentName(modelService *msv1alpha1.ModelService) string {
-	return modelService.Name + "-epp"
+	sanitizedName, err := sanitizeName(modelService.Name + "-epp")
+	if err != nil {
+		return "epp-deployment"
+	}
+
+	return sanitizedName
 }
 
 // eppServiceName returns the name of the epp service object
 func eppServiceName(modelService *msv1alpha1.ModelService) string {
-	return modelService.Name + "-epp-service"
+	sanitizedName, err := sanitizeName(modelService.Name + "-epp-service")
+	if err != nil {
+		return "epp-service"
+	}
+	return sanitizedName
 }
 
 // infModelName returns the name of the inference model object
@@ -154,13 +172,13 @@ func getVLLMContainer(modelArtifact *msv1alpha1.ModelArtifacts, pdSpec *msv1alph
 }
 */
 
-// SanitizeModelName converts an routing.ModelNAme into a valid Kubernetes label value
-func SanitizeModelName(s string) (string, error) {
+// sanitizeName converts an routing.ModelNAme into a valid Kubernetes label value
+func sanitizeName(s string) (string, error) {
 	// Convert to lower case and trim spaces
 	s = strings.ToLower(strings.TrimSpace(s))
 
 	// Replace any disallowed characters with `-`
-	re := regexp.MustCompile(`[^a-z0-9_.-]`)
+	re := regexp.MustCompile(`[^a-z0-9-]+`)
 	s = re.ReplaceAllString(s, "-")
 
 	// Trim leading/trailing non-alphanumerics
@@ -173,7 +191,7 @@ func SanitizeModelName(s string) (string, error) {
 
 	// Final check
 	if len(validation.IsValidLabelValue(s)) > 0 {
-		return "", fmt.Errorf("cannot sanitize modelName into a valid label for deployment")
+		return "", fmt.Errorf("cannot sanitize into a valid DNS compliant name")
 	}
 
 	return s, nil
