@@ -565,7 +565,8 @@ func getInferencePoolLabels(labels map[string]string) map[giev1alpha2.LabelKey]g
 	for k, v := range labels {
 		m[giev1alpha2.LabelKey(k)] = giev1alpha2.LabelValue(v)
 	}
-	m["llm-d.ai/role"] = DECODE_ROLE
+
+	delete(m, "llm-d.ai/role")
 	return m
 }
 
