@@ -63,6 +63,8 @@ spec:
         args:
           - --leader-elect=false
           - --health-probe-bind-address=:8081
+          - "--zap-log-level=info"
+          - "--zap-verbosity=1"
         image: controller:latest
         name: manager
         ports: []

@@ -52,7 +52,7 @@ type ModelServiceReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
 func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log.FromContext(ctx).Info("ModelService Reconciler started")
+	log.FromContext(ctx).V(1).Info("ModelService Reconciler started")
 
 	// Step 1: Check that the model service is valid:
 	// Get the current model service from API server
@@ -61,70 +61,70 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	modelService := &msv1alpha1.ModelService{}
 	if err := r.Get(ctx, req.NamespacedName, modelService); err != nil {
 		if errors.IsNotFound(err) {
-			log.FromContext(ctx).Info("ModelService not found.")
+			log.FromContext(ctx).V(1).Info("ModelService not found.")
 			return ctrl.Result{}, nil
 		}
-		log.FromContext(ctx).Error(err, "Unable to get ModelService")
+		log.FromContext(ctx).V(1).Error(err, "Unable to get ModelService")
 		// should we requeue?  Neurops controller does.
 		// Others do not always. See, for example https://github.com/kubernetes-sigs/kueue/blob/e9b35497ccf5b0534cce64a2a5f71c81b0926d6d/pkg/controller/core/workload_controller.go#L145
 		// and https://github.com/kubernetes-sigs/gateway-api-inference-extension/blob/bd9ee36450d68fb4d0d8ac4f9be4db7d1ec4fee3/pkg/epp/controller/inferencepool_reconciler.go#L53
 		// if we don't requeue there is a utility method we could use: client.IgnoreNotFound(err)
 		return ctrl.Result{Requeue: true}, err
 	} else if !modelService.DeletionTimestamp.IsZero() {
-		log.FromContext(ctx).Info("ModelService is marked for deletion")
+		log.FromContext(ctx).V(1).Info("ModelService is marked for deletion")
 		return ctrl.Result{}, nil
 	}
 
-	log.FromContext(ctx).Info("attempting to get baseconfig object")
+	log.FromContext(ctx).V(1).Info("attempting to get baseconfig object")
 	// Step 2: Get the baseconfig object if it exists
 	childResources, err := r.getChildResourcesFromConfigMap(ctx, modelService)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	log.FromContext(ctx).Info("attempting to update configmaps")
+	log.FromContext(ctx).V(1).Info("attempting to update configmaps")
 	// Step: update configmaps
 	if childResources.ConfigMaps != nil {
 		childResources.updateConfigMaps(ctx, modelService, r.Scheme)
 	}
 
-	log.FromContext(ctx).Info("attempting to update prefill deployment")
+	log.FromContext(ctx).V(1).Info("attempting to update prefill deployment")
 	// Step 3: update the child resources
 	// Idea: updates do the mergo merge
 	if modelService.Spec.Prefill != nil || childResources.PrefillDeployment != nil {
 		childResources.updatePDDeployment(ctx, modelService, PREFILL_ROLE, r.Scheme)
 		childResources.updatePDService(ctx, modelService, PREFILL_ROLE, r.Scheme)
 	}
-	log.FromContext(ctx).Info("attempting to update decode deployment")
+	log.FromContext(ctx).V(1).Info("attempting to update decode deployment")
 	if modelService.Spec.Decode != nil || childResources.DecodeDeployment != nil {
 		childResources.updatePDDeployment(ctx, modelService, DECODE_ROLE, r.Scheme)
 		childResources.updatePDService(ctx, modelService, DECODE_ROLE, r.Scheme)
 	}
 
 	if childResources.InferencePool != nil {
-		log.FromContext(ctx).Info("attempting to update inference pool")
+		log.FromContext(ctx).V(1).Info("attempting to update inference pool")
 		childResources.updateInferencePool(ctx, modelService, r.Scheme)
 	}
 
 	if childResources.InferenceModel != nil {
-		log.FromContext(ctx).Info("attempting to update inference model")
+		log.FromContext(ctx).V(1).Info("attempting to update inference model")
 		childResources.updateInferenceModel(ctx, modelService, r.Scheme)
 	}
 
 	if childResources.EPPDeployment != nil {
-		log.FromContext(ctx).Info("attempting to update epp deployment")
+		log.FromContext(ctx).V(1).Info("attempting to update epp deployment")
 		childResources.updateEppDeployment(ctx, modelService, r.Scheme)
 	}
 
 	if childResources.EPPDeployment != nil || childResources.EPPService != nil {
-		log.FromContext(ctx).Info("attempting to update epp service")
+		log.FromContext(ctx).V(1).Info("attempting to update epp service")
 		childResources.updateEppService(ctx, modelService, r.Scheme)
 	}
 	// and so on
 	// TODO: update other objects here
 
 	// TODO: Post-process for decoupled Scaling
-	log.FromContext(ctx).Info("attempting to createOrUpdate child resources")
+	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate child resources")
 	err = childResources.createOrUpdate(ctx, r)
 
 	// we will deal with status later
@@ -154,7 +154,7 @@ func (r *ModelServiceReconciler) deploymentMapFunc(ctx context.Context, obj clie
 			ownerAPIVersion := owner.APIVersion
 
 			if ownerKind == "ModelService" && ownerAPIVersion == "llm-d.ai/v1alpha1" {
-				log.FromContext(ctx).Info("Found deployment owner", "deployment owner", owner.Name)
+				log.FromContext(ctx).V(1).Info("Found deployment owner", "deployment owner", owner.Name)
 				return []reconcile.Request{{
 					NamespacedName: types.NamespacedName{
 						Namespace: deployment.Namespace,
