@@ -560,13 +560,12 @@ func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.
 	}
 }
 
-func getInferencePoolLabels(labels map[string]string) map[giev1alpha2.LabelKey]giev1alpha2.LabelValue {
-	m := make(map[giev1alpha2.LabelKey]giev1alpha2.LabelValue, len(labels))
-	for k, v := range labels {
+func getInferencePoolLabels(ctx context.Context, msvc *msv1alpha1.ModelService) map[giev1alpha2.LabelKey]giev1alpha2.LabelValue {
+	commonLabels := getCommonLabels(ctx, msvc)
+	m := make(map[giev1alpha2.LabelKey]giev1alpha2.LabelValue, len(commonLabels))
+	for k, v := range commonLabels {
 		m[giev1alpha2.LabelKey(k)] = giev1alpha2.LabelValue(v)
 	}
-
-	delete(m, "llm-d.ai/role")
 	return m
 }
 
@@ -662,7 +661,7 @@ func (childResources *BaseConfig) updateInferencePool(ctx context.Context, msvc 
 			Namespace: msvc.Namespace,
 		},
 		Spec: giev1alpha2.InferencePoolSpec{
-			Selector: getInferencePoolLabels(getCommonLabels(ctx, msvc)),
+			Selector: getInferencePoolLabels(ctx, msvc),
 			EndpointPickerConfig: giev1alpha2.EndpointPickerConfig{
 				ExtensionRef: &giev1alpha2.Extension{
 					ExtensionReference: giev1alpha2.ExtensionReference{
