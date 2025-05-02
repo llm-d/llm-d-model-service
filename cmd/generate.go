@@ -7,6 +7,8 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
+	zaplog "go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -153,7 +155,12 @@ var generateCmd = &cobra.Command{
 	Long:  `Generate manifest for objects created by ModelService controller`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-
+		var opts = zap.Options{
+			Development: false,
+			TimeEncoder: zapcore.RFC3339NanoTimeEncoder,
+			ZapOpts:     []zaplog.Option{zaplog.AddCaller()},
+			Level:       zapcore.DebugLevel,
+		}
 		logger := zap.New(zap.UseFlagOptions(&opts))
 		log.SetLogger(logger)
 		log.IntoContext(ctx, logger)
