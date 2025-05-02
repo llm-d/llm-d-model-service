@@ -164,8 +164,8 @@ var generateCmd = &cobra.Command{
 }
 
 func init() {
-	generateCmd.Flags().StringVar(&modelServiceManifest, "modelservice", "", "File containing the ModelService definition.")
+	generateCmd.Flags().StringVarP(&modelServiceManifest, "modelservice", "m", "", "File containing the ModelService definition.")
 	_ = rootCmd.MarkFlagRequired("modelservice")
-	generateCmd.Flags().StringVar(&baseConfigurationManifest, "baseConfiguration", "", "File containing the base platform configuration.")
+	generateCmd.Flags().StringVarP(&baseConfigurationManifest, "baseconfig", "b", "", "File containing the base platform configuration.")
 	rootCmd.AddCommand(generateCmd)
 }
