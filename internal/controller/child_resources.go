@@ -603,6 +603,34 @@ func (childResources *BaseConfig) mergeEppDeployment(ctx context.Context, msvc *
 
 	src.Labels = eppLabels
 
+	src.Spec = dest.Spec
+
+	src.Spec.Selector = &metav1.LabelSelector{
+		MatchLabels: eppLabels,
+	}
+
+	src.Spec.Template.ObjectMeta = metav1.ObjectMeta{
+		Labels: eppLabels,
+	}
+	serviceName := eppServiceName(msvc)
+	src.Spec.Template.Spec.Containers[0].LivenessProbe = &corev1.Probe{FailureThreshold: 3,
+		ProbeHandler: corev1.ProbeHandler{
+			GRPC: &corev1.GRPCAction{
+				Port:    9003,
+				Service: &serviceName,
+			},
+		},
+	}
+
+	src.Spec.Template.Spec.Containers[0].ReadinessProbe = &corev1.Probe{FailureThreshold: 3,
+		ProbeHandler: corev1.ProbeHandler{
+			GRPC: &corev1.GRPCAction{
+				Port:    9003,
+				Service: &serviceName,
+			},
+		},
+	}
+
 	src.Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: eppLabels,
 	}
