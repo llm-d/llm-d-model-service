@@ -1,11 +1,19 @@
 package controller
 
-// import (
-// 	. "github.com/onsi/ginkgo/v2"
-// 	. "github.com/onsi/gomega"
-// )
+import (
+	"context"
+	"fmt"
 
-/*
+	"k8s.io/apimachinery/pkg/api/errors"
+
+	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/yaml"
+)
 
 // tests to check if base config reading works ok
 var _ = Describe("BaseConfig reader", func() {
@@ -14,15 +22,16 @@ var _ = Describe("BaseConfig reader", func() {
 		reconciler *ModelServiceReconciler
 		msvc       *msv1alpha1.ModelService
 		cm         *corev1.ConfigMap
+		replicas   = int32(1)
 	)
 
-	BeforeAll(func() {
+	BeforeEach(func() {
 		ctx = context.Background()
 
 		// Create test deployment YAML
 		deployment := appsv1.Deployment{
 			Spec: appsv1.DeploymentSpec{
-				Replicas: pointerToInt32(1),
+				Replicas: &replicas,
 			},
 		}
 		deployYaml, err := yaml.Marshal(deployment)
@@ -62,7 +71,6 @@ var _ = Describe("BaseConfig reader", func() {
 			Client: k8sClient,
 			Scheme: k8sClient.Scheme(),
 		}
-
 	})
 
 	It("should correctly deserialize the eppDeployment from ConfigMap", func() {
@@ -78,7 +86,14 @@ var _ = Describe("BaseConfig reader", func() {
 		msvc.Spec.BaseConfigMapRef = nil
 		bc, err := reconciler.getChildResourcesFromConfigMap(ctx, msvc)
 		Expect(err).To(BeNil())
-		Expect(bc).To(BeNil())
+		Expect(bc.PrefillDeployment).To(BeNil())
+		Expect(bc.DecodeDeployment).To(BeNil())
+		Expect(bc.PrefillService).To(BeNil())
+		Expect(bc.DecodeService).To(BeNil())
+		Expect(bc.InferencePool).To(BeNil())
+		Expect(bc.InferenceModel).To(BeNil())
+		Expect(bc.EPPDeployment).To(BeNil())
+		Expect(bc.EPPService).To(BeNil())
 	})
 
 	It("should error if the ConfigMap is missing", func() {
@@ -88,9 +103,16 @@ var _ = Describe("BaseConfig reader", func() {
 		Expect(bc).To(BeNil())
 	})
 
-})
+	AfterEach(func() {
+		// Clean up resources after each test
+		err := k8sClient.Delete(ctx, msvc)
+		if err != nil && !errors.IsNotFound(err) {
+			Fail(fmt.Sprintf("Failed to delete ModelService: %v", err))
+		}
 
-func pointerToInt32(i int32) *int32 {
-	return &i
-}
-*/
+		err = k8sClient.Delete(ctx, cm)
+		if err != nil && !errors.IsNotFound(err) {
+			Fail(fmt.Sprintf("Failed to delete ConfigMap: %v", err))
+		}
+	})
+})

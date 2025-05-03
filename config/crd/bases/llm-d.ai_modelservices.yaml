@@ -11,6 +11,8 @@ spec:
     kind: ModelService
     listKind: ModelServiceList
     plural: modelservices
+    shortNames:
+    - msvc
     singular: modelservice
   scope: Namespaced
   versions:
@@ -2000,10 +2002,22 @@ spec:
                   if decode deployment is yet to be created,
                   this reference will be nil
                 type: string
+              eppDeploymentRef:
+                description: |-
+                  EppDeploymentRef identifies the epp deployment
+                  if epp deployment is yet to be created,
+                  this reference will be nil
+                type: string
               inferenceModelRef:
                 description: |-
                   InferenceModelRef identifies the inference model resource
                   if inference model is yet to be created,
+                  this reference will be nil
+                type: string
+              inferencePoolRef:
+                description: |-
+                  InferencePoolRef identifies the inference pool resource
+                  if inference pool is yet to be created,
                   this reference will be nil
                 type: string
               prefillDeploymentRef:

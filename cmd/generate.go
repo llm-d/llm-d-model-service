@@ -7,6 +7,8 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
+	zaplog "go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -107,7 +109,7 @@ func generateManifests(ctx context.Context, manifestFile string, configFile stri
 	}
 
 	// update child resources
-	cR := config.UpdateChildResources(ctx, msvc, scheme.Scheme)
+	cR := config.MergeChildResources(ctx, msvc, scheme.Scheme)
 	logger.Info("generateManifest", "baseResources", cR)
 
 	// generate yaml for chile resources
@@ -153,7 +155,12 @@ var generateCmd = &cobra.Command{
 	Long:  `Generate manifest for objects created by ModelService controller`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
-
+		var opts = zap.Options{
+			Development: false,
+			TimeEncoder: zapcore.RFC3339NanoTimeEncoder,
+			ZapOpts:     []zaplog.Option{zaplog.AddCaller()},
+			Level:       parseZapLogLevel(logLevel),
+		}
 		logger := zap.New(zap.UseFlagOptions(&opts))
 		log.SetLogger(logger)
 		log.IntoContext(ctx, logger)
@@ -164,8 +171,8 @@ var generateCmd = &cobra.Command{
 }
 
 func init() {
-	generateCmd.Flags().StringVar(&modelServiceManifest, "modelservice", "", "File containing the ModelService definition.")
+	generateCmd.Flags().StringVarP(&modelServiceManifest, "modelservice", "m", "", "File containing the ModelService definition.")
 	_ = rootCmd.MarkFlagRequired("modelservice")
-	generateCmd.Flags().StringVar(&baseConfigurationManifest, "baseConfiguration", "", "File containing the base platform configuration.")
+	generateCmd.Flags().StringVarP(&baseConfigurationManifest, "baseconfig", "b", "", "File containing the base platform configuration.")
 	rootCmd.AddCommand(generateCmd)
 }

@@ -127,40 +127,42 @@ func BaseConfigFromCM(cm *corev1.ConfigMap) (*BaseConfig, error) {
 	return bc, nil
 }
 
-func (childResource *BaseConfig) UpdateChildResources(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
-	childResource = childResource.updateConfigMaps(ctx, msvc, scheme)
+// MergeChildResources merges the MSVC resources into BaseConfig resources
+// merging means MSVC controller is overwriting some fields, such as Name and Namespace for that resource
+func (childResource *BaseConfig) MergeChildResources(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
+	childResource = childResource.mergeConfigMaps(ctx, msvc, scheme)
 	if msvc.Spec.Prefill != nil {
-		log.FromContext(ctx).Info("update Prefill Deployment and Service")
-		childResource = childResource.updatePDDeployment(ctx, msvc, PREFILL_ROLE, scheme).
-			updatePDService(ctx, msvc, PREFILL_ROLE, scheme)
+		log.FromContext(ctx).V(1).Info("merging Prefill Deployment and Service")
+		childResource = childResource.mergePDDeployment(ctx, msvc, PREFILL_ROLE, scheme).
+			mergePDService(ctx, msvc, PREFILL_ROLE, scheme)
 	}
 	if msvc.Spec.Decode != nil {
-		log.FromContext(ctx).Info("update Decode Deployment and Service")
-		childResource = childResource.updatePDDeployment(ctx, msvc, DECODE_ROLE, scheme).
-			updatePDService(ctx, msvc, DECODE_ROLE, scheme)
+		log.FromContext(ctx).V(1).Info("merging Decode Deployment and Service")
+		childResource = childResource.mergePDDeployment(ctx, msvc, DECODE_ROLE, scheme).
+			mergePDService(ctx, msvc, DECODE_ROLE, scheme)
 	}
 	if childResource.EPPDeployment != nil {
-		log.FromContext(ctx).Info("update EPP Deployment and Service")
-		childResource = childResource.updateEppDeployment(ctx, msvc, scheme)
+		log.FromContext(ctx).V(1).Info("merging EPP Deployment and Service")
+		childResource = childResource.mergeEppDeployment(ctx, msvc, scheme)
 	}
 	if childResource.EPPService != nil {
-		log.FromContext(ctx).Info("update EPP Deployment and Service")
-		childResource = childResource.updateEppService(ctx, msvc, scheme)
+		log.FromContext(ctx).V(1).Info("merging EPP Deployment and Service")
+		childResource = childResource.mergeEppService(ctx, msvc, scheme)
 	}
 	if childResource.InferencePool != nil {
-		log.FromContext(ctx).Info("update InferencePool")
-		childResource = childResource.updateInferencePool(ctx, msvc, scheme)
+		log.FromContext(ctx).V(1).Info("merging InferencePool")
+		childResource = childResource.mergeInferencePool(ctx, msvc, scheme)
 	}
 	if childResource.InferenceModel != nil {
-		log.FromContext(ctx).Info("update EPP InferenceModel")
-		childResource = childResource.updateInferenceModel(ctx, msvc, scheme)
+		log.FromContext(ctx).V(1).Info("merging EPP InferenceModel")
+		childResource = childResource.mergeInferenceModel(ctx, msvc, scheme)
 	}
 
 	return childResource
 }
 
-// updateConfigMaps updates childResource configmaps
-func (childResource *BaseConfig) updateConfigMaps(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
+// mergeConfigMaps creates config maps for found in base config
+func (childResource *BaseConfig) mergeConfigMaps(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
 	for i := range childResource.ConfigMaps {
 		// if there's no namespace, set it to msvc's
 		if strings.TrimSpace(childResource.ConfigMaps[i].Namespace) == "" {
@@ -170,7 +172,7 @@ func (childResource *BaseConfig) updateConfigMaps(ctx context.Context, msvc *msv
 		// Setting owner ref before setting namespace seems problematic
 		err := controllerutil.SetOwnerReference(msvc, &childResource.ConfigMaps[i], scheme)
 		if err != nil {
-			log.FromContext(ctx).Error(err, "unable to set owner reference")
+			log.FromContext(ctx).V(1).Error(err, "unable to set owner reference")
 		}
 	}
 	return childResource
@@ -181,9 +183,9 @@ func getCommonLabels(ctx context.Context, msvc *msv1alpha1.ModelService) map[str
 	// Step 3: Define object meta
 	// Sanitize modelName into a valid label
 	// TODO: this is not a good approach. Confirm with routing team on what label they need
-	modelLabel, err := SanitizeModelName(msvc.Spec.Routing.ModelName)
+	modelLabel, err := sanitizeName(msvc.Spec.Routing.ModelName)
 	if err != nil {
-		log.FromContext(ctx).Error(err, "unable to sanitize model name")
+		log.FromContext(ctx).V(1).Error(err, "unable to sanitize model name")
 	}
 
 	return map[string]string{
@@ -199,8 +201,8 @@ func getPodLabels(ctx context.Context, msvc *msv1alpha1.ModelService, role strin
 	return labels
 }
 
-// updateInferenceModel uses msvc fields to update childResource inference model
-func (childResources *BaseConfig) updateInferenceModel(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
+// mergeInferenceModel uses msvc fields to update childResource inference model
+func (childResources *BaseConfig) mergeInferenceModel(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
 	// there's nothing to update
 	if childResources.InferenceModel == nil {
 		return childResources
@@ -216,15 +218,36 @@ func (childResources *BaseConfig) updateInferenceModel(ctx context.Context, msvc
 
 	// Set owner reference for the merged service
 	if err := controllerutil.SetOwnerReference(msvc, im, scheme); err != nil {
-		log.FromContext(ctx).Error(err, "unable to set owner ref for inferencepool")
+		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for inferencepool")
 		return childResources
 	}
 
 	return childResources
 }
 
-// updatePDService uses msvc fields to update childResource P/D Service
-func (childResource *BaseConfig) updatePDService(ctx context.Context, msvc *msv1alpha1.ModelService, role string, scheme *runtime.Scheme) *BaseConfig {
+// sanitizeSvcName returns the
+func sanitizeSvcName(msvc *msv1alpha1.ModelService, role string) string {
+	sanitizedName, err := sanitizeName(msvc.Name + "-service-" + role)
+	if err != nil {
+		// TODO: don't return a default name?
+		return "default-service-" + role
+	}
+
+	return sanitizedName
+}
+
+func sanitizeModelName(msvc *msv1alpha1.ModelService) string {
+	sanitizedModelName, err := sanitizeName(msvc.Spec.Routing.ModelName)
+	if err != nil {
+		// TODO: don't return a default model name?
+		return "default-modelName"
+	}
+
+	return sanitizedModelName
+}
+
+// mergePDService uses msvc fields to update childResource P/D Service
+func (childResource *BaseConfig) mergePDService(ctx context.Context, msvc *msv1alpha1.ModelService, role string, scheme *runtime.Scheme) *BaseConfig {
 
 	// Get dest Service
 	destService := corev1.Service{}
@@ -249,9 +272,10 @@ func (childResource *BaseConfig) updatePDService(ctx context.Context, msvc *msv1
 	// At this point, we are going to create a service for role
 	// srcService contains ownerRef, name for service, and selector labels
 	// srcService contains the stuff we want to override destService with
+
 	srcService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      msvc.Name + "-service-" + role,
+			Name:      sanitizeSvcName(msvc, role),
 			Namespace: msvc.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
@@ -263,13 +287,13 @@ func (childResource *BaseConfig) updatePDService(ctx context.Context, msvc *msv1
 
 	// Mergo merge src into dst
 	if err := mergo.Merge(&destService, srcService, mergo.WithOverride); err != nil {
-		log.FromContext(ctx).Error(err, "problem with service merge for "+role)
+		log.FromContext(ctx).V(1).Error(err, "problem with service merge for "+role)
 		return childResource
 	}
 
 	// Set owner reference for the merged service
 	if err := controllerutil.SetOwnerReference(msvc, &destService, scheme); err != nil {
-		log.FromContext(ctx).Error(err, "unable to set owner ref for service "+role)
+		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for service "+role)
 		return childResource
 	}
 
@@ -283,8 +307,8 @@ func (childResource *BaseConfig) updatePDService(ctx context.Context, msvc *msv1
 	return childResource
 }
 
-// updatePDDeployment uses msvc fields to update childResource prefill deployment
-func (childResource *BaseConfig) updatePDDeployment(ctx context.Context, msvc *msv1alpha1.ModelService, role string, scheme *runtime.Scheme) *BaseConfig {
+// mergePDDeployment uses msvc fields to update childResource prefill deployment
+func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *msv1alpha1.ModelService, role string, scheme *runtime.Scheme) *BaseConfig {
 	pdSpec := &msv1alpha1.PDSpec{}
 	if role == PREFILL_ROLE {
 		if msvc.Spec.Prefill != nil {
@@ -311,18 +335,14 @@ func (childResource *BaseConfig) updatePDDeployment(ctx context.Context, msvc *m
 	// Step 3: Define object meta
 	// Sanitize modelName into a valid label
 	// TODO: this is not a good approach. Confirm with routing team on what label they need
-	modelLabel, err := SanitizeModelName(msvc.Spec.Routing.ModelName)
-	if err != nil {
-		log.FromContext(ctx).Error(err, "unable to set owner reference")
-	}
 
 	labels := map[string]string{
 		"llm-d.ai/inferenceServing": "true",
-		"llm-d.ai/model":            modelLabel,
+		"llm-d.ai/model":            sanitizeModelName(msvc),
 		"llm-d.ai/role":             role,
 	}
 
-	log.FromContext(ctx).Info("model service", "type meta", msvc.TypeMeta)
+	log.FromContext(ctx).V(1).Info("model service", "type meta", msvc.TypeMeta)
 
 	depl.ObjectMeta = metav1.ObjectMeta{
 		Name:      deploymentName(msvc, role),
@@ -331,7 +351,7 @@ func (childResource *BaseConfig) updatePDDeployment(ctx context.Context, msvc *m
 	}
 	err = controllerutil.SetOwnerReference(msvc, depl, scheme)
 	if err != nil {
-		log.FromContext(ctx).Error(err, "unable to set owner reference")
+		log.FromContext(ctx).V(1).Error(err, "unable to set owner reference")
 	}
 
 	// Step 4b. Define selectors for pods
@@ -356,7 +376,7 @@ func (childResource *BaseConfig) updatePDDeployment(ctx context.Context, msvc *m
 			NodeAffinity: na,
 		}
 	} else {
-		log.FromContext(ctx).Error(err, "unable to get node affinity")
+		log.FromContext(ctx).V(1).Error(err, "unable to get node affinity")
 	}
 
 	// Step 6: populate replicas
@@ -370,7 +390,7 @@ func (childResource *BaseConfig) updatePDDeployment(ctx context.Context, msvc *m
 		volume, err := getVolumeFromModelArtifacts(&msvc.Spec.ModelArtifacts)
 		if err != nil {
 			// The modelArtifact is invalid
-			log.FromContext(ctx).Error(err, "unable to get volume")
+			log.FromContext(ctx).V(1).Error(err, "unable to get volume")
 		}
 		if volume != nil {
 			depl.Spec.Template.Spec.Volumes = append(depl.Spec.Template.Spec.Volumes, *volume)
@@ -387,19 +407,19 @@ func (childResource *BaseConfig) updatePDDeployment(ctx context.Context, msvc *m
 	// We merge source into destination
 	// We apply the merged destination
 	if role == PREFILL_ROLE {
-		log.FromContext(ctx).Info("mergo info", "role", role, "dst", childResource.PrefillDeployment, "src", depl)
+		log.FromContext(ctx).V(1).Info("mergo info", "role", role, "dst", childResource.PrefillDeployment, "src", depl)
 		err = mergo.Merge(childResource.PrefillDeployment, depl, mergo.WithOverride, mergo.WithAppendSlice, mergo.WithTransformers(containerSliceTransformer{}))
 		if err != nil {
-			log.FromContext(ctx).Error(err, "mergo error")
+			log.FromContext(ctx).V(1).Error(err, "mergo error")
 		}
 	}
 	if role == DECODE_ROLE {
-		log.FromContext(ctx).Info("mergo info", "role", role, "dst", childResource.DecodeDeployment, "src", depl)
-		log.FromContext(ctx).Info("before mergo info -- details", "role", role, "dst.spec", childResource.DecodeDeployment.Spec, "src.spec", depl.Spec)
+		log.FromContext(ctx).V(1).Info("mergo info", "role", role, "dst", childResource.DecodeDeployment, "src", depl)
+		log.FromContext(ctx).V(1).Info("before mergo info -- details", "role", role, "dst.spec", childResource.DecodeDeployment.Spec, "src.spec", depl.Spec)
 		err = mergo.Merge(childResource.DecodeDeployment, depl, mergo.WithOverride, mergo.WithAppendSlice, mergo.WithTransformers(containerSliceTransformer{}))
-		log.FromContext(ctx).Info("after mergo info -- details", "role", role, "dst.spec", childResource.DecodeDeployment.Spec)
+		log.FromContext(ctx).V(1).Info("after mergo info -- details", "role", role, "dst.spec", childResource.DecodeDeployment.Spec)
 		if err != nil {
-			log.FromContext(ctx).Error(err, "mergo error")
+			log.FromContext(ctx).V(1).Error(err, "mergo error")
 		}
 	}
 
@@ -409,71 +429,14 @@ func (childResource *BaseConfig) updatePDDeployment(ctx context.Context, msvc *m
 // createOrUpdate all the child resources
 func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelServiceReconciler) error {
 	// create or update configmaps
-	log.FromContext(ctx).Info("attempting to createOrUpdate configmaps")
-	for i := range childResource.ConfigMaps {
-		cm := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      childResource.ConfigMaps[i].Name,
-				Namespace: childResource.ConfigMaps[i].Namespace,
-			}}
+	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate configmaps")
+	childResource.createOrUpdateConfigMaps(ctx, r)
 
-		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, cm, func() error {
-			cm.OwnerReferences = childResource.ConfigMaps[i].OwnerReferences
-			cm.Labels = childResource.ConfigMaps[i].Labels
-			cm.Annotations = childResource.ConfigMaps[i].Annotations
-			cm.Data = childResource.ConfigMaps[i].Data
-			return nil
-		})
-		if err != nil {
-			log.FromContext(ctx).Error(err, "unable to create configmap")
-		}
-	}
+	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate prefill deployment")
+	childResource.createOrUpdatePDDeployment(ctx, r, PREFILL_ROLE)
 
-	log.FromContext(ctx).Info("attempting to createOrUpdate prefill deployment")
-	// create decode deployment
-	desired := childResource.PrefillDeployment
-	if desired != nil {
-		deploy := &appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      desired.Name,
-				Namespace: desired.Namespace,
-			}}
-		op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deploy, func() error {
-			deploy.OwnerReferences = desired.OwnerReferences
-			deploy.Labels = desired.Labels
-			deploy.Annotations = desired.Annotations
-			deploy.Spec = desired.Spec
-			return nil
-		})
-		log.FromContext(ctx).Info("from CreateOrUpdate", "op", op)
-		if err != nil {
-			log.FromContext(ctx).Error(err, "unable to create configmap")
-		}
-	}
-
-	log.FromContext(ctx).Info("attempting to createOrUpdate decode deployment")
-	log.FromContext(ctx).Info("printing decode info", "deployment", childResource.DecodeDeployment)
-
-	// create decode deployment
-	desired = childResource.DecodeDeployment
-	if desired != nil {
-		deploy := &appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      desired.Name,
-				Namespace: desired.Namespace,
-			}}
-		op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deploy, func() error {
-			deploy.OwnerReferences = desired.OwnerReferences
-			deploy.Labels = desired.Labels
-			deploy.Annotations = desired.Annotations
-			deploy.Spec = desired.Spec
-			return nil
-		})
-		log.FromContext(ctx).Info("from CreateOrUpdate", "op", op)
-		if err != nil {
-			log.FromContext(ctx).Error(err, "unable to create configmap")
-		}
-	}
+	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate decode deployment")
+	childResource.createOrUpdatePDDeployment(ctx, r, DECODE_ROLE)
 
 	// Create or update services only if corresponding deployment exists in childResources
 	childResource.createOrUpdateServiceForDeployment(ctx, r, PREFILL_ROLE)
@@ -488,14 +451,14 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 	if childResource.EPPDeployment != nil {
 		err := childResource.createEppDeployment(ctx, r.Client)
 		if err != nil {
-			log.FromContext(ctx).Error(err, "unable to create epp deployment")
+			log.FromContext(ctx).V(1).Error(err, "unable to create epp deployment")
 		}
 	}
 
 	if childResource.EPPService != nil {
 		err := childResource.createEppService(ctx, r.Client, *childResource.EPPService)
 		if err != nil {
-			log.FromContext(ctx).Error(err, "unable to create epp service")
+			log.FromContext(ctx).V(1).Error(err, "unable to create epp service")
 		}
 	}
 	return nil
@@ -516,16 +479,64 @@ func (childResource *BaseConfig) createOrUpdateInferenceModel(ctx context.Contex
 
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, infModelInCluster, func() error {
 		infModelInCluster.Labels = childResource.InferenceModel.Labels
-		infModelInCluster.Annotations = childResource.InferenceModel.Annotations
 		infModelInCluster.OwnerReferences = childResource.InferenceModel.OwnerReferences
 		infModelInCluster.Spec = childResource.InferenceModel.Spec
 		return nil
 	})
 
 	if err != nil {
-		log.FromContext(ctx).Error(err, "unable to create inference model")
+		log.FromContext(ctx).V(1).Error(err, "unable to create inference model")
+	}
+}
+
+func (childResource *BaseConfig) createOrUpdateConfigMaps(ctx context.Context, r *ModelServiceReconciler) {
+	for i := range childResource.ConfigMaps {
+		cm := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      childResource.ConfigMaps[i].Name,
+				Namespace: childResource.ConfigMaps[i].Namespace,
+			}}
+
+		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, cm, func() error {
+			cm.OwnerReferences = childResource.ConfigMaps[i].OwnerReferences
+			cm.Labels = childResource.ConfigMaps[i].Labels
+			cm.Data = childResource.ConfigMaps[i].Data
+			return nil
+		})
+		if err != nil {
+			log.FromContext(ctx).V(1).Error(err, "unable to create configmap")
+		}
+	}
+}
+
+func (childResource *BaseConfig) createOrUpdatePDDeployment(ctx context.Context, r *ModelServiceReconciler, role string) {
+
+	var desiredDeployment *appsv1.Deployment
+
+	if role == PREFILL_ROLE {
+		desiredDeployment = childResource.PrefillDeployment
+	} else {
+		desiredDeployment = childResource.DecodeDeployment
 	}
 
+	if desiredDeployment != nil {
+		deploymentInCluster := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      desiredDeployment.Name,
+				Namespace: desiredDeployment.Namespace,
+			}}
+
+		op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deploymentInCluster, func() error {
+			deploymentInCluster.OwnerReferences = desiredDeployment.OwnerReferences
+			deploymentInCluster.Labels = desiredDeployment.Labels
+			deploymentInCluster.Spec = desiredDeployment.Spec
+			return nil
+		})
+		log.FromContext(ctx).V(1).Info("from CreateOrUpdate", "op", op)
+		if err != nil {
+			log.FromContext(ctx).V(1).Error(err, "unable to create deployment for "+role)
+		}
+	}
 }
 
 func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.Context, r *ModelServiceReconciler, role string) {
@@ -543,7 +554,7 @@ func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.
 
 	// Create service for the deployment iff deployment exists and service is defined in baseConfig
 	if deployment != nil && service != nil {
-		log.FromContext(ctx).Info("service for "+role, "service", service)
+		log.FromContext(ctx).V(1).Info("service for "+role, "service", service)
 
 		svcInCluster := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -553,28 +564,27 @@ func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.
 
 		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, svcInCluster, func() error {
 			svcInCluster.Labels = service.Labels
-			svcInCluster.Annotations = service.Annotations
 			svcInCluster.OwnerReferences = service.OwnerReferences
 			svcInCluster.Spec = service.Spec
 			return nil
 		})
 
 		if err != nil {
-			log.FromContext(ctx).Error(err, "unable to create service for "+role)
+			log.FromContext(ctx).V(1).Error(err, "unable to create service for "+role)
 		}
 	}
 }
 
-func getInferencePoolLabels(labels map[string]string) map[giev1alpha2.LabelKey]giev1alpha2.LabelValue {
-	m := make(map[giev1alpha2.LabelKey]giev1alpha2.LabelValue, len(labels))
-	for k, v := range labels {
+func getInferencePoolLabels(ctx context.Context, msvc *msv1alpha1.ModelService) map[giev1alpha2.LabelKey]giev1alpha2.LabelValue {
+	commonLabels := getCommonLabels(ctx, msvc)
+	m := make(map[giev1alpha2.LabelKey]giev1alpha2.LabelValue, len(commonLabels))
+	for k, v := range commonLabels {
 		m[giev1alpha2.LabelKey(k)] = giev1alpha2.LabelValue(v)
 	}
-	m["llm-d.ai/role"] = DECODE_ROLE
 	return m
 }
 
-func (childResources *BaseConfig) updateEppDeployment(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
+func (childResources *BaseConfig) mergeEppDeployment(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
 
 	if childResources == nil || childResources.EPPDeployment == nil {
 		return childResources
@@ -602,23 +612,23 @@ func (childResources *BaseConfig) updateEppDeployment(ctx context.Context, msvc 
 	}
 
 	if err := mergo.Merge(&dest, src, mergo.WithOverride); err != nil {
-		log.FromContext(ctx).Error(err, "problem with epp deployment merge")
+		log.FromContext(ctx).V(1).Error(err, "problem with epp deployment merge")
 		return childResources
 	}
 
 	// Set owner reference for the merged service
 	if err := controllerutil.SetOwnerReference(msvc, &dest, scheme); err != nil {
-		log.FromContext(ctx).Error(err, "unable to set owner ref for inferencepool")
+		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for inferencepool")
 		return childResources
 	}
-	log.FromContext(ctx).Info("deployment", "post-merge-label", dest.Labels, "post-merge-spec", dest.Spec)
+	log.FromContext(ctx).V(1).Info("deployment", "post-merge-label", dest.Labels, "post-merge-spec", dest.Spec)
 	// Set the merged epp deployment in the child resource
 	childResources.EPPDeployment = &dest
 
 	return childResources
 }
 
-func (childResources *BaseConfig) updateEppService(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
+func (childResources *BaseConfig) mergeEppService(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
 	if childResources == nil || childResources.EPPService == nil {
 		return childResources
 	}
@@ -634,11 +644,11 @@ func (childResources *BaseConfig) updateEppService(ctx context.Context, msvc *ms
 
 	src.Spec.Selector = eppLabels
 	if err := mergo.Merge(&dest, src, mergo.WithOverride); err != nil {
-		log.FromContext(ctx).Error(err, "problem with epp service merge")
+		log.FromContext(ctx).V(1).Error(err, "problem with epp service merge")
 		return childResources
 	}
 	if err := controllerutil.SetOwnerReference(msvc, &dest, scheme); err != nil {
-		log.FromContext(ctx).Error(err, "unable to set owner ref for inferencepool")
+		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for inferencepool")
 		return childResources
 	}
 
@@ -647,8 +657,8 @@ func (childResources *BaseConfig) updateEppService(ctx context.Context, msvc *ms
 	return childResources
 }
 
-// updateInferencePool uses msvc fields to update childResource InferencePool resource.
-func (childResources *BaseConfig) updateInferencePool(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
+// mergeInferencePool uses msvc fields to update childResource InferencePool resource.
+func (childResources *BaseConfig) mergeInferencePool(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
 
 	if childResources == nil || childResources.InferencePool == nil {
 		return childResources
@@ -666,7 +676,7 @@ func (childResources *BaseConfig) updateInferencePool(ctx context.Context, msvc 
 			Namespace: msvc.Namespace,
 		},
 		Spec: giev1alpha2.InferencePoolSpec{
-			Selector: getInferencePoolLabels(getCommonLabels(ctx, msvc)),
+			Selector: getInferencePoolLabels(ctx, msvc),
 			EndpointPickerConfig: giev1alpha2.EndpointPickerConfig{
 				ExtensionRef: &giev1alpha2.Extension{
 					ExtensionReference: giev1alpha2.ExtensionReference{
@@ -679,13 +689,13 @@ func (childResources *BaseConfig) updateInferencePool(ctx context.Context, msvc 
 
 	// Mergo merge src into dst
 	if err := mergo.Merge(&dest, src, mergo.WithOverride); err != nil {
-		log.FromContext(ctx).Error(err, "problem with inferencepool merge")
+		log.FromContext(ctx).V(1).Error(err, "problem with inferencepool merge")
 		return childResources
 	}
 
 	// Set owner reference for the merged service
 	if err := controllerutil.SetOwnerReference(msvc, &dest, scheme); err != nil {
-		log.FromContext(ctx).Error(err, "unable to set owner ref for inferencepool")
+		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for inferencepool")
 		return childResources
 	}
 
@@ -707,17 +717,16 @@ func (childResource *BaseConfig) createOrUpdateInferencePool(ctx context.Context
 			Namespace: childResource.InferencePool.Namespace,
 		},
 	}
-	log.FromContext(ctx).Info("merged inf pool", "data", childResource.InferencePool)
+	log.FromContext(ctx).V(1).Info("merged inf pool", "data", childResource.InferencePool)
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, inferencePoolInCluster, func() error {
 		inferencePoolInCluster.Labels = childResource.InferenceModel.Labels
-		inferencePoolInCluster.Annotations = childResource.InferenceModel.Annotations
 		inferencePoolInCluster.OwnerReferences = childResource.InferenceModel.OwnerReferences
 		inferencePoolInCluster.Spec = childResource.InferencePool.Spec
 		return nil
 	})
 
 	if err != nil {
-		log.FromContext(ctx).Error(err, "unable to create inference pool")
+		log.FromContext(ctx).V(1).Error(err, "unable to create inference pool")
 	}
 
 }
@@ -743,14 +752,13 @@ func (childResource *BaseConfig) createEppDeployment(ctx context.Context, kubeCl
 
 	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, deploymentTobeCreatedOrUpdated, func() error {
 		deploymentTobeCreatedOrUpdated.Labels = childResource.EPPDeployment.Labels
-		deploymentTobeCreatedOrUpdated.Annotations = childResource.EPPDeployment.Annotations
 		deploymentTobeCreatedOrUpdated.OwnerReferences = childResource.EPPDeployment.OwnerReferences
 		deploymentTobeCreatedOrUpdated.Spec = childResource.EPPDeployment.Spec
 		return nil
 	})
 
 	if err != nil {
-		log.FromContext(ctx).Error(err, "unable to create epp deployment from immutable base configmap ")
+		log.FromContext(ctx).V(1).Error(err, "unable to create epp deployment from immutable base configmap ")
 		return err
 	}
 	return nil
@@ -770,14 +778,13 @@ func (childResource *BaseConfig) createEppService(ctx context.Context, kubeClien
 
 	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &eppService, func() error {
 		serviceTobeCreatedOrUpdated.Labels = childResource.EPPService.Labels
-		serviceTobeCreatedOrUpdated.Annotations = childResource.EPPService.Annotations
 		serviceTobeCreatedOrUpdated.OwnerReferences = childResource.EPPService.OwnerReferences
 		serviceTobeCreatedOrUpdated.Spec = childResource.EPPService.Spec
 		return nil
 	})
 
 	if err != nil {
-		log.FromContext(ctx).Error(err, "unable to create epp service from immutable base configmap ")
+		log.FromContext(ctx).V(1).Error(err, "unable to create epp service from immutable base configmap ")
 		return err
 	}
 	return nil
