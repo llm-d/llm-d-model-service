@@ -12,7 +12,7 @@ spec:
     modelName: facebook/opt-125m
 
   modelArtifacts:
-    uri: pvc://facebook-pvc/path/to/opt-125m
+    uri: hf://facebook/opt-125m
 
   # describe decode pods
   decode:
