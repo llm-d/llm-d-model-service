@@ -159,6 +159,28 @@ func TestMergeContainerSlices(t *testing.T) {
 			},
 			expectError: false,
 		},
+		{
+			name: "with command override only when srcSlice.Command isn't empty",
+			destSlice: []corev1.Container{
+				{
+					Name:    "c1",
+					Command: []string{"old", "command"},
+				},
+			},
+			srcSlice: []corev1.Container{
+				{
+					Name:    "c1", // note name is same as dest
+					Command: []string{},
+				},
+			},
+			expectedMergedSlice: []corev1.Container{
+				{
+					Name:    "c1",
+					Command: []string{"old", "command"}, // still uses old command
+				},
+			},
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {

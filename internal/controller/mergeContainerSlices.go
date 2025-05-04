@@ -176,7 +176,9 @@ func (c containerSliceTransformer) Transformer(typ reflect.Type) func(dst, src r
 		}
 
 		// Command should be completely overriden, not appended
-		dstContainer.Command = srcContainer.Command
+		if len(srcContainer.Command) > 0 {
+			dstContainer.Command = srcContainer.Command
+		}
 
 		return nil
 	}
