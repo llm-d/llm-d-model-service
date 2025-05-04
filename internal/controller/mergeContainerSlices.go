@@ -24,146 +24,164 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-type envVarSliceTransformer struct{}
+// convertToGenericSlice returns a slice where each item in the slice
+// is converted to a T object from each item in reflect.Value
+func convertToGenericSlice[T any](val reflect.Value) []T {
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	if val.Kind() != reflect.Slice {
+		return nil
+	}
 
-// Transformer for the []corev1.Env
-func (e envVarSliceTransformer) Transformer(typ reflect.Type) func(dst, src reflect.Value) error {
+	var result []T
+	for i := 0; i < val.Len(); i++ {
+		item := val.Index(i).Interface()
+		tItem, ok := item.(T)
+		if !ok {
+			return nil
+		}
+		result = append(result, tItem)
+	}
+	return result
+}
 
-	if typ == reflect.TypeOf([]corev1.EnvVar{}) {
+// mergeKeyValue returns the value given the name of the field in that struct
+// for example,
+// myEnvVar := corev1.EnvVar{"Name": "env-var"}
+// mergeKeyValue(myEnvVar, "Name") returns "env-var"
+func mergeKeyValue[T any](obj T, fieldName string) string {
+	return reflect.ValueOf(obj).FieldByName(fieldName).String()
+}
+
+// genericSliceTransformer merges two slices of the same type T
+// mergeFunc is the function that contains logic for merging two T objects
+// mergeKey is the name of the field in T, so that if dst.MergeKey == src.MergeKey,
+// the mergeFunc is called on those two objects. Otherwise, the src is appended
+// for now, only string fields are supported for mergeKey
+// (since we cannot guarantee equality for generic reflect.Value)
+// mergeFunc takes in
+// - dst (pointer): so that in-place merge can take happen
+// - src: the src object to merge into dst
+func genericSliceTransformer[T any](
+	typ reflect.Type,
+	mergeFunc func(dst *T, src T) error,
+	mergeKey string) func(dst, src reflect.Value) error {
+
+	if typ == reflect.TypeOf([]T{}) {
 		return func(dst, src reflect.Value) error {
+
 			// Reject transforming anything other than slices
 			if dst.Kind() != reflect.Slice || src.Kind() != reflect.Slice {
 				return nil
 			}
 
-			srcEnvVarSlice := src.Interface().([]corev1.EnvVar)
-			dstEnvVarSlice := dst.Interface().([]corev1.EnvVar)
+			srcSlice := convertToGenericSlice[T](src)
+			dstSlice := convertToGenericSlice[T](dst)
 
-			// keep track of the common envVar among src and dst
-			srcEnvVarNames := make(map[string]corev1.EnvVar, len(srcEnvVarSlice))
-			commonEnvVarNames := []string{}
+			// keep track of the common mergeKeys among src and dst
+			srcMergeKeyMap := map[string]T{}
+			commonMergeKeys := []string{} // TODO: maybe mergeKey can be another generic type?
 
-			for _, envVar := range srcEnvVarSlice {
-				srcEnvVarNames[envVar.Name] = envVar
+			for _, srcObj := range srcSlice {
+				mergeKeyValue := mergeKeyValue(srcObj, mergeKey)
+				srcMergeKeyMap[mergeKeyValue] = srcObj
 			}
 
-			for _, dstEnvVar := range dstEnvVarSlice {
-				if _, found := srcEnvVarNames[dstEnvVar.Name]; found {
-					commonEnvVarNames = append(commonEnvVarNames, dstEnvVar.Name)
+			for _, dstObj := range dstSlice {
+				mergeKeyValue := mergeKeyValue(dstObj, mergeKey)
+				if _, found := srcMergeKeyMap[mergeKeyValue]; found {
+					commonMergeKeys = append(commonMergeKeys, mergeKeyValue)
 				}
 			}
 
-			// now loop over dstEnvVarSlice and see if there is a EnvVar with same name in src
-			for i, dstEnvVar := range dstEnvVarSlice {
-				dstEnvVarName := dstEnvVar.Name
+			// now loop over dstSlice and see if there is a srcObj with same mergeKey value in src
+			for i, dstObj := range dstSlice {
 
-				// Found a matching src EnvVar with same name
-				if srcEnvVar, found := srcEnvVarNames[dstEnvVarName]; found {
-					// Set new value and valueFrom from src
-					err := mergo.Merge(&dstEnvVar, srcEnvVar, mergo.WithOverride)
+				dstMergeKeyValue := mergeKeyValue(dstObj, mergeKey)
+
+				// Found a matching srcObj with same mergeKey value
+				if srcObj, found := srcMergeKeyMap[dstMergeKeyValue]; found {
+
+					// Calls mergeFunc on the logic that merges two T structs in the slice
+					err := mergeFunc(&dstObj, srcObj)
+
 					if err != nil {
 						return err
 					}
 
-					dstEnvVarSlice[i] = dstEnvVar
+					// Update dstObj in dstSlice if merge was successful
+					dstSlice[i] = dstObj
 				}
 			}
 
-			// Construct the mergedEnvVarSlice combining both src and dst
-			mergedEnvVarSlice := []corev1.EnvVar{}
+			// Construct the mergedSlice combining both src and dst
+			mergedSlice := []T{}
 
-			// mergedEnvVarSlice contains everything already present in dst to begin with,
-			// with the common EnvVar already merged from src
-			mergedEnvVarSlice = append(mergedEnvVarSlice, dstEnvVarSlice...)
+			// mergedSlice contains everything already present in dst to begin with,
+			// with the common T objects already merged from src
+			mergedSlice = append(mergedSlice, dstSlice...)
 
-			// for other src EnvVar, skip the ones that are common
-			for _, srcEnvVar := range srcEnvVarSlice {
-				if !slices.Contains(commonEnvVarNames, srcEnvVar.Name) {
-					mergedEnvVarSlice = append(mergedEnvVarSlice, srcEnvVar)
+			// append other src objects that weren't merged and skip the ones that are common
+			for _, srcObj := range srcSlice {
+				mergeKeyValue := mergeKeyValue(srcObj, mergeKey)
+				if !slices.Contains(commonMergeKeys, mergeKeyValue) {
+					mergedSlice = append(mergedSlice, srcObj)
 				}
 			}
 
-			// Now rewrite dst with mergedEnvVarSlice
-			dst.Set(reflect.ValueOf(mergedEnvVarSlice))
+			// Now rewrite dst with mergedSlice
+			dst.Set(reflect.ValueOf(mergedSlice))
 			return nil
 		}
 	}
 	return nil
 }
 
+// envVarSliceTransformer: transformer for merging two EnvVars
+type envVarSliceTransformer struct{}
+
+// Transformer for []corev1.Env
+func (e envVarSliceTransformer) Transformer(typ reflect.Type) func(dst, src reflect.Value) error {
+
+	// mergeKey for merging two EnvVars is the Name of the EnvVar
+	mergeKey := "Name"
+	mergeFunc := func(dst *corev1.EnvVar, src corev1.EnvVar) error {
+		return mergo.Merge(dst, src, mergo.WithOverride)
+	}
+
+	return genericSliceTransformer(typ, mergeFunc, mergeKey)
+}
+
+// containerSliceTransformer: transformer for merging two Containers
 type containerSliceTransformer struct{}
 
-// Transformer merges two []corev1.Container based on their Name, and applies
-// transformers for each Container.Spec fields
+// Transformer merges two []corev1.Container based on their Name,
+// and applies transformers for each Container.Spec fields
 func (c containerSliceTransformer) Transformer(typ reflect.Type) func(dst, src reflect.Value) error {
 
-	if typ == reflect.TypeOf([]corev1.Container{}) {
-		return func(dst, src reflect.Value) error {
-			// Reject transforming anything other than slices
-			if dst.Kind() != reflect.Slice || src.Kind() != reflect.Slice {
-				return nil
-			}
+	// mergeKey for merging two Containers is the Name of the Container
+	mergeKey := "Name"
+	mergeFunc := func(dstContainer *corev1.Container, srcContainer corev1.Container) error {
 
-			srcContainerSlice := src.Interface().([]corev1.Container)
-			dstContainerSlice := dst.Interface().([]corev1.Container)
+		err := mergo.Merge(dstContainer,
+			srcContainer,
+			mergo.WithAppendSlice,
+			mergo.WithOverride,
+			mergo.WithTransformers(envVarSliceTransformer{}),
+		)
 
-			// keep track of the common containers among src and dst
-			srcContainerNames := make(map[string]corev1.Container, len(srcContainerSlice))
-			commonContainerNames := []string{}
-
-			for _, container := range srcContainerSlice {
-				srcContainerNames[container.Name] = container
-			}
-
-			for _, dstContainer := range dstContainerSlice {
-				if _, found := srcContainerNames[dstContainer.Name]; found {
-					commonContainerNames = append(commonContainerNames, dstContainer.Name)
-				}
-			}
-
-			// now loop over dstContainerSlice and see if there is a container with same name in src
-			for i, dstContainer := range dstContainerSlice {
-				dstContainerName := dstContainer.Name
-
-				// Found a matching src container with same name
-				if srcContainer, found := srcContainerNames[dstContainerName]; found {
-					// TODO: update this
-					err := mergo.Merge(
-						&dstContainer,
-						srcContainer,
-						mergo.WithAppendSlice,
-						mergo.WithOverride,
-						mergo.WithTransformers(envVarSliceTransformer{}),
-					)
-
-					if err != nil {
-						return err
-					}
-
-					dstContainerSlice[i] = dstContainer
-				}
-			}
-
-			// Construct the mergedContainerSlice combining both src and dst
-			mergedContainerSlice := []corev1.Container{}
-
-			// mergedContainerSlice contains everything already present in dst to begin with,
-			// with the common containers already merged from src
-			mergedContainerSlice = append(mergedContainerSlice, dstContainerSlice...)
-
-			// for other src containers, skip the ones that are common
-			for _, srcContainer := range srcContainerSlice {
-				if !slices.Contains(commonContainerNames, srcContainer.Name) {
-					mergedContainerSlice = append(mergedContainerSlice, srcContainer)
-				}
-			}
-
-			// Now rewrite dst with mergedContainerSlice
-			dst.Set(reflect.ValueOf(mergedContainerSlice))
-			return nil
+		if err != nil {
+			return err
 		}
+
+		// Command should be completely overriden, not appended
+		dstContainer.Command = srcContainer.Command
+
+		return nil
 	}
-	return nil
+
+	return genericSliceTransformer(typ, mergeFunc, mergeKey)
 }
 
 // MergeContainerSlices merges src slice into dest in place

@@ -137,6 +137,28 @@ func TestMergeContainerSlices(t *testing.T) {
 			},
 			expectError: false,
 		},
+		{
+			name: "with command override",
+			destSlice: []corev1.Container{
+				{
+					Name:    "c1",
+					Command: []string{"old", "command"},
+				},
+			},
+			srcSlice: []corev1.Container{
+				{
+					Name:    "c1", // note name is same as dest
+					Command: []string{"new", "command"},
+				},
+			},
+			expectedMergedSlice: []corev1.Container{
+				{
+					Name:    "c1",
+					Command: []string{"new", "command"},
+				},
+			},
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -162,23 +184,9 @@ func TestMergeContainerSlices(t *testing.T) {
 					// Assert image
 					assert.Equal(t, expectedContainer.Image, actualContainer.Image)
 
-					// Assert args
-					assert.Equal(t, len(expectedContainer.Args), len(actualContainer.Args))
-
-					for j, expectedArg := range expectedContainer.Args {
-						actualArg := actualContainer.Args[j]
-						assert.Equal(t, expectedArg, actualArg)
-					}
-
-					// Assert env var list
-					assert.Equal(t, len(expectedContainer.Env), len(actualContainer.Env))
-
-					for j, expectedEnvVar := range expectedContainer.Env {
-						actualEnvVar := actualContainer.Env[j]
-						assert.Equal(t, expectedEnvVar.Name, actualEnvVar.Name)
-						assert.Equal(t, expectedEnvVar.Value, actualEnvVar.Value)
-						assert.Equal(t, expectedEnvVar.ValueFrom, actualEnvVar.ValueFrom)
-					}
+					assert.ElementsMatch(t, expectedContainer.Args, actualContainer.Args)
+					assert.ElementsMatch(t, expectedContainer.Command, actualContainer.Command)
+					assert.ElementsMatch(t, expectedContainer.Env, actualContainer.Env)
 
 					// add more assertions
 					// ...
