@@ -98,8 +98,6 @@ data:
                   mountPath: /vllm-workspace
                 - name: model-cache
                   mountPath: /vllm-workspace/models
-                - name: model-storage
-                  mountPath: /stored/models
               resources:
                 limits:
                   # TODO: inc this for llama
@@ -153,8 +151,6 @@ data:
                   mountPath: /vllm-workspace
                 - name: model-cache
                   mountPath: /vllm-workspace/models
-                - name: model-storage
-                  mountPath: /stored/models
               ports:
                 - containerPort: 8000
                   protocol: TCP

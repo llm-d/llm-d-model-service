@@ -110,10 +110,6 @@ data:
             - name: config-decoder
               configMap:
                 name: {{ .ModelServiceName }}-config-decoder
-            # Should be model-storage?
-            - name: model-cache
-              emptyDir:
-                sizeLimit: 1Gi
 
   prefillDeployment: |
     apiVersion: apps/v1
@@ -150,8 +146,8 @@ data:
               volumeMounts:
                 - name: config-prefiller
                   mountPath: /vllm-workspace
-                - name: model-cache
-                  mountPath: /vllm-workspace/models
+                - name: model-storage
+                  mountPath: /stored/models
               ports:
                 - containerPort: 8000
                   protocol: TCP
@@ -167,10 +163,6 @@ data:
               configMap:
                 name: {{ .ModelServiceName }}-config-prefiller
             
-            # TODO: should be model-storage?
-            - name: model-cache
-              emptyDir:
-                sizeLimit: 1Gi
 
   decodeService: |
     apiVersion: v1
