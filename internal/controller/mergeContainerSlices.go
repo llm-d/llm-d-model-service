@@ -128,6 +128,12 @@ func (c containerSliceTransformer) Transformer(typ reflect.Type) func(dst, src r
 				// Found a matching src container with same name
 				if srcContainer, found := srcContainerNames[dstContainerName]; found {
 					// TODO: update this
+
+					// if a command is specified in src overwrite dst
+					if len(srcContainer.Command) > 0 {
+						dstContainer.Command = srcContainer.Command
+					}
+
 					err := mergo.Merge(
 						&dstContainer,
 						srcContainer,

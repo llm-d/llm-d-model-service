@@ -137,6 +137,72 @@ func TestMergeContainerSlices(t *testing.T) {
 			},
 			expectError: false,
 		},
+		{
+			name: "Overwrite command if set in src",
+			destSlice: []corev1.Container{
+				{
+					Name:    "c1",
+					Command: []string{"something", "random"},
+				},
+			},
+			srcSlice: []corev1.Container{
+				{
+					Name:    "c1", // note name is same as dest
+					Command: []string{"vllm", "serve"},
+				},
+			},
+			expectedMergedSlice: []corev1.Container{
+				{
+					Name:    "c1",
+					Command: []string{"vllm", "serve"},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Don't overwrite command if not set",
+			destSlice: []corev1.Container{
+				{
+					Name:    "c1",
+					Command: []string{"vllm", "serve"},
+				},
+			},
+			srcSlice: []corev1.Container{
+				{
+					Name:    "c1", // note name is same as dest
+					Command: []string{},
+				},
+			},
+			expectedMergedSlice: []corev1.Container{
+				{
+					Name:    "c1",
+					Command: []string{"vllm", "serve"},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Safely use entrypoint if neither Commands are set",
+			destSlice: []corev1.Container{
+				{
+					Name:    "c1",
+					Command: []string{},
+				},
+			},
+			srcSlice: []corev1.Container{
+				{
+					Name:    "c1", // note name is same as dest
+					Command: []string{},
+				},
+			},
+			expectedMergedSlice: []corev1.Container{
+				{
+					Name:    "c1",
+					Command: []string{},
+				},
+			},
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {

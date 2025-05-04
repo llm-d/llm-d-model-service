@@ -29,3 +29,6 @@ go.work
 # temp files
 eppandinference.yaml
 externalcrds.yaml
+
+# temp directory for bringing modelservice and baseconfig CRs for comparison against generate
+temp
