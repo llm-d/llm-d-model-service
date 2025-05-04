@@ -76,7 +76,25 @@ func (r *ModelServiceReconciler) getChildResourcesFromConfigMap(
 		return nil, fmt.Errorf("failed to get ConfigMap: %w", err)
 	}
 
-	return BaseConfigFromCM(&cm)
+	values := &TemplateVars{}
+	err = values.from(ctx, msvc)
+	if err != nil {
+		log.FromContext(ctx).V(1).Error(err, "cannot construct child resource")
+		return nil, err
+	}
+
+	// interpolate base config data
+	interpolated := cm.DeepCopy()
+	for key, tmplStr := range interpolated.Data {
+		rendering, err := renderTemplate(tmplStr, values)
+		if err != nil {
+			log.FromContext(ctx).V(1).Error(err, "cannot construct child resource")
+			return nil, err
+		}
+		interpolated.Data[key] = rendering
+	}
+
+	return BaseConfigFromCM(interpolated)
 }
 
 // BaseConfigFromCM returns a BaseConfig object if the input

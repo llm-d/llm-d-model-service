@@ -58,6 +58,9 @@ var _ = Describe("BaseConfig reader", func() {
 				BaseConfigMapRef: &corev1.ObjectReference{
 					Name: "test-base-config",
 				},
+				ModelArtifacts: msv1alpha1.ModelArtifacts{
+					URI: "hf://facebook/opt-125m",
+				},
 			},
 		}
 
@@ -74,6 +77,16 @@ var _ = Describe("BaseConfig reader", func() {
 	})
 
 	It("should correctly deserialize the eppDeployment from ConfigMap", func() {
+		bc, err := reconciler.getChildResourcesFromConfigMap(ctx, msvc)
+		Expect(err).To(BeNil())
+		Expect(bc).ToNot(BeNil())
+		Expect(bc.EPPDeployment).ToNot(BeNil())
+		Expect(bc.EPPDeployment.Spec.Replicas).ToNot(BeNil())
+		Expect(*bc.EPPDeployment.Spec.Replicas).To(Equal(int32(1)))
+	})
+
+	It("should continue to correctly deserialize the eppDeployment from ConfigMap with pvc prefix", func() {
+		msvc.Spec.ModelArtifacts.URI = "pvc://my-pvc/path/to/opt-125m"
 		bc, err := reconciler.getChildResourcesFromConfigMap(ctx, msvc)
 		Expect(err).To(BeNil())
 		Expect(bc).ToNot(BeNil())

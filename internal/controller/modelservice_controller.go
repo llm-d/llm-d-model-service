@@ -18,6 +18,8 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -32,12 +34,72 @@ import (
 	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
 )
 
+const HF_PREFIX string = "hf://"
+const PVC_PREFIX string = "pvc://"
+
 // TODO: Decide where to requeue and where to requeueAfter
 
 // ModelServiceReconciler reconciles a ModelService object
 type ModelServiceReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+}
+
+// Context is intended to be use for interpolating template variables
+// in BaseConfig
+type TemplateVars struct {
+	ModelName             string `json:"modelName,omitempty"`
+	HFModelName           string `json:"hfModelName,omitempty"`
+	SanitizedModelName    string `json:"sanitizedModelName,omitempty"`
+	ModelPath             string `json:"modelPath,omitempty"`
+	EPPServiceName        string `json:"eppServiceName,omitempty"`
+	EPPDeploymentName     string `json:"eppDeploymentName,omitempty"`
+	PrefillDeploymentName string `json:"prefillDeploymentName,omitempty"`
+	DecodeDeploymentName  string `json:"decodeDeploymentName,omitempty"`
+	PrefillServiceName    string `json:"prefillServiceName,omitempty"`
+	DecodeServiceName     string `json:"decodeServiceName,omitempty"`
+	InferencePoolName     string `json:"inferencePoolName,omitempty"`
+	InferenceModelName    string `json:"inferenceModelName,omitempty"`
+}
+
+// from populates the field values for TemplateVars from the model service
+func (t *TemplateVars) from(ctx context.Context, msvc *msv1alpha1.ModelService) error {
+	if t == nil {
+		log.FromContext(ctx).V(1).Info("nil templatevars")
+		return fmt.Errorf("nil templatevars")
+	}
+
+	// non empty template vars; attempt to populate
+	if msvc == nil {
+		log.FromContext(ctx).V(1).Info("empty modelservice; nothing to do")
+		return nil
+	}
+
+	t.EPPServiceName = eppServiceName(msvc)
+	t.EPPDeploymentName = eppDeploymentName(msvc)
+	t.PrefillDeploymentName = deploymentName(msvc, PREFILL_ROLE)
+	t.DecodeDeploymentName = deploymentName(msvc, DECODE_ROLE)
+	t.PrefillServiceName = sanitizeSvcName(msvc, PREFILL_ROLE)
+	t.DecodeServiceName = sanitizeSvcName(msvc, DECODE_ROLE)
+	t.InferencePoolName = infPoolName(msvc)
+	t.InferenceModelName = infModelName(msvc)
+	t.ModelName = msvc.Spec.Routing.ModelName
+	t.SanitizedModelName = sanitizeModelName(msvc)
+
+	uri := msvc.Spec.ModelArtifacts.URI
+	if strings.HasPrefix(uri, HF_PREFIX) {
+		t.HFModelName = strings.TrimPrefix(uri, HF_PREFIX)
+		t.ModelPath = t.HFModelName
+	} else if strings.HasPrefix(uri, PVC_PREFIX) {
+		t.ModelPath = strings.TrimPrefix(uri, PVC_PREFIX)
+	} else {
+		err := fmt.Errorf("unsupported prefix")
+		log.FromContext(ctx).V(1).Error(err, "cannot get template vars", "uri", uri)
+		return err
+	}
+
+	return nil
+
 }
 
 // +kubebuilder:rbac:groups=llm-d.ai,resources=modelservices,verbs=get;list;watch;create;update;patch;delete
@@ -77,7 +139,7 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	log.FromContext(ctx).V(1).Info("attempting to get baseconfig object")
-	// Step 2: Get the baseconfig object if it exists
+	// Step 2: Get the interpolated baseconfig object if it exists
 	childResources, err := r.getChildResourcesFromConfigMap(ctx, modelService)
 	if err != nil {
 		return ctrl.Result{}, err
