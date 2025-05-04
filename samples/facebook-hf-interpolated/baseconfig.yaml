@@ -96,6 +96,8 @@ data:
               volumeMounts:
                 - name: config-decoder
                   mountPath: /vllm-workspace
+                - name: model-cache
+                  mountPath: /vllm-workspace/models
                 - name: model-storage
                   mountPath: /stored/models
               resources:
@@ -110,7 +112,6 @@ data:
             - name: config-decoder
               configMap:
                 name: {{ .ModelServiceName }}-config-decoder
-            # Should be model-storage?
             - name: model-cache
               emptyDir:
                 sizeLimit: 1Gi
@@ -152,6 +153,8 @@ data:
                   mountPath: /vllm-workspace
                 - name: model-cache
                   mountPath: /vllm-workspace/models
+                - name: model-storage
+                  mountPath: /stored/models
               ports:
                 - containerPort: 8000
                   protocol: TCP
@@ -165,9 +168,7 @@ data:
           volumes:
             - name: config-prefiller
               configMap:
-                name: {{ .ModelServiceName }}-config-prefiller
-            
-            # TODO: should be model-storage?
+                name: {{ .ModelServiceName }}-config-prefiller            
             - name: model-cache
               emptyDir:
                 sizeLimit: 1Gi
