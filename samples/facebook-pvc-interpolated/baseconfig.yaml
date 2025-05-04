@@ -88,8 +88,6 @@ data:
                   value: "1"
                 - name: VLLM_WORKER_MULTIPROC_METHOD
                   value: spawn
-                - name: HF_HUB_CACHE
-                  value: /vllm-workspace/models
               ports:
                 - containerPort: 55555
                   protocol: TCP
@@ -141,8 +139,6 @@ data:
                   value: "1"
                 - name: VLLM_WORKER_MULTIPROC_METHOD
                   value: spawn
-                - name: HF_HUB_CACHE
-                  value: /vllm-workspace/models
               volumeMounts:
                 - name: config-prefiller
                   mountPath: /vllm-workspace
@@ -222,11 +218,6 @@ data:
               env:
                 - name: KVCACHE_INDEXER_REDIS_ADDR
                   value: vllm-p2p-lookup-server-service:8100
-                - name: HF_TOKEN
-                  valueFrom:
-                    secretKeyRef:
-                      key: hf_token_llama3-8b-instruct
-                      name: vllm-p2p-secrets
               image: quay.io/llm-d/llm-d-gateway-api-inference-extension:0.0.4
               imagePullPolicy: Always
               livenessProbe:
