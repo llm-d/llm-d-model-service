@@ -52,6 +52,29 @@ type BaseConfig struct {
 	EPPService        *corev1.Service             `json:"eppService,omitempty"`
 }
 
+// InterpolateBaseConfigMap data strings using msvc template variable values
+func InterpolateBaseConfigMap(ctx context.Context, cm *corev1.ConfigMap, msvc *msv1alpha1.ModelService) (*corev1.ConfigMap, error) {
+	values := &TemplateVars{}
+	err := values.from(ctx, msvc)
+	if err != nil {
+		log.FromContext(ctx).V(1).Error(err, "cannot get template variable values from msvc")
+		return nil, err
+	}
+
+	// interpolate base config data
+	interpolated := cm.DeepCopy()
+	for key, tmplStr := range interpolated.Data {
+		rendering, err := renderTemplate(tmplStr, values)
+		if err != nil {
+			log.FromContext(ctx).V(1).Error(err, "cannot construct child resource")
+			return nil, err
+		}
+		interpolated.Data[key] = rendering
+	}
+
+	return interpolated, nil
+}
+
 func (r *ModelServiceReconciler) getChildResourcesFromConfigMap(
 	ctx context.Context,
 	msvc *msv1alpha1.ModelService,
@@ -76,7 +99,12 @@ func (r *ModelServiceReconciler) getChildResourcesFromConfigMap(
 		return nil, fmt.Errorf("failed to get ConfigMap: %w", err)
 	}
 
-	return BaseConfigFromCM(&cm)
+	interpolated, err := InterpolateBaseConfigMap(ctx, &cm, msvc)
+	if err != nil {
+		return nil, err
+	}
+
+	return BaseConfigFromCM(interpolated)
 }
 
 // BaseConfigFromCM returns a BaseConfig object if the input
