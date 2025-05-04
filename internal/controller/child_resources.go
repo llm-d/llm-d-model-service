@@ -317,6 +317,31 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 		if childResource.PrefillDeployment == nil {
 			childResource.PrefillDeployment = &appsv1.Deployment{}
 		}
+
+		var vllmArgs []string
+		var argsTobeCleared int
+		foundVllm := false
+		for i, container := range pdSpec.Containers {
+			if container.Name == "vllm" {
+				vllmArgs = container.Args
+				argsTobeCleared = i
+				foundVllm = true
+				break
+			}
+		}
+
+		if foundVllm {
+			pdSpec.Containers[argsTobeCleared].Args = nil
+		}
+
+		for i := range childResource.PrefillDeployment.Spec.Template.Spec.Containers {
+			if childResource.PrefillDeployment.Spec.Template.Spec.Containers[i].Name == "vllm" {
+				currentArgs := childResource.PrefillDeployment.Spec.Template.Spec.Containers[i].Args
+				childResource.PrefillDeployment.Spec.Template.Spec.Containers[i].Args = append(vllmArgs, currentArgs...)
+				break
+			}
+		}
+
 	}
 	if role == DECODE_ROLE {
 		if msvc.Spec.Decode != nil {
@@ -324,6 +349,30 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 		}
 		if childResource.DecodeDeployment == nil {
 			childResource.DecodeDeployment = &appsv1.Deployment{}
+		}
+
+		var vllmArgs []string
+		var argsTobeCleared int
+		foundVllm := false
+		for i, container := range pdSpec.Containers {
+			if container.Name == "vllm" {
+				vllmArgs = container.Args
+				argsTobeCleared = i
+				foundVllm = true
+				break
+			}
+		}
+
+		if foundVllm {
+			pdSpec.Containers[argsTobeCleared].Args = nil
+		}
+
+		for i := range childResource.DecodeDeployment.Spec.Template.Spec.Containers {
+			if childResource.PrefillDeployment.Spec.Template.Spec.Containers[i].Name == "vllm" {
+				currentArgs := childResource.DecodeDeployment.Spec.Template.Spec.Containers[i].Args
+				childResource.DecodeDeployment.Spec.Template.Spec.Containers[i].Args = append(vllmArgs, currentArgs...)
+				break
+			}
 		}
 	}
 
@@ -364,7 +413,6 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 		Labels: labels,
 	}
 
-	// Step 4: populate containers
 	depl.Spec.Template.Spec.Containers = msv1alpha1.ConvertToContainerSlice(pdSpec.Containers)
 	depl.Spec.Template.Spec.InitContainers = msv1alpha1.ConvertToContainerSlice(pdSpec.InitContainers)
 
