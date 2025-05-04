@@ -241,7 +241,7 @@ data:
                 failureThreshold: 3
                 grpc:
                   port: 9003
-                  service: inference-extension
+                  service: {{ .EPPServiceName }}
                 initialDelaySeconds: 5
                 periodSeconds: 10
                 successThreshold: 1
@@ -259,7 +259,7 @@ data:
                 failureThreshold: 3
                 grpc:
                   port: 9003
-                  service: inference-extension
+                  service: {{ .EPPServiceName }}
                 initialDelaySeconds: 5
                 periodSeconds: 10
                 successThreshold: 1
