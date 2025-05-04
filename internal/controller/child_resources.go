@@ -680,7 +680,7 @@ func (childResources *BaseConfig) mergeInferencePool(ctx context.Context, msvc *
 			EndpointPickerConfig: giev1alpha2.EndpointPickerConfig{
 				ExtensionRef: &giev1alpha2.Extension{
 					ExtensionReference: giev1alpha2.ExtensionReference{
-						Name: giev1alpha2.ObjectName(eppDeploymentName(msvc)),
+						Name: giev1alpha2.ObjectName(eppServiceName(msvc)),
 					},
 				},
 			},
