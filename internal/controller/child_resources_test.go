@@ -129,3 +129,98 @@ var _ = Describe("BaseConfig reader", func() {
 		}
 	})
 })
+
+// tests to check if templating works ok
+var _ = Describe("BaseConfig reader", func() {
+	var (
+		ctx        context.Context
+		reconciler *ModelServiceReconciler
+		msvc       *msv1alpha1.ModelService
+		cm         *corev1.ConfigMap
+	)
+
+	BeforeEach(func() {
+		ctx = context.Background()
+
+		// Create test deployment YAML
+		deployment := appsv1.Deployment{
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:    "vllm",
+								Command: []string{"vllm", "serve"},
+								Args:    []string{"{{ .HFModelName }}"},
+							},
+						},
+					},
+				},
+			},
+		}
+		deployYaml, err := yaml.Marshal(deployment)
+		Expect(err).To(BeNil())
+
+		// Create ConfigMap with a deployment inside
+		cm = &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-base-config",
+				Namespace: "default",
+			},
+			Data: map[string]string{
+				"prefillDeployment": string(deployYaml),
+			},
+		}
+
+		// Create ModelService referencing the ConfigMap
+		msvc = &msv1alpha1.ModelService{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-modelservice",
+				Namespace: "default",
+			},
+			Spec: msv1alpha1.ModelServiceSpec{
+				BaseConfigMapRef: &corev1.ObjectReference{
+					Name: "test-base-config",
+				},
+				ModelArtifacts: msv1alpha1.ModelArtifacts{
+					URI: "hf://facebook/opt-125m",
+				},
+			},
+		}
+
+		By("Creating the base config cm")
+		Expect(k8sClient.Create(ctx, cm)).To(Succeed())
+
+		By("Creating the msvc")
+		Expect(k8sClient.Create(ctx, msvc)).To(Succeed())
+
+		reconciler = &ModelServiceReconciler{
+			Client: k8sClient,
+			Scheme: k8sClient.Scheme(),
+		}
+	})
+
+	It("should correctly interpolate container args", func() {
+		bc, err := reconciler.getChildResourcesFromConfigMap(ctx, msvc)
+		Expect(err).To(BeNil())
+		Expect(bc).ToNot(BeNil())
+		Expect(bc.PrefillDeployment).ToNot(BeNil())
+		Expect(bc.PrefillDeployment.Spec.Template.Spec.Containers).ToNot(BeNil())
+		c := bc.PrefillDeployment.Spec.Template.Spec.Containers[0]
+		Expect(c.Args).ToNot(BeNil())
+		Expect(c.Args[0]).To(Equal("facebook/opt-125m"))
+	})
+
+	AfterEach(func() {
+		// Clean up resources after each test
+		err := k8sClient.Delete(ctx, msvc)
+		if err != nil && !errors.IsNotFound(err) {
+			Fail(fmt.Sprintf("Failed to delete ModelService: %v", err))
+		}
+
+		err = k8sClient.Delete(ctx, cm)
+		if err != nil && !errors.IsNotFound(err) {
+			Fail(fmt.Sprintf("Failed to delete ConfigMap: %v", err))
+		}
+	})
+})
