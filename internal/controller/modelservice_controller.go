@@ -48,6 +48,8 @@ type ModelServiceReconciler struct {
 // Context is intended to be use for interpolating template variables
 // in BaseConfig
 type TemplateVars struct {
+	ModelServiceName      string `json:"modelServiceName,omitempty"`
+	ModelServiceNamespace string `json:"modelServiceNamespace,omitempty"`
 	ModelName             string `json:"modelName,omitempty"`
 	HFModelName           string `json:"hfModelName,omitempty"`
 	SanitizedModelName    string `json:"sanitizedModelName,omitempty"`
@@ -75,6 +77,8 @@ func (t *TemplateVars) from(ctx context.Context, msvc *msv1alpha1.ModelService) 
 		return nil
 	}
 
+	t.ModelServiceName = msvc.Name
+	t.ModelServiceNamespace = msvc.Namespace
 	t.EPPServiceName = eppServiceName(msvc)
 	t.EPPDeploymentName = eppDeploymentName(msvc)
 	t.PrefillDeploymentName = deploymentName(msvc, PREFILL_ROLE)
@@ -91,7 +95,9 @@ func (t *TemplateVars) from(ctx context.Context, msvc *msv1alpha1.ModelService) 
 		t.HFModelName = strings.TrimPrefix(uri, HF_PREFIX)
 		t.ModelPath = t.HFModelName
 	} else if strings.HasPrefix(uri, PVC_PREFIX) {
-		t.ModelPath = strings.TrimPrefix(uri, PVC_PREFIX)
+		tail := strings.TrimPrefix(uri, PVC_PREFIX)
+		segments := strings.Split(tail, pathSep)
+		t.ModelPath = strings.Join(segments[1:], pathSep)
 	} else {
 		err := fmt.Errorf("unsupported prefix")
 		log.FromContext(ctx).V(1).Error(err, "cannot get template vars", "uri", uri)
