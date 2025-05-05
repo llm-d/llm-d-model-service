@@ -138,6 +138,28 @@ func TestMergeContainerSlices(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name: "with args append where srcContainer.Args takes precedence",
+			destSlice: []corev1.Container{
+				{
+					Name: "c1",
+					Args: []string{"--destArg1", "--destArg2"},
+				},
+			},
+			srcSlice: []corev1.Container{
+				{
+					Name: "c1", // note name is same as dest
+					Args: []string{"--arg1", "--arg2"},
+				},
+			},
+			expectedMergedSlice: []corev1.Container{
+				{
+					Name: "c1",
+					Args: []string{"--arg1", "--arg2", "--destArg1", "--destArg2"},
+				},
+			},
+			expectError: false,
+		},
+		{
 			name: "with command override",
 			destSlice: []corev1.Container{
 				{
