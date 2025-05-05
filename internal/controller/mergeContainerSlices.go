@@ -156,16 +156,40 @@ func (e envVarSliceTransformer) Transformer(typ reflect.Type) func(dst, src refl
 // stringSlicePrependTransformer: transformer for merging two EnvVars
 type stringSlicePrependTransformer struct{}
 
-// Transformer for []string for Container.Args
-func (e stringSlicePrependTransformer) Transformer(typ reflect.Type) func(dst, src reflect.Value) error {
+// Transformer for []string, such as Container.Args so that src args get prepended, not appended
+func (stringSlicePrependTransformer) Transformer(t reflect.Type) func(dst, src reflect.Value) error {
+	if t.Kind() == reflect.Slice && t.Elem().Kind() == reflect.String {
+		return func(dst, src reflect.Value) error {
+			// Ensure dst is settable
+			if !dst.CanSet() {
+				return nil
+			}
+			if src.IsNil() || src.Len() == 0 {
+				return nil
+			}
 
-	// mergeKey for merging two EnvVars is the Name of the EnvVar
-	mergeKey := "Name"
-	mergeFunc := func(dst *corev1.EnvVar, src corev1.EnvVar) error {
-		return mergo.Merge(dst, src, mergo.WithOverride)
+			// Combine: src first, then dst
+			merged := reflect.AppendSlice(src, dst)
+			dst.Set(merged)
+			return nil
+		}
 	}
+	return nil
+}
 
-	return genericSliceTransformer(typ, mergeFunc, mergeKey)
+// compositeTransformer is a list of transformers to apply in a single mergo.Merge call
+type compositeTransformer struct {
+	transformers []mergo.Transformers
+}
+
+// Transformer takes in a list of Transformers and applies them one by one
+func (ct compositeTransformer) Transformer(t reflect.Type) func(dst, src reflect.Value) error {
+	for _, tr := range ct.transformers {
+		if fn := tr.Transformer(t); fn != nil {
+			return fn
+		}
+	}
+	return nil
 }
 
 // containerSliceTransformer: transformer for merging two Containers
@@ -179,13 +203,6 @@ func (c containerSliceTransformer) Transformer(typ reflect.Type) func(dst, src r
 	mergeKey := "Name"
 	mergeFunc := func(dstContainer *corev1.Container, srcContainer corev1.Container) error {
 
-		// srcContainer.Args should take precendence (get added before) over dstContainer.Args
-		srcContainerArgTemp := make([]string, len(srcContainer.Args))
-		copy(srcContainerArgTemp, srcContainer.Args)
-
-		srcContainer.Args = dstContainer.Args
-		dstContainer.Args = srcContainerArgTemp
-
 		// Command should be completely overriden, not appended
 		if len(srcContainer.Command) > 0 {
 			dstContainer.Command = []string{}
@@ -195,8 +212,12 @@ func (c containerSliceTransformer) Transformer(typ reflect.Type) func(dst, src r
 			srcContainer,
 			mergo.WithAppendSlice,
 			mergo.WithOverride,
-			mergo.WithTransformers(envVarSliceTransformer{}),
-			mergo.WithTransformers(stringSlicePrependTransformer{}),
+			mergo.WithTransformers(compositeTransformer{
+				transformers: []mergo.Transformers{
+					envVarSliceTransformer{},
+					stringSlicePrependTransformer{},
+				},
+			}),
 		)
 
 		if err != nil {

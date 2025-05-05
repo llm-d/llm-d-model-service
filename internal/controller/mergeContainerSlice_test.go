@@ -17,11 +17,21 @@ limitations under the License.
 package controller
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 )
+
+// assertEqualSlices checks if two slices are equal in length, order, and content.
+func assertEqualSlices[T comparable](t *testing.T, got, want []T) {
+	if !reflect.DeepEqual(got, want) {
+		sliceError := fmt.Errorf("slices do not match:\ngot:  %v\nwant: %v", got, want)
+		assert.NoError(t, sliceError, "error with comparing slices")
+	}
+}
 
 func TestMergeContainerSlices(t *testing.T) {
 
@@ -228,9 +238,9 @@ func TestMergeContainerSlices(t *testing.T) {
 					// Assert image
 					assert.Equal(t, expectedContainer.Image, actualContainer.Image)
 
-					assert.ElementsMatch(t, expectedContainer.Args, actualContainer.Args)
-					assert.ElementsMatch(t, expectedContainer.Command, actualContainer.Command)
-					assert.ElementsMatch(t, expectedContainer.Env, actualContainer.Env)
+					assertEqualSlices(t, expectedContainer.Args, actualContainer.Args)
+					assertEqualSlices(t, expectedContainer.Command, actualContainer.Command)
+					assertEqualSlices(t, expectedContainer.Env, actualContainer.Env)
 
 					// add more assertions
 					// ...
@@ -239,5 +249,4 @@ func TestMergeContainerSlices(t *testing.T) {
 			}
 		})
 	}
-
 }
