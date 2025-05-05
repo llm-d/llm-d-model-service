@@ -81,6 +81,16 @@ func eppServiceName(modelService *msv1alpha1.ModelService) string {
 	return sanitizedName
 }
 
+// infPoolName returns the name of the inference pool object
+func pdServiceAccountName(modelService *msv1alpha1.ModelService) string {
+	return ""
+}
+
+// infPoolName returns the name of the inference pool object
+func eppServiceAccountName(modelService *msv1alpha1.ModelService) string {
+	return ""
+}
+
 // infModelName returns the name of the inference model object
 func infModelName(modelService *msv1alpha1.ModelService) string {
 	return modelService.Name
