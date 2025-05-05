@@ -629,7 +629,7 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 	}
 
 	if childResource.EPPService != nil {
-		err := childResource.createEppService(ctx, r.Client, *childResource.EPPService)
+		err := childResource.createEppService(ctx, r.Client)
 		if err != nil {
 			log.FromContext(ctx).V(1).Error(err, "unable to create epp service")
 		}
@@ -658,13 +658,6 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 
 	if childResource.PDRoleBinding != nil {
 		err := childResource.createPDRoleBinding(ctx, r.Client)
-		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "unable to create a rolebinding for PD service account")
-		}
-	}
-
-	if childResource.PDRoleBinding != nil {
-		err := childResource.createPDRoleBinding(ctx, r.Client, *childResource.PDRoleBinding)
 		if err != nil {
 			log.FromContext(ctx).V(1).Error(err, "unable to create a rolebinding for PD service account")
 		}
@@ -977,7 +970,7 @@ func (childResource *BaseConfig) createEppDeployment(ctx context.Context, kubeCl
 }
 
 // createEppDeployment spawns epp service from immutable configmap
-func (childResource *BaseConfig) createEppService(ctx context.Context, kubeClient client.Client, eppService corev1.Service) error {
+func (childResource *BaseConfig) createEppService(ctx context.Context, kubeClient client.Client) error {
 
 	if childResource == nil || childResource.EPPService == nil {
 		return nil
@@ -988,7 +981,7 @@ func (childResource *BaseConfig) createEppService(ctx context.Context, kubeClien
 		Namespace: childResource.EPPService.Namespace,
 	}}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &eppService, func() error {
+	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &serviceTobeCreatedOrUpdated, func() error {
 		serviceTobeCreatedOrUpdated.Labels = childResource.EPPService.Labels
 		serviceTobeCreatedOrUpdated.OwnerReferences = childResource.EPPService.OwnerReferences
 		serviceTobeCreatedOrUpdated.Spec = childResource.EPPService.Spec
