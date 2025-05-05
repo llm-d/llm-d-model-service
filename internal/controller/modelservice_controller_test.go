@@ -328,6 +328,28 @@ var _ = Describe("ModelService Controller", func() {
 			Expect(rolebinding.Name).To(Equal(modelService.Name + "-pd-rolebinding"))
 			Expect(rolebinding.OwnerReferences).ToNot(BeEmpty())
 
+			By("Checking if a epp SA was created")
+			sa = corev1.ServiceAccount{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: eppServiceAccountName(modelService), Namespace: namespace}, &sa)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+
+			By("Checking if epp SA has the correct owner reference")
+			Expect(sa.Name).To(Equal(eppServiceAccountName(modelService)))
+			Expect(sa.OwnerReferences).ToNot(BeEmpty())
+
+			By("Checking if a epp RoleBinding was created")
+			rolebinding = rbacv1.RoleBinding{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: modelService.Name + "-epp-rolebinding", Namespace: namespace}, &rolebinding)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+
+			By("Checking if epp RoleBinding has correct owner reference")
+			Expect(rolebinding.Name).To(Equal(modelService.Name + "-epp-rolebinding"))
+			Expect(rolebinding.OwnerReferences).ToNot(BeEmpty())
+
 			By("Checking if ModelService status has been updated")
 			Eventually(func() string {
 				updatedModelService := &msv1alpha1.ModelService{}
