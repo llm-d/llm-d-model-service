@@ -153,6 +153,45 @@ func (e envVarSliceTransformer) Transformer(typ reflect.Type) func(dst, src refl
 	return genericSliceTransformer(typ, mergeFunc, mergeKey)
 }
 
+// stringSlicePrependTransformer: transformer for merging two string slices
+type stringSlicePrependTransformer struct{}
+
+// Transformer for []string, such as Container.Args so that src args get prepended, not appended
+func (stringSlicePrependTransformer) Transformer(t reflect.Type) func(dst, src reflect.Value) error {
+	if t.Kind() == reflect.Slice && t.Elem().Kind() == reflect.String {
+		return func(dst, src reflect.Value) error {
+			// Ensure dst is settable
+			if !dst.CanSet() {
+				return nil
+			}
+			if src.IsNil() || src.Len() == 0 {
+				return nil
+			}
+
+			// Combine: src first, then dst
+			merged := reflect.AppendSlice(src, dst)
+			dst.Set(merged)
+			return nil
+		}
+	}
+	return nil
+}
+
+// compositeTransformer is a list of transformers to apply in a single mergo.Merge call
+type compositeTransformer struct {
+	transformers []mergo.Transformers
+}
+
+// Transformer takes in a list of Transformers and applies them one by one
+func (ct compositeTransformer) Transformer(t reflect.Type) func(dst, src reflect.Value) error {
+	for _, tr := range ct.transformers {
+		if fn := tr.Transformer(t); fn != nil {
+			return fn
+		}
+	}
+	return nil
+}
+
 // containerSliceTransformer: transformer for merging two Containers
 type containerSliceTransformer struct{}
 
@@ -162,22 +201,30 @@ func (c containerSliceTransformer) Transformer(typ reflect.Type) func(dst, src r
 
 	// mergeKey for merging two Containers is the Name of the Container
 	mergeKey := "Name"
+
+	// dstContainer (comes from baseconfig)
+	// srcContainer (comes from msvc and controller logic)
 	mergeFunc := func(dstContainer *corev1.Container, srcContainer corev1.Container) error {
+
+		// Command should be completely overriden, not appended
+		if len(srcContainer.Command) > 0 {
+			dstContainer.Command = []string{}
+		}
 
 		err := mergo.Merge(dstContainer,
 			srcContainer,
 			mergo.WithAppendSlice,
 			mergo.WithOverride,
-			mergo.WithTransformers(envVarSliceTransformer{}),
+			mergo.WithTransformers(compositeTransformer{
+				transformers: []mergo.Transformers{
+					envVarSliceTransformer{},
+					stringSlicePrependTransformer{},
+				},
+			}),
 		)
 
 		if err != nil {
 			return err
-		}
-
-		// Command should be completely overriden, not appended
-		if len(srcContainer.Command) > 0 {
-			dstContainer.Command = srcContainer.Command
 		}
 
 		return nil
