@@ -25,6 +25,7 @@ import (
 	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -50,6 +51,10 @@ type BaseConfig struct {
 	InferenceModel    *giev1alpha2.InferenceModel `json:"inferenceModel,omitempty"`
 	EPPDeployment     *appsv1.Deployment          `json:"eppDeployment,omitempty"`
 	EPPService        *corev1.Service             `json:"eppService,omitempty"`
+	EPPServiceAccount *corev1.ServiceAccount      `json:"eppServiceAccount,omitempty"`
+	PDServiceAccount  *corev1.ServiceAccount      `json:"pdServiceAccount,omitempty"`
+	EPPRoleBinding    *rbacv1.RoleBinding         `json:"eppRoleBinding,omitempty"`
+	PDRoleBinding     *rbacv1.RoleBinding         `json:"pdRoleBinding,omitempty"`
 }
 
 // InterpolateBaseConfigMap data strings using msvc template variable values
@@ -64,11 +69,14 @@ func InterpolateBaseConfigMap(ctx context.Context, cm *corev1.ConfigMap, msvc *m
 	// interpolate base config data
 	interpolated := cm.DeepCopy()
 	for key, tmplStr := range interpolated.Data {
+		// render first time with the user-exposed values;
+		// these values can be used to interpolate user-defined base config templates
 		rendering, err := renderTemplate(tmplStr, values)
 		if err != nil {
 			log.FromContext(ctx).V(1).Error(err, "cannot construct child resource")
 			return nil, err
 		}
+
 		interpolated.Data[key] = rendering
 	}
 
@@ -151,42 +159,70 @@ func BaseConfigFromCM(cm *corev1.ConfigMap) (*BaseConfig, error) {
 	if err := deserialize("eppService", &bc.EPPService); err != nil {
 		return nil, fmt.Errorf("failed to decode eppService: %w", err)
 	}
+	// TODO: deserialize SAs and rolebindings from the baseconfig CM
 
 	return bc, nil
 }
 
 // MergeChildResources merges the MSVC resources into BaseConfig resources
 // merging means MSVC controller is overwriting some fields, such as Name and Namespace for that resource
-func (childResource *BaseConfig) MergeChildResources(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
-	childResource = childResource.mergeConfigMaps(ctx, msvc, scheme)
-	if msvc.Spec.Prefill != nil {
-		log.FromContext(ctx).V(1).Info("merging Prefill Deployment and Service")
-		childResource = childResource.mergePDDeployment(ctx, msvc, PREFILL_ROLE, scheme).
-			mergePDService(ctx, msvc, PREFILL_ROLE, scheme)
-	}
-	if msvc.Spec.Decode != nil {
-		log.FromContext(ctx).V(1).Info("merging Decode Deployment and Service")
-		childResource = childResource.mergePDDeployment(ctx, msvc, DECODE_ROLE, scheme).
-			mergePDService(ctx, msvc, DECODE_ROLE, scheme)
-	}
-	if childResource.EPPDeployment != nil {
-		log.FromContext(ctx).V(1).Info("merging EPP Deployment and Service")
-		childResource = childResource.mergeEppDeployment(ctx, msvc, scheme)
-	}
-	if childResource.EPPService != nil {
-		log.FromContext(ctx).V(1).Info("merging EPP Deployment and Service")
-		childResource = childResource.mergeEppService(ctx, msvc, scheme)
-	}
-	if childResource.InferencePool != nil {
-		log.FromContext(ctx).V(1).Info("merging InferencePool")
-		childResource = childResource.mergeInferencePool(ctx, msvc, scheme)
-	}
-	if childResource.InferenceModel != nil {
-		log.FromContext(ctx).V(1).Info("merging EPP InferenceModel")
-		childResource = childResource.mergeInferenceModel(ctx, msvc, scheme)
+func (interpolatedBaseConfig *BaseConfig) MergeChildResources(ctx context.Context, modelService *msv1alpha1.ModelService, scheme *runtime.Scheme, rbacOptions *RBACOptions) *BaseConfig {
+	log.FromContext(ctx).V(1).Info("attempting to update configmaps")
+	// Step: update configmaps
+	if interpolatedBaseConfig.ConfigMaps != nil {
+		interpolatedBaseConfig.mergeConfigMaps(ctx, modelService, scheme)
 	}
 
-	return childResource
+	log.FromContext(ctx).V(1).Info("attempting to update prefill deployment")
+	// Step 3: update the child resources
+	// Idea: updates do the mergo merge
+	if modelService.Spec.Prefill != nil || interpolatedBaseConfig.PrefillDeployment != nil {
+		interpolatedBaseConfig.mergePDDeployment(ctx, modelService, PREFILL_ROLE, scheme)
+		interpolatedBaseConfig.mergePDService(ctx, modelService, PREFILL_ROLE, scheme)
+	}
+	log.FromContext(ctx).V(1).Info("attempting to update decode deployment")
+	if modelService.Spec.Decode != nil || interpolatedBaseConfig.DecodeDeployment != nil {
+		interpolatedBaseConfig.mergePDDeployment(ctx, modelService, DECODE_ROLE, scheme)
+		interpolatedBaseConfig.mergePDService(ctx, modelService, DECODE_ROLE, scheme)
+	}
+
+	if interpolatedBaseConfig.PrefillDeployment != nil || interpolatedBaseConfig.DecodeDeployment != nil {
+		// some pd pods are getting created; set SA and RB here
+		interpolatedBaseConfig.setPDServiceAccount(ctx, modelService, rbacOptions)
+		// this is role binding with a cluster role
+		interpolatedBaseConfig.setPDRoleBinding(ctx, modelService, rbacOptions)
+	}
+
+	// if both prefill and decode are missing, then don't bother with
+	// p & d SA and rolebindings;
+	// else create them.
+	/* Todo: implement this
+	if interpolatedBaseConfig.<pd-sa,pd-role-binding> != nil {
+		log.FromContext(ctx).V(1).Info("attempting to merge <pd-sa,pd-role-binding>")
+		interpolatedBaseConfig.merge<pd-sa,pd-role-binding>(ctx, modelService, scheme)
+	}
+	*/
+
+	if interpolatedBaseConfig.InferencePool != nil {
+		log.FromContext(ctx).V(1).Info("attempting to update inference pool")
+		interpolatedBaseConfig.mergeInferencePool(ctx, modelService, scheme)
+	}
+
+	if interpolatedBaseConfig.InferenceModel != nil {
+		log.FromContext(ctx).V(1).Info("attempting to update inference model")
+		interpolatedBaseConfig.mergeInferenceModel(ctx, modelService, scheme)
+	}
+
+	if interpolatedBaseConfig.EPPDeployment != nil {
+		log.FromContext(ctx).V(1).Info("attempting to update epp deployment and service")
+		interpolatedBaseConfig.mergeEppDeployment(ctx, modelService, scheme)
+		interpolatedBaseConfig.mergeEppService(ctx, modelService, scheme)
+		interpolatedBaseConfig.setEPPServiceAccount(ctx, modelService, rbacOptions)
+		// this is role binding with a cluster role
+		interpolatedBaseConfig.setEPPRoleBinding(ctx, modelService, rbacOptions)
+	}
+
+	return interpolatedBaseConfig
 }
 
 // mergeConfigMaps creates config maps for found in base config
@@ -425,10 +461,12 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 		}
 	}
 
+	// set service account for pd pods
+	depl.Spec.Template.Spec.ServiceAccountName = pdServiceAccountName(msvc)
+
 	// Step 9: We need to figure out the volume mount story in
 	// addition to the volume story above ...
 
-	// Final step:
 	// In Mergo merge...
 	// We create a destination deployment object from baseconfig
 	// We create a source deployment object from model service
@@ -489,6 +527,15 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 			log.FromContext(ctx).V(1).Error(err, "unable to create epp service")
 		}
 	}
+
+	if childResource.EPPServiceAccount != nil {
+		err := childResource.createEppServiceAccount(ctx, r.Client, *childResource.EPPServiceAccount)
+		if err != nil {
+			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
+		}
+	}
+	// TODO: repeat the above for pd-sa, epp-rb, pd-rb
+
 	return nil
 }
 
@@ -638,6 +685,9 @@ func (childResources *BaseConfig) mergeEppDeployment(ctx context.Context, msvc *
 	src.Spec.Template.ObjectMeta = metav1.ObjectMeta{
 		Labels: eppLabels,
 	}
+
+	// set epp service account name
+	src.Spec.Template.Spec.ServiceAccountName = eppServiceAccountName(msvc)
 
 	if err := mergo.Merge(&dest, src, mergo.WithOverride); err != nil {
 		log.FromContext(ctx).V(1).Error(err, "problem with epp deployment merge")

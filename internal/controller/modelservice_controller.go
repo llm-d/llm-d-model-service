@@ -39,8 +39,28 @@ const PVC_PREFIX string = "pvc://"
 
 // TODO: Decide where to requeue and where to requeueAfter
 
+// RBACOptions provides the options need to create service accounts and
+// role binding during reconcile
+type RBACOptions struct {
+	// EPPPullSecrets contains names of epp pull secrets
+	// the secrets objects are assumed to be in the controller namespace
+	// these are pull secrets used by epp deployment created by the controller
+	EPPPullSecrets []string
+	// PDPullSecrets contains names of pd pull secrets;
+	// the secrets objects are assumed to be in the controller namespace
+	// these are pull secrets used by pd deployment created by the controller
+	PDPullSecrets []string
+	// EPPClusterRole name of the epp cluster role
+	// this is a cluster role used in the rolebinding for the epp deployment
+	EPPClusterRole string
+	// PDClusterRole name of the pd cluster role
+	// this is a cluster role used in the rolebinding for the pd deployments
+	PDClusterRole string
+}
+
 // ModelServiceReconciler reconciles a ModelService object
 type ModelServiceReconciler struct {
+	RBACOptions RBACOptions
 	client.Client
 	Scheme *runtime.Scheme
 }
@@ -146,60 +166,25 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	log.FromContext(ctx).V(1).Info("attempting to get baseconfig object")
 	// Step 2: Get the interpolated baseconfig object if it exists
-	childResources, err := r.getChildResourcesFromConfigMap(ctx, modelService)
+	interpolatedBaseConfig, err := r.getChildResourcesFromConfigMap(ctx, modelService)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	log.FromContext(ctx).V(1).Info("attempting to update configmaps")
-	// Step: update configmaps
-	if childResources.ConfigMaps != nil {
-		childResources.mergeConfigMaps(ctx, modelService, r.Scheme)
-	}
-
-	log.FromContext(ctx).V(1).Info("attempting to update prefill deployment")
-	// Step 3: update the child resources
-	// Idea: updates do the mergo merge
-	if modelService.Spec.Prefill != nil || childResources.PrefillDeployment != nil {
-		childResources.mergePDDeployment(ctx, modelService, PREFILL_ROLE, r.Scheme)
-		childResources.mergePDService(ctx, modelService, PREFILL_ROLE, r.Scheme)
-	}
-	log.FromContext(ctx).V(1).Info("attempting to update decode deployment")
-	if modelService.Spec.Decode != nil || childResources.DecodeDeployment != nil {
-		childResources.mergePDDeployment(ctx, modelService, DECODE_ROLE, r.Scheme)
-		childResources.mergePDService(ctx, modelService, DECODE_ROLE, r.Scheme)
-	}
-
-	if childResources.InferencePool != nil {
-		log.FromContext(ctx).V(1).Info("attempting to update inference pool")
-		childResources.mergeInferencePool(ctx, modelService, r.Scheme)
-	}
-
-	if childResources.InferenceModel != nil {
-		log.FromContext(ctx).V(1).Info("attempting to update inference model")
-		childResources.mergeInferenceModel(ctx, modelService, r.Scheme)
-	}
-
-	if childResources.EPPDeployment != nil {
-		log.FromContext(ctx).V(1).Info("attempting to update epp deployment and service")
-		childResources.mergeEppDeployment(ctx, modelService, r.Scheme)
-		childResources.mergeEppService(ctx, modelService, r.Scheme)
-	}
-
-	// and so on
-	// TODO: update other objects here
+	interpolatedBaseConfig = interpolatedBaseConfig.MergeChildResources(ctx, modelService, r.Scheme, &r.RBACOptions)
 
 	// TODO: Post-process for decoupled Scaling
 	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate child resources")
-	err = childResources.createOrUpdate(ctx, r)
+	err = interpolatedBaseConfig.createOrUpdate(ctx, r)
 
 	// we will deal with status later
 	// err = r.updateStatus(modelService)
-	populateStatus(ctx, modelService, r.Client, childResources.PrefillDeployment,
-		childResources.DecodeDeployment,
-		childResources.EPPDeployment,
-		childResources.InferenceModel,
-		childResources.InferencePool)
+	populateStatus(ctx, modelService, r.Client, interpolatedBaseConfig.PrefillDeployment,
+		interpolatedBaseConfig.DecodeDeployment,
+		interpolatedBaseConfig.EPPDeployment,
+		interpolatedBaseConfig.InferenceModel,
+		interpolatedBaseConfig.InferencePool)
+
 	if err := r.Status().Update(ctx, modelService); err != nil {
 		log.FromContext(ctx).Error(err, "unable to update ModelService status")
 		return ctrl.Result{}, err
