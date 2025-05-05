@@ -19,6 +19,14 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - serviceaccount
+  verbs:
+  - create
+  - delete
+  - update
+- apiGroups:
+  - ""
+  resources:
   - services
   verbs:
   - create
@@ -89,7 +97,6 @@ rules:
   - rbac.authorization.k8s.io
   resources:
   - rolebinding
-  - serviceaccount
   verbs:
   - create
   - delete
