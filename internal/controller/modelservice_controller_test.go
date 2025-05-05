@@ -16,23 +16,147 @@ limitations under the License.
 
 package controller
 
-/*
 import (
+	"context"
+	"fmt"
+	"time"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/yaml"
+
 	. "github.com/onsi/ginkgo/v2"
+
+	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-*/
 
-// const namespace = "default"
-// const modelServiceName = "llama-3-1-8b-instruct"
-// const decodeWorkloadName = "llama-3-1-8b-instruct-decode"
-// const prefillWorkloadName = "llama-3-1-8b-instruct-prefill"
+const namespace = "default"
+const modelServiceName = "llama-3-1-8b-instruct"
+const decodeWorkloadName = "llama-3-1-8b-instruct-decode"
+const prefillWorkloadName = "llama-3-1-8b-instruct-prefill"
 
-// // TODO: change image
-// const imageName = "quay.io/redhattraining/hello-world-nginx"
+const configMapYAML = `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: basic-base-conf
+data:
+  decodeDeployment: |
+    spec:
+      replicas: 2
+      template:
+        spec:
+          containers:
+          - name: llm
+            command:
+            - sleep
+  decodeService: |
+    spec:
+      selector:
+        app.kubernetes.io/name: decodeServiceLabelInBaseConfig
+      ports:
+        - protocol: TCP
+          port: 80
+          targetPort: 9376
+  prefillDeployment: |
+    spec:
+      replicas: 2
+      template:
+        spec:
+          containers:
+          - name: llm
+            command:
+            - sleep
+  prefillService: |
+    spec:
+      selector:
+        app.kubernetes.io/name: prefillServiceLabelInBaseConfig
+      ports:
+        - protocol: TCP
+          port: 80
+          targetPort: 9376
+  inferenceModel: |
+    spec:
+      criticality: Standard    
+  inferencePool: |
+    spec:
+      targetPortNumber: 9376
+  eppDeployment: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: epp
+      namespace: default
+    spec:
+      replicas: 1
+      template:
+        spec:
+          terminationGracePeriodSeconds: 130
+          containers:
+          - name: epp
+            image: us-central1-docker.pkg.dev/k8s-staging-images/gateway-api-inference-extension/epp:main
+            imagePullPolicy: Always
+            args:
+            - -poolName
+            - my-pool-name
+            - -poolNamespace
+            - my-pool-namespace
+            - -v
+            - "4"
+            - --zap-encoder
+            - "json"
+            - -grpcPort
+            - "9002"
+            - -grpcHealthPort
+            - "9003"
+            env:
+            - name: USE_STREAMING
+              value: "true"
+            ports:
+            - containerPort: 9002
+            - containerPort: 9003
+            - name: metrics
+              containerPort: 9090
+            livenessProbe:
+              grpc:
+                port: 9003
+                service: inference-extension
+              initialDelaySeconds: 5
+              periodSeconds: 10
+            readinessProbe:
+              grpc:
+                port: 9003
+                service: inference-extension
+              initialDelaySeconds: 5
+              periodSeconds: 10 
+  eppService: |
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: llm-llama3-8b-instruct-epp
+      namespace: default
+    spec:
+      selector:
+        app: llm-llama3-8b-instruct-epp
+      ports:
+      - protocol: TCP
+        port: 9002
+        targetPort: 9002
+        appProtocol: http2
+    type: ClusterIP
+`
+
+// TODO: change image
+var imageName = "quay.io/redhattraining/hello-world-nginx"
 
 // this test needs to change... commenting for now ...
-/*
+
 var _ = Describe("ModelService Controller", func() {
 	Context("When reconciling a resource", func() {
 		//ctx := context.Background()
@@ -57,31 +181,46 @@ var _ = Describe("ModelService Controller", func() {
 						URI: "pvc://llama-pvc/path/to/model",
 					},
 					Routing: msv1alpha1.Routing{
-						InferencePoolRef: modelServiceName,
+						ModelName: modelServiceName,
 					},
 					DecoupleScaling: false,
-					Decode: msv1alpha1.PDSpec{
-						VLLMContainer: &corev1.Container{
-							Name:  "vllm",
-							Image: imageName,
-						},
-						VLLMProxyContainer: &corev1.Container{
-							Name:  "vllm-proxy",
-							Image: imageName,
+					Decode: &msv1alpha1.PDSpec{
+						Containers: []msv1alpha1.ContainerSpec{
+							{
+								Name:  "llm",
+								Image: &imageName,
+							},
 						},
 					},
 					Prefill: &msv1alpha1.PDSpec{
-						VLLMContainer: &corev1.Container{
-							Name:  "vllm",
-							Image: imageName,
+						Containers: []msv1alpha1.ContainerSpec{
+							{
+								Name:  "llm",
+								Image: &imageName,
+							},
 						},
-						VLLMProxyContainer: &corev1.Container{
-							Name:  "vllm-proxy",
-							Image: imageName,
-						},
+					},
+					BaseConfigMapRef: &corev1.ObjectReference{
+						Name:      "basic-base-conf",
+						Namespace: "default",
 					},
 				},
 			}
+			By("Creating the basic base configmap")
+			var cm corev1.ConfigMap
+			err := yaml.Unmarshal([]byte(configMapYAML), &cm)
+			Expect(err).NotTo(HaveOccurred())
+
+			cm.Namespace = "default"
+
+			err = k8sClient.Create(ctx, &cm)
+			Expect(err).NotTo(HaveOccurred())
+
+			var fetched corev1.ConfigMap
+			key := client.ObjectKey{Name: cm.Name, Namespace: cm.Namespace}
+			err = k8sClient.Get(ctx, key, &fetched)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(fetched.Data).To(HaveKey("decodeDeployment"))
 
 			By("Creating the ModelService CR")
 			Expect(k8sClient.Create(ctx, modelService)).To(Succeed())
@@ -91,7 +230,7 @@ var _ = Describe("ModelService Controller", func() {
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}
-			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      modelService.Name,
 					Namespace: modelService.Namespace,
@@ -165,4 +304,3 @@ var _ = Describe("ModelService Controller", func() {
 
 	})
 })
-*/
