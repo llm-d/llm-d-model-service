@@ -217,9 +217,9 @@ func (interpolatedBaseConfig *BaseConfig) MergeChildResources(ctx context.Contex
 		log.FromContext(ctx).V(1).Info("attempting to update epp deployment and service")
 		interpolatedBaseConfig.mergeEppDeployment(ctx, modelService, scheme)
 		interpolatedBaseConfig.mergeEppService(ctx, modelService, scheme)
-		interpolatedBaseConfig.setEPPServiceAccount(ctx, modelService, rbacOptions)
+		interpolatedBaseConfig.setEPPServiceAccount(modelService, rbacOptions)
 		// this is role binding with a cluster role
-		interpolatedBaseConfig.setEPPRoleBinding(ctx, modelService, rbacOptions)
+		interpolatedBaseConfig.setEPPRoleBinding(ctx, modelService, rbacOptions, scheme)
 	}
 
 	return interpolatedBaseConfig
@@ -500,11 +500,57 @@ func (childResource *BaseConfig) setPDRoleBinding(ctx context.Context, msvc *msv
 
 }
 
-func (childResource *BaseConfig) setEPPServiceAccount(ctx context.Context, msvc *msv1alpha1.ModelService, rbacOptions *RBACOptions) {
+func (childResource *BaseConfig) setEPPServiceAccount(msvc *msv1alpha1.ModelService, rbacOptions *RBACOptions) *BaseConfig {
+
+	eppServiceAccount := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      eppServiceAccountName(msvc),
+			Namespace: msvc.Namespace,
+		},
+	}
+
+	for _, name := range rbacOptions.PDPullSecrets {
+		eppServiceAccount.ImagePullSecrets = append(eppServiceAccount.ImagePullSecrets, corev1.LocalObjectReference{Name: name})
+	}
+
+	childResource.PDServiceAccount = eppServiceAccount
+
+	return childResource
 
 }
 
-func (childResource *BaseConfig) setEPPRoleBinding(ctx context.Context, msvc *msv1alpha1.ModelService, rbacOptions *RBACOptions) {
+func (childResource *BaseConfig) setEPPRoleBinding(ctx context.Context, msvc *msv1alpha1.ModelService, rbacOptions *RBACOptions, scheme *runtime.Scheme) {
+
+	sanitizedMSVCName, err := sanitizeName(msvc.Name)
+	if err != nil {
+		log.FromContext(ctx).V(1).Error(err, "cannot sanitize MSVC name for pd rolebinding creation")
+		sanitizedMSVCName = "default-msvc-name"
+	}
+
+	childResource.EPPRoleBinding = &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      sanitizedMSVCName + "-epp-rolebinding",
+			Namespace: msvc.Namespace,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				APIGroup:  "",
+				Name:      eppServiceAccountName(msvc),
+				Namespace: msvc.Namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "ClusterRole",
+			APIGroup: "rbac.authorization.k8s.io",
+			Name:     rbacOptions.EPPClusterRole,
+		},
+	}
+
+	// Set owner reference for PDRoleBinding
+	if err := controllerutil.SetOwnerReference(msvc, childResource.EPPRoleBinding, scheme); err != nil {
+		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for epp rolebinding")
+	}
 
 }
 
@@ -545,7 +591,7 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 	}
 
 	if childResource.EPPServiceAccount != nil {
-		err := childResource.createEppServiceAccount(ctx, r.Client, *childResource.EPPServiceAccount)
+		err := childResource.createEppServiceAccount(ctx, r.Client)
 		if err != nil {
 			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
 		}
@@ -903,14 +949,54 @@ func (childResource *BaseConfig) createEppService(ctx context.Context, kubeClien
 }
 
 // createEppDeployment spawns epp service from immutable configmap
-func (childResource *BaseConfig) createEppServiceAccount(ctx context.Context, kubeClient client.Client, eppServiceAccount corev1.ServiceAccount) error {
+func (childResource *BaseConfig) createEppServiceAccount(ctx context.Context, kubeClient client.Client) error {
+	if childResource == nil || childResource.EPPServiceAccount == nil {
+		return nil
+	}
 
+	saTobeCreatedOrUpdated := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      childResource.EPPDeployment.Name,
+			Namespace: childResource.EPPDeployment.Namespace,
+		},
+	}
+
+	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, saTobeCreatedOrUpdated, func() error {
+		saTobeCreatedOrUpdated.Labels = childResource.EPPServiceAccount.Labels
+		saTobeCreatedOrUpdated.OwnerReferences = childResource.EPPServiceAccount.OwnerReferences
+		saTobeCreatedOrUpdated.ImagePullSecrets = childResource.EPPServiceAccount.ImagePullSecrets
+		return nil
+	})
+
+	if err != nil {
+		log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
+		return err
+	}
 	return nil
 }
 
 // createEppDeployment spawns epp service from immutable configmap
-func (childResource *BaseConfig) createEppRoleBinding(ctx context.Context, kubeClient client.Client, eppServiceAccount rbacv1.RoleBinding) error {
+func (childResource *BaseConfig) createEppRoleBinding(ctx context.Context, kubeClient client.Client, eppRoleBinding rbacv1.RoleBinding) error {
+	if childResource == nil || childResource.PDRoleBinding == nil {
+		return nil
+	}
+	eppRoleBindingInCluster := rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      childResource.PDRoleBinding.Name,
+			Namespace: childResource.PDRoleBinding.Namespace,
+		}}
 
+	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &eppRoleBinding, func() error {
+		eppRoleBindingInCluster.Labels = childResource.EPPRoleBinding.Labels
+		eppRoleBindingInCluster.OwnerReferences = childResource.PDRoleBinding.OwnerReferences
+		eppRoleBindingInCluster.Subjects = childResource.PDRoleBinding.Subjects
+		eppRoleBindingInCluster.RoleRef = childResource.PDRoleBinding.RoleRef
+		return nil
+	})
+	if err != nil {
+		log.FromContext(ctx).V(1).Error(err, "unable to create epp rolebinding from immutable base configmap ")
+		return err
+	}
 	return nil
 }
 

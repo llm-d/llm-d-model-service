@@ -86,9 +86,14 @@ func pdServiceAccountName(modelService *msv1alpha1.ModelService) string {
 	return ""
 }
 
-// infPoolName returns the name of the inference pool object
+// eppServiceAccountName returns the name of the eppServiceAccount object
+// defaults to epp-sa
 func eppServiceAccountName(modelService *msv1alpha1.ModelService) string {
-	return ""
+	sanitizedName, err := sanitizeName(modelService.Name + "-sa")
+	if err != nil {
+		return "epp-sa"
+	}
+	return sanitizedName
 }
 
 // infModelName returns the name of the inference model object
