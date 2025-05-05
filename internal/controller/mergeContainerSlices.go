@@ -201,6 +201,9 @@ func (c containerSliceTransformer) Transformer(typ reflect.Type) func(dst, src r
 
 	// mergeKey for merging two Containers is the Name of the Container
 	mergeKey := "Name"
+
+	// dstContainer (comes from baseconfig)
+	// srcContainer (comes from msvc and controller logic)
 	mergeFunc := func(dstContainer *corev1.Container, srcContainer corev1.Container) error {
 
 		// Command should be completely overriden, not appended
