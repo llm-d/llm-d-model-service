@@ -8,13 +8,23 @@ import (
 	sprig "github.com/Masterminds/sprig/v3"
 )
 
-func renderTemplate(tmplStr string, vars *TemplateVars) (string, error) {
+// registerSprigFunctions to get a new template with sprig functions support
+func registerSprigFunctions(tmplStr string) (*template.Template, error) {
 	// Create a new template and register Sprig functions
 	tmpl, err := template.New("template").
 		Funcs(sprig.TxtFuncMap()).
 		Parse(tmplStr)
 	if err != nil {
-		return "", fmt.Errorf("error parsing template: %w", err)
+		return nil, fmt.Errorf("error parsing template: %w", err)
+	}
+	return tmpl, err
+}
+
+// renderTemplate using template vars
+func renderTemplate(tmplStr string, vars *TemplateVars) (string, error) {
+	tmpl, err := registerSprigFunctions(tmplStr)
+	if err != nil {
+		return "", err
 	}
 
 	// Execute the template with the provided struct

@@ -51,6 +51,9 @@ var (
 	setupLog = ctrl.Log.WithName("setup")
 )
 
+// rbac options
+var rbacOptions controller.RBACOptions
+
 var metricsAddr string
 var metricsCertPath, metricsCertName, metricsCertKey string
 var webhookCertPath, webhookCertName, webhookCertKey string
@@ -65,8 +68,17 @@ var tlsOpts []func(*tls.Config)
 var logLevel string
 
 func init() {
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// secrets & cluster roles
+	rootCmd.PersistentFlags().StringVar(&rbacOptions.EPPClusterRole, "epp-cluster-role", "epp-cluster-role", "Name of the epp cluster role")
+	rootCmd.PersistentFlags().StringVar(&rbacOptions.PDClusterRole, "pd-cluster-role", "pd-cluster-role", "Name of the pd cluster role")
+	rootCmd.PersistentFlags().StringSliceVar(&rbacOptions.EPPPullSecrets, "epp-pull-secrets", []string{"epp-pull-secret"}, "List of pull secrets for configuring the epp deployment")
+	rootCmd.PersistentFlags().StringSliceVar(&rbacOptions.PDPullSecrets, "pd-pull-secrets", []string{"pd-pull-secret"}, "List of pull secrets for configuring the prefill and decode deployments")
 
+	// logger
+	rootCmd.PersistentFlags().StringVarP(&logLevel, "log-level", "l", "info", "Set the logging level (debug, info, warn, error, etc.)")
+
+	// added by kubebuilder
+	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	rootCmd.Flags().StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	rootCmd.Flags().StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -86,7 +98,6 @@ func init() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	rootCmd.Flags().StringVar(&defaultsYAMLPath, "defaults-yaml-path", "", "The YAML file containing the controller defaults.")
 
-	rootCmd.PersistentFlags().StringVarP(&logLevel, "log-level", "l", "info", "Set the logging level (debug, info, warn, error, etc.)")
 }
 
 // nolint:gocyclo
@@ -222,8 +233,9 @@ func runController() {
 	// Pass that into Reconciler below
 
 	if err = (&controller.ModelServiceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		RBACOptions: rbacOptions,
 		// Defaults: &modelServiceDefaults // from above
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ModelService")

@@ -23,6 +23,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -155,9 +156,9 @@ data:
 // TODO: change image
 var imageName = "quay.io/redhattraining/hello-world-nginx"
 
-// this test needs to change... commenting for now ...
-
 var _ = Describe("ModelService Controller", func() {
+	var rbacOptions *RBACOptions
+
 	Context("When reconciling a resource", func() {
 		//ctx := context.Background()
 
@@ -168,6 +169,25 @@ var _ = Describe("ModelService Controller", func() {
 
 		It("should spawn decode and prefill deployments with status", func() {
 			ctx := context.Background()
+
+			// Set RBAC options with EPPPullSecrets and PDPullSecrets
+			rbacOptions = &RBACOptions{
+				EPPPullSecrets: []string{"secret1", "secret2"},
+				PDPullSecrets:  []string{"pull-secret"},
+				EPPClusterRole: "epp-cluster-role",
+				PDClusterRole:  "pd-cluster-role",
+			}
+
+			// Create dummy secrets required for the test
+			for _, secretName := range append(rbacOptions.EPPPullSecrets, rbacOptions.PDPullSecrets...) {
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      secretName,
+						Namespace: namespace,
+					},
+				}
+				Expect(k8sClient.Create(ctx, secret)).To(Succeed())
+			}
 			modelService := &msv1alpha1.ModelService{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: msv1alpha1.GroupVersion.String(),
@@ -229,6 +249,12 @@ var _ = Describe("ModelService Controller", func() {
 			reconciler := &ModelServiceReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
+				RBACOptions: RBACOptions{
+					EPPPullSecrets: []string{},
+					PDPullSecrets:  []string{"pull-secret"},
+					EPPClusterRole: "epp-cluster-role",
+					PDClusterRole:  "pd-cluster-role",
+				},
 			}
 			_, err = reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{
@@ -279,6 +305,105 @@ var _ = Describe("ModelService Controller", func() {
 			updated.Status.PrefillDeploymentRef = ptr.To(prefill.Name)
 			err = k8sClient.Status().Update(ctx, updated)
 			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: prefillWorkloadName, Namespace: namespace}, &prefill)
+				return err == nil
+			}, time.Second*5, time.Second*5).Should(BeTrue())
+
+			By("Checking if Prefill deployment has correct owner reference")
+			Expect(prefill.OwnerReferences).ToNot(BeEmpty())
+			Expect(ownerRef.Kind).To(Equal("ModelService"))
+			Expect(ownerRef.Name).To(Equal(modelService.Name))
+			Expect(ownerRef.APIVersion).To(Equal("llm-d.ai/v1alpha1"))
+			updated = &msv1alpha1.ModelService{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, updated)).To(Succeed())
+			updated.Status.PrefillDeploymentRef = ptr.To(prefill.Name)
+			err = k8sClient.Status().Update(ctx, updated)
+			Expect(err).NotTo(HaveOccurred())
+
+			// By("Checking if a PD SA was created")
+			// sa := corev1.ServiceAccount{}
+			// Eventually(func() bool {
+			// 	err := k8sClient.Get(ctx, client.ObjectKey{Name: pdServiceAccountName(modelService), Namespace: namespace}, &sa)
+			// 	return err == nil
+			// }, time.Second*5, time.Millisecond*500).Should(BeTrue())
+
+			// By("Checking if PD SA has the corret owner reference")
+			// Expect(sa.Name).To(Equal(pdServiceAccountName(modelService)))
+			// Expect(sa.OwnerReferences).ToNot(BeEmpty())
+
+			By("Checking that prefill is using the correct SA")
+			Expect(prefill.Spec.Template.Spec.ServiceAccountName).To(Equal(pdServiceAccountName(modelService)))
+
+			By("Checking if a PD RoleBinding was created")
+			rolebinding := rbacv1.RoleBinding{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: modelService.Name + "-pd-rolebinding", Namespace: namespace}, &rolebinding)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+
+			By("Checking if PD RoleBinding has correct owner reference")
+			Expect(rolebinding.Name).To(Equal(modelService.Name + "-pd-rolebinding"))
+			Expect(rolebinding.OwnerReferences).ToNot(BeEmpty())
+
+			By("Validating that the EPP ServiceAccount was created")
+
+			sa := corev1.ServiceAccount{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: eppServiceAccountName(modelService), Namespace: namespace}, &sa)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+
+			// fmt.Printf("the sa is %v", sa)
+			// actualSecrets := make([]string, len(sa.ImagePullSecrets))
+			// for i, s := range sa.ImagePullSecrets {
+			// 	actualSecrets[i] = s.Name
+			// }
+
+			// expectedSecrets := rbacOptions.EPPPullSecrets
+			// expectedSecretsAny := make([]any, len(expectedSecrets))
+			// for i, s := range expectedSecrets {
+			// 	expectedSecretsAny[i] = s
+			// }
+			// Expect(actualSecrets).To(ContainElements(expectedSecretsAny...))
+
+			By("Checking if epp SA has the correct owner reference")
+			Expect(sa.Name).To(Equal(eppServiceAccountName(modelService)))
+			Expect(sa.OwnerReferences).ToNot(BeEmpty())
+
+			By("Checking if a epp RoleBinding was created")
+			rolebinding = rbacv1.RoleBinding{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: modelService.Name + "-epp-rolebinding", Namespace: namespace}, &rolebinding)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+
+			By("Checking if the EPP ServiceAccount was created with correct ImagePullSecrets")
+			serviceAccount := corev1.ServiceAccount{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{
+					Name:      eppServiceAccountName(modelService),
+					Namespace: namespace,
+				}, &serviceAccount)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+
+			// expectedSecrets = []string{"secret1", "secret2"}
+			// actualSecrets = make([]string, len(serviceAccount.ImagePullSecrets))
+			// for i, s := range serviceAccount.ImagePullSecrets {
+			// 	actualSecrets[i] = s.Name
+			// }
+			// // Convert []string to []any
+			// expectedSecretsAny = make([]any, len(expectedSecrets))
+			// for i, s := range expectedSecrets {
+			// 	expectedSecretsAny[i] = s
+			// }
+			// Expect(actualSecrets).To(ContainElements(expectedSecretsAny...))
+
+			By("Checking if epp RoleBinding has correct owner reference")
+			Expect(rolebinding.Name).To(Equal(modelService.Name + "-epp-rolebinding"))
+			Expect(rolebinding.OwnerReferences).ToNot(BeEmpty())
 
 			By("Checking if ModelService status has been updated")
 			Eventually(func() string {
