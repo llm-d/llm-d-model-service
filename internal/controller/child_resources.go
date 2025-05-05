@@ -551,7 +551,7 @@ func (childResource *BaseConfig) setEPPServiceAccount(msvc *msv1alpha1.ModelServ
 		},
 	}
 
-	for _, name := range rbacOptions.PDPullSecrets {
+	for _, name := range rbacOptions.EPPPullSecrets {
 		eppServiceAccount.ImagePullSecrets = append(eppServiceAccount.ImagePullSecrets, corev1.LocalObjectReference{Name: name})
 	}
 
