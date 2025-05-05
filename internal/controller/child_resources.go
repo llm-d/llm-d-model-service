@@ -492,6 +492,22 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 	return childResource
 }
 
+func (childResource *BaseConfig) setPDServiceAccount(ctx context.Context, msvc *msv1alpha1.ModelService, rbacOptions *RBACOptions) {
+
+}
+
+func (childResource *BaseConfig) setPDRoleBinding(ctx context.Context, msvc *msv1alpha1.ModelService, rbacOptions *RBACOptions) {
+
+}
+
+func (childResource *BaseConfig) setEPPServiceAccount(ctx context.Context, msvc *msv1alpha1.ModelService, rbacOptions *RBACOptions) {
+
+}
+
+func (childResource *BaseConfig) setEPPRoleBinding(ctx context.Context, msvc *msv1alpha1.ModelService, rbacOptions *RBACOptions) {
+
+}
+
 // createOrUpdate all the child resources
 func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelServiceReconciler) error {
 	// create or update configmaps
@@ -535,6 +551,24 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 		}
 	}
 	// TODO: repeat the above for pd-sa, epp-rb, pd-rb
+	if childResource.EPPRoleBinding != nil {
+		err := childResource.createEppRoleBinding(ctx, r.Client, *childResource.EPPRoleBinding)
+		if err != nil {
+			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
+		}
+	}
+	if childResource.PDServiceAccount != nil {
+		err := childResource.createPDServiceAccount(ctx, r.Client, *childResource.PDServiceAccount)
+		if err != nil {
+			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
+		}
+	}
+	if childResource.PDRoleBinding != nil {
+		err := childResource.createPDRoleBinding(ctx, r.Client, *childResource.PDRoleBinding)
+		if err != nil {
+			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
+		}
+	}
 
 	return nil
 }
@@ -865,5 +899,29 @@ func (childResource *BaseConfig) createEppService(ctx context.Context, kubeClien
 		log.FromContext(ctx).V(1).Error(err, "unable to create epp service from immutable base configmap ")
 		return err
 	}
+	return nil
+}
+
+// createEppDeployment spawns epp service from immutable configmap
+func (childResource *BaseConfig) createEppServiceAccount(ctx context.Context, kubeClient client.Client, eppServiceAccount corev1.ServiceAccount) error {
+
+	return nil
+}
+
+// createEppDeployment spawns epp service from immutable configmap
+func (childResource *BaseConfig) createEppRoleBinding(ctx context.Context, kubeClient client.Client, eppServiceAccount rbacv1.RoleBinding) error {
+
+	return nil
+}
+
+// createEppDeployment spawns epp service from immutable configmap
+func (childResource *BaseConfig) createPDServiceAccount(ctx context.Context, kubeClient client.Client, eppServiceAccount corev1.ServiceAccount) error {
+
+	return nil
+}
+
+// createEppDeployment spawns epp service from immutable configmap
+func (childResource *BaseConfig) createPDRoleBinding(ctx context.Context, kubeClient client.Client, eppServiceAccount rbacv1.RoleBinding) error {
+
 	return nil
 }
