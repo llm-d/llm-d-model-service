@@ -153,7 +153,7 @@ func (e envVarSliceTransformer) Transformer(typ reflect.Type) func(dst, src refl
 	return genericSliceTransformer(typ, mergeFunc, mergeKey)
 }
 
-// stringSlicePrependTransformer: transformer for merging two EnvVars
+// stringSlicePrependTransformer: transformer for merging two string slices
 type stringSlicePrependTransformer struct{}
 
 // Transformer for []string, such as Container.Args so that src args get prepended, not appended
