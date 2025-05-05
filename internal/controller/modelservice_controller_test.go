@@ -232,7 +232,7 @@ var _ = Describe("ModelService Controller", func() {
 				Scheme: k8sClient.Scheme(),
 				RBACOptions: RBACOptions{
 					EPPPullSecrets: []string{},
-					PDPullSecrets:  []string{},
+					PDPullSecrets:  []string{"pull-secret"},
 					EPPClusterRole: "epp-cluster-role",
 					PDClusterRole:  "pd-cluster-role",
 				},
@@ -302,6 +302,20 @@ var _ = Describe("ModelService Controller", func() {
 			updated.Status.PrefillDeploymentRef = ptr.To(prefill.Name)
 			err = k8sClient.Status().Update(ctx, updated)
 			Expect(err).NotTo(HaveOccurred())
+
+			By("Checking if a PD SA was created")
+			sa := corev1.ServiceAccount{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: pdServiceAccountName(modelService), Namespace: namespace}, &sa)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+
+			By("Checking if PD SA has the corret owner reference")
+			Expect(sa.Name).To(Equal(pdServiceAccountName(modelService)))
+			Expect(sa.OwnerReferences).ToNot(BeEmpty())
+
+			By("Checking that prefill is using the correct SA")
+			Expect(prefill.Spec.Template.Spec.ServiceAccountName).To(Equal(pdServiceAccountName(modelService)))
 
 			By("Checking if a PD RoleBinding was created")
 			rolebinding := rbacv1.RoleBinding{}
