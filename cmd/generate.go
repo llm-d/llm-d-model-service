@@ -37,7 +37,7 @@ func readModelService(filename string, logger logr.Logger) (*msv1alpha1.ModelSer
 	return &modelService, nil
 }
 
-func readBaseChildResources(filename string, logger logr.Logger) (*controller.BaseConfig, error) {
+func getBaseChildResources(filename string, msvc *msv1alpha1.ModelService, logger logr.Logger) (*controller.BaseConfig, error) {
 	var baseChildResourcesConfigMap *corev1.ConfigMap
 	var baseChildResources *controller.BaseConfig
 
@@ -56,7 +56,13 @@ func readBaseChildResources(filename string, logger logr.Logger) (*controller.Ba
 		return nil, err
 	}
 
-	baseChildResources, err = controller.BaseConfigFromCM(baseChildResourcesConfigMap)
+	interpolated, err := controller.InterpolateBaseConfigMap(context.TODO(), baseChildResourcesConfigMap, msvc)
+	if err != nil {
+		logger.Error(err, "cannot interpolate base configmap")
+		return nil, err
+	}
+
+	baseChildResources, err = controller.BaseConfigFromCM(interpolated)
 	if err != nil {
 		logger.Error(err, "unable to create base child resources from config map")
 		return nil, err
@@ -89,7 +95,7 @@ func generateManifests(ctx context.Context, manifestFile string, configFile stri
 	logger.Info("generateManifest", "modelService", msvc)
 
 	// get base child resources from file
-	config, err := readBaseChildResources(configFile, logger)
+	config, err := getBaseChildResources(configFile, msvc, logger)
 	if err != nil {
 		logger.Error(err, "unable to read basic configuration", "location", configFile)
 		return nil, err
