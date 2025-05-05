@@ -41,19 +41,23 @@ func getBaseChildResources(filename string, msvc *msv1alpha1.ModelService, logge
 	var baseChildResourcesConfigMap *corev1.ConfigMap
 	var baseChildResources *controller.BaseConfig
 
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		if os.IsNotExist(err) {
-			logger.Error(err, "unable to read base child resources from "+filename)
+	if filename != "" {
+		data, err := os.ReadFile(filename)
+		if err != nil {
+			if os.IsNotExist(err) {
+				logger.Error(err, "unable to read base child resources from "+filename)
+				return nil, err
+			}
+			data = []byte{}
+		}
+
+		err = yaml.Unmarshal(data, &baseChildResourcesConfigMap)
+		if err != nil {
+			logger.Error(err, "unable to unmarshal base child resources")
 			return nil, err
 		}
-		data = []byte{}
-	}
-
-	err = yaml.Unmarshal(data, &baseChildResourcesConfigMap)
-	if err != nil {
-		logger.Error(err, "unable to unmarshal base child resources")
-		return nil, err
+	} else {
+		baseChildResourcesConfigMap = &corev1.ConfigMap{}
 	}
 
 	interpolated, err := controller.InterpolateBaseConfigMap(context.TODO(), baseChildResourcesConfigMap, msvc)
@@ -115,7 +119,7 @@ func generateManifests(ctx context.Context, manifestFile string, configFile stri
 	}
 
 	// update child resources
-	cR := config.MergeChildResources(ctx, msvc, scheme.Scheme)
+	cR := config.MergeChildResources(ctx, msvc, scheme.Scheme, &rbacOptions)
 	logger.Info("generateManifest", "baseResources", cR)
 
 	// generate yaml for chile resources
@@ -146,6 +150,18 @@ func generateManifests(ctx context.Context, manifestFile string, configFile stri
 	}
 	if cR.EPPService != nil {
 		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.EPPService))
+	}
+	if cR.EPPServiceAccount != nil {
+		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.EPPServiceAccount))
+	}
+	if cR.EPPRoleBinding != nil {
+		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.EPPRoleBinding))
+	}
+	if cR.PDServiceAccount != nil {
+		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.PDServiceAccount))
+	}
+	if cR.PDRoleBinding != nil {
+		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.PDRoleBinding))
 	}
 
 	logger.Info("generateManifest", "yaml", allYaml)
@@ -178,7 +194,7 @@ var generateCmd = &cobra.Command{
 
 func init() {
 	generateCmd.Flags().StringVarP(&modelServiceManifest, "modelservice", "m", "", "File containing the ModelService definition.")
-	_ = rootCmd.MarkFlagRequired("modelservice")
+	_ = generateCmd.MarkFlagRequired("modelservice")
 	generateCmd.Flags().StringVarP(&baseConfigurationManifest, "baseconfig", "b", "", "File containing the base platform configuration.")
 	rootCmd.AddCommand(generateCmd)
 }
