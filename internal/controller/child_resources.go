@@ -646,14 +646,14 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 	}
 
 	if childResource.PDServiceAccount != nil {
-		err := childResource.createPDServiceAccount(ctx, r.Client, *childResource.PDServiceAccount)
+		err := childResource.createPDServiceAccount(ctx, r.Client)
 		if err != nil {
 			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
 		}
 	}
 
 	if childResource.PDRoleBinding != nil {
-		err := childResource.createPDRoleBinding(ctx, r.Client, *childResource.PDRoleBinding)
+		err := childResource.createPDRoleBinding(ctx, r.Client)
 		if err != nil {
 			log.FromContext(ctx).V(1).Error(err, "unable to create a rolebinding for PD service account")
 		}
@@ -1046,7 +1046,7 @@ func (childResource *BaseConfig) createEppRoleBinding(ctx context.Context, kubeC
 }
 
 // createPDServiceAccount creates or updates service account for p and d deployments
-func (childResource *BaseConfig) createPDServiceAccount(ctx context.Context, kubeClient client.Client, pdServiceAccount corev1.ServiceAccount) error {
+func (childResource *BaseConfig) createPDServiceAccount(ctx context.Context, kubeClient client.Client) error {
 	if childResource == nil || childResource.PDServiceAccount == nil {
 		return nil
 	}
@@ -1056,7 +1056,7 @@ func (childResource *BaseConfig) createPDServiceAccount(ctx context.Context, kub
 		Namespace: childResource.PDServiceAccount.Namespace,
 	}}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &pdServiceAccount, func() error {
+	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &saToBeCreatedOrUpdated, func() error {
 		saToBeCreatedOrUpdated.Labels = childResource.PDServiceAccount.Labels
 		saToBeCreatedOrUpdated.OwnerReferences = childResource.PDServiceAccount.OwnerReferences
 		saToBeCreatedOrUpdated.ImagePullSecrets = childResource.PDServiceAccount.ImagePullSecrets
@@ -1072,7 +1072,7 @@ func (childResource *BaseConfig) createPDServiceAccount(ctx context.Context, kub
 }
 
 // createPDRoleBinding creates a RoleBinding for PDServiceAccount with PDClusterRole
-func (childResource *BaseConfig) createPDRoleBinding(ctx context.Context, kubeClient client.Client, pdRoleBinding rbacv1.RoleBinding) error {
+func (childResource *BaseConfig) createPDRoleBinding(ctx context.Context, kubeClient client.Client) error {
 
 	if childResource == nil || childResource.PDRoleBinding == nil {
 		return nil
@@ -1084,7 +1084,7 @@ func (childResource *BaseConfig) createPDRoleBinding(ctx context.Context, kubeCl
 			Namespace: childResource.PDRoleBinding.Namespace,
 		}}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &pdRoleBinding, func() error {
+	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &roleBindingInCluster, func() error {
 		roleBindingInCluster.Labels = childResource.PDRoleBinding.Labels
 		roleBindingInCluster.OwnerReferences = childResource.PDRoleBinding.OwnerReferences
 		roleBindingInCluster.Subjects = childResource.PDRoleBinding.Subjects
