@@ -1,20 +1,28 @@
 # Model Service
 
-`ModelService` is a Kubernetes operator (CRD + controller) that enables the creation of vllm pods and routing resources for a given model.
+`ModelService` is a Kubernetes operator (CRD + controller) that enables the creation of vllm pods and routing resources for a given base-model. 
+
+Serving a base-model using `ModelService` involves creating a couple of Kubernetes objects.
+
+- `BaseConfig` configmap: this is typically created by the platform owner, and specifies configuration that is common across multiple base-models.
+
+- `ModelService` custom resource: this is typically created by the inference model owner; it specifies configuration that is specific to a given model, and can optionally refer to a `BaseConfig`. 
+
+`BaseConfig` configmap values are templated, and their values are dynamically interpolated when the `ModelService` custom resource is reconciled.
+
+![model-service-arch](model-service-arch.png)
+
 
 ## Key Features
 
-- Simple Kubernetes API for platform engineers
+- Simple `ModelService` Kubernetes custom resource that enables model owners to serve base-models
+- Enables common configuration across multiple models to be captured in a `BaseConfig` configmap. This configmap 
 - Enables disaggregated prefill
 - Supports creation of [Gateway API Inference Extension](https://gateway-api-inference-extension.sigs.k8s.io) resources for routing
-- Supports auto-scaling with HPA
+- Supports auto-scaling of prefill and decode deployments with HPA and/or other auto-scalers
 - Supports independent scaling of prefill and decode instances
 - Supports independent node affinities for prefill and decode instances
 - Supports model loading from OCI images, HuggingFace public and private registries, and PVCs
-
-## Design
-
-![model-service-arch](model-service-arch.png)
 
 ## Samples
 
