@@ -1,0 +1,18 @@
+# Make image pull policy always if using dev image
+- op: add
+  path: /spec/template/spec/containers/0/imagePullPolicy
+  value: Always
+
+# Add image pull secret
+- op: add
+  path: /spec/template/spec/imagePullSecrets
+  value:
+  - name: quay-secret-llm-d
+
+# to configure pull secrets for pd and epp pods, uncomment
+# - op: add
+#   path: /spec/template/spec/containers/0/args/-
+#   value: --pd-pull-secrets=$PD_PULL_SECRETS
+# - op: add
+#   path: /spec/template/spec/containers/0/args/-
+#   value: --epp-pull-secrets=$EPP_PULL_SECRETS

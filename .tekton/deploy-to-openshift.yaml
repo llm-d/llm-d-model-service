@@ -70,13 +70,13 @@ spec:
       echo "🧹 Uninstalling existing deployment..."
       # make uninstall-openshift NAMESPACE=$NS PROJECT_NAME=$PROJECT_NAME IMAGE_TAG_BASE=$IMAGE_TAG_BASE VERSION=$VERSION || echo "❗️ Failed to uninstall deployment"
       
-      (make uninstall || echo "❗️ Failed to uninstall") && (make ips-undeploy IMG=$IMAGE_TAG_BASE:$VERSION || echo "❗️ Failed to uninstall deployment")
+      (make uninstall || echo "❗️ Failed to uninstall") && (make dev-undeploy IMG=$IMAGE_TAG_BASE:$VERSION || echo "❗️ Failed to uninstall deployment")
       
       echo "⏳ Waiting 3 seconds before reinstall..."
       sleep 3
 
       echo "🚀 Reinstalling OpenShift deployment..."
-      make install && make ips-deploy IMG=$IMAGE_TAG_BASE:$VERSION
+      make install && make dev-deploy IMG=$IMAGE_TAG_BASE:$VERSION
       
       # make install-openshift NAMESPACE=$NS PROJECT_NAME=$PROJECT_NAME IMAGE_TAG_BASE=$IMAGE_TAG_BASE VERSION=$VERSION
 
