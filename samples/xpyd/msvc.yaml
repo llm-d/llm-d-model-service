@@ -26,7 +26,9 @@ spec:
     containers:
     - name: "vllm"
       args:
-      - "--model"
+      # /cache comes from baseconfig's mountPath for the model-storage volume
+      - "/cache/path/to/model"
+      - "--served-model-name"
       - "facebook/opt-125m"
   
   # describe the prefill pods 
@@ -39,5 +41,7 @@ spec:
     containers:
     - name: "vllm"
       args:
-      - "--model"
-      - "facebook/opt-125m"
+        # /cache comes from baseconfig's mountPath for the model-storage volume
+        - "/cache/path/to/model"
+        - "--served-model-name"
+        - "facebook/opt-125m"
