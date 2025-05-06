@@ -1,50 +1,10 @@
-# LMCache + KV connector, no NiXL
+# Source: https://github.com/neuralmagic/llm-d-routing-sidecar/tree/dev/test/config/nixl
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: facebook-base-config
+  name: facebook-base-config-nixl
 immutable: true
 data:
-  configMaps: |
-    - apiVersion: v1
-      kind: ConfigMap
-      metadata:
-        name: facebook-opt-125m-config-decoder
-      data:
-        lmcache-decoder-config.yaml: |
-          local_cpu: False
-          max_local_cpu_size: 0
-          #local_disk:
-          max_local_disk_size: 0
-          remote_serde: NULL
-
-          enable_nixl: True
-          nixl_role: "receiver"
-          nixl_peer_host: "0.0.0.0"
-          nixl_peer_port: 55555
-          nixl_buffer_size: 524288
-          nixl_buffer_device: "cuda"
-          nixl_enable_gc: True
-    - apiVersion: v1
-      kind: ConfigMap
-      metadata:
-        name: facebook-opt-125m-config-prefiller
-      data:
-        lmcache-prefiller-config.yaml: |
-          local_cpu: False
-          max_local_cpu_size: 0
-          #local_disk:
-          max_local_disk_size: 0
-          remote_serde: NULL
-
-          enable_nixl: True
-          nixl_role: "sender"
-          nixl_peer_host: "facebook-opt-125m-decoder"
-          nixl_peer_port: 55555
-          nixl_buffer_size: 524288
-          nixl_buffer_device: "cuda"
-          nixl_enable_gc: True
-
   decodeDeployment: |
     apiVersion: apps/v1
     kind: Deployment
@@ -53,64 +13,60 @@ data:
         spec:
           initContainers:
             - name: routing-proxy
-              image: quay.io/llm-d/llm-d-routing-sidecar-dev:0.0.5
+              image: quay.io/llm-d/llm-d-routing-sidecar@sha256:2682e3ad86d2e741030eb693544e1977f5ce072fe6e3db78ffa18ddf84b6d
               securityContext:
                 allowPrivilegeEscalation: false
                 runAsNonRoot: true
               args:
                 - "--port=8000"
                 - "--vllm-port=8200"
+                - "--connector=nixl"
               ports:
                 - containerPort: 8000
                   protocol: TCP
               restartPolicy: Always
           containers:
             - name: vllm
-              image: quay.io/llm-d/llm-d-dev:0.0.4
+              image: quay.io/llm-d/llm-d-dev@sha256:d6d212de0d1dc0f6da9877eab21800f62d7dd32d825bae9bf1692c4f6e017109
+              command:
+                - vllm
+                - serve
               securityContext:
                 allowPrivilegeEscalation: false
               args:
                 - "--port"
                 - "8200"
+                - "--enforce-eager"
                 - "--kv-transfer-config"
-                - '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_consumer","kv_connector_extra_config": {"discard_partial_chunks": false, "lmcache_rpc_port": "consumer1"}}'
+                - '{"kv_connector":"NixlConnector","kv_role":"kv_both"}'
               env:
-                # TODO: rm this env for llama
                 - name: CUDA_VISIBLE_DEVICES
                   value: "0"
                 - name: UCX_TLS
                   value: "cuda_ipc,cuda_copy,tcp"
-                - name: LMCACHE_CONFIG_FILE
-                  value: /vllm-workspace/lmcache-decoder-config.yaml
-                - name: LMCACHE_USE_EXPERIMENTAL
-                  value: "True"
-                - name: VLLM_ENABLE_V1_MULTIPROCESSING
-                  value: "1"
-                - name: VLLM_WORKER_MULTIPROC_METHOD
-                  value: spawn
+                - name: NIXL_ROLE
+                  value: RECVER
                 - name: HF_HUB_CACHE
                   value: /vllm-workspace/models
               ports:
                 - containerPort: 55555
                   protocol: TCP
               volumeMounts:
-                - name: config-decoder
-                  mountPath: /vllm-workspace
                 - name: model-cache
                   mountPath: /vllm-workspace/models
+                  
+                # A volume with this name will be created by MSVC controller
+                # for pvc case
+                - name: model-storage
+                  mountPath: /cache
               resources:
                 limits:
-                  # TODO: inc this for llama
                   nvidia.com/gpu: 1
                 requests:
                   cpu: "16"
                   memory: 16Gi
                   nvidia.com/gpu: 1
           volumes:
-            - name: config-decoder
-              configMap:
-                name: facebook-opt-125m-config-decoder
-            # Should be model-storage?
             - name: model-cache
               emptyDir:
                 sizeLimit: 1Gi
@@ -123,37 +79,43 @@ data:
         spec:
           containers:
             - name: vllm
-              image: quay.io/llm-d/llm-d-dev:0.0.4
+              image: quay.io/llm-d/llm-d-dev@sha256:d6d212de0d1dc0f6da9877eab21800f62d7dd32d825bae9bf1692c4f6e017109
+              command:
+                - vllm
+                - serve
               securityContext:
                 allowPrivilegeEscalation: false
               args:
                 - "--port"
-                - "8000"
+                - "8100"
+                - "--enforce-eager"
                 - "--kv-transfer-config"
-                - '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_producer","kv_connector_extra_config": {"discard_partial_chunks": false, "lmcache_rpc_port": "producer1"}}'
+                - '{"kv_connector":"NixlConnector","kv_role":"kv_both"}'  
               env:
                 - name: CUDA_VISIBLE_DEVICES
                   value: "0"
                 - name: UCX_TLS
                   value: "cuda_ipc,cuda_copy,tcp"
-                - name: LMCACHE_CONFIG_FILE
-                  value: /vllm-workspace/lmcache-prefiller-config.yaml
-                - name: LMCACHE_USE_EXPERIMENTAL
-                  value: "True"
-                - name: VLLM_ENABLE_V1_MULTIPROCESSING
-                  value: "1"
-                - name: VLLM_WORKER_MULTIPROC_METHOD
-                  value: spawn
+                - name: VLLM_NIXL_SIDE_CHANNEL_PORT
+                  value: "5557"
+                - name: VLLM_NIXL_SIDE_CHANNEL_HOST
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: status.podIP
+                - name: VLLM_LOGGING_LEVEL
+                  value: DEBUG
                 - name: HF_HUB_CACHE
                   value: /vllm-workspace/models
-              volumeMounts:
-                - name: config-prefiller
-                  mountPath: /vllm-workspace
-                - name: model-cache
-                  mountPath: /vllm-workspace/models
               ports:
                 - containerPort: 8000
                   protocol: TCP
+                - containerPort: 5557
+                  protocol: TCP
+              volumeMounts:
+                - name: model-cache
+                  mountPath: /vllm-workspace/models
+                - name: model-storage
+                  mountPath: /cache
               resources:
                 limits:
                   nvidia.com/gpu: 1
@@ -162,11 +124,6 @@ data:
                   memory: 16Gi
                   nvidia.com/gpu: 1
           volumes:
-            - name: config-prefiller
-              configMap:
-                name: facebook-opt-125m-config-prefiller
-            
-            # TODO: should be model-storage?
             - name: model-cache
               emptyDir:
                 sizeLimit: 1Gi
@@ -214,10 +171,11 @@ data:
         spec:
           containers:
             - args:
+                # TODO: replace with template vars
                 - -poolName
-                - facebook-opt-125m
+                - {{ .InferencePoolName }}
                 - -poolNamespace
-                - default
+                - {{ .ModelServiceNamespace }}
                 - -v
                 - "4"
                 - --zap-encoder
@@ -227,25 +185,21 @@ data:
                 - -grpcHealthPort
                 - "9003"
               env:
-                - name: KVCACHE_INDEXER_REDIS_ADDR
-                  value: vllm-p2p-lookup-server-service:8100
-                - name: HF_TOKEN
-                  valueFrom:
-                    secretKeyRef:
-                      key: hf_token_llama3-8b-instruct
-                      name: vllm-p2p-secrets
-              image: quay.io/llm-d/llm-d-gateway-api-inference-extension:0.0.4
+                - name: PD_ENABLED
+                  value: "true"
+                - name: PD_PROMPT_LEN_THRESHOLD
+                  value: "10"
+              image: quay.io/llm-d/llm-d-gateway-api-inference-extension:0.0.5
               imagePullPolicy: Always
               livenessProbe:
                 failureThreshold: 3
                 grpc:
                   port: 9003
-                  service: inference-extension
+                  service: {{ .EPPServiceName }}
                 initialDelaySeconds: 5
                 periodSeconds: 10
                 successThreshold: 1
                 timeoutSeconds: 1
-              name: epp
               ports:
                 - containerPort: 9002
                   protocol: TCP
@@ -258,7 +212,7 @@ data:
                 failureThreshold: 3
                 grpc:
                   port: 9003
-                  service: inference-extension
+                  service: {{ .EPPServiceName }}
                 initialDelaySeconds: 5
                 periodSeconds: 10
                 successThreshold: 1
