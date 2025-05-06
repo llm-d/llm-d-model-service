@@ -1,20 +1,24 @@
 # Model Service
 
-`Model Service` is a Kubernetes operator (CRD + controller) that enables the creation of inference workloads and routing resources for a given base-model. Serving a base-model involves creating a couple of Kubernetes objects.
+> A Modelservice manages the inference workloads and routing resources for a given base-model. 
 
-- `Baseconfig` configmap: this is typically created by the platform owner, and specifies configuration that is common across multiple base-models.
+A *Modelservice* provides declarative updates for prefill and decode deployments, inference pool, inference model, the endpoint picker (epp) deployment and service associated with the inference pool, and the RBAC resources associated with them.
 
-- `Modelservice` custom resource: this is typically created by the inference model owner; it specifies configuration that is specific to a given base-model, and can optionally refer to a `Baseconfig`.
+You describe the desired state of the base-model in a *Modelservice* and in an optional *Baseconfig* config map that is referred to by the Modelservice. The `Modelservice` controller changes the actual state of the base-model to the desired state. 
+
+> Note: Do not manage the objects owned by a ModelService. Consider opening an issue in the main llm-d repository if your use case is not covered below.
 
 ![model-service-arch](model-service-arch.png)
 
-## Template support & reconciliation
+## Reconcilation
 
 The values in `baseconfig`, and certain values in the `modelservice` resource can be templated. When the `modelservice` resource is reconciled:
 
 1. Template variables in `baseconfig` and `modelservice` are dynamically interpolated based on the `modelservice` spec.
 2. A semantic merge takes place between `baseconfig` and `modelservice`.
 3. Inference workloads, routing resources, and RBACs authorizations needed for running the base-model are created or updated in the cluster.
+
+> Note on best-practice: `Baseconfig` is intended to capture configuration that is common across a collection of base-models. `Modelservice` is intended to capture configuration specific to a single base-model, and extend or selectively override the values in `Baseconfig` it refers to. The platform owner is expected to install `llm-d` with a collection of `Baseconfig` presets. Inference owners are expected to take advantage of these presets to serve their base-models using the simplified `Modelservice` spec.
 
 ## Key Features
 
