@@ -188,8 +188,6 @@ func (interpolatedBaseConfig *BaseConfig) MergeChildResources(ctx context.Contex
 	if interpolatedBaseConfig.PrefillDeployment != nil || interpolatedBaseConfig.DecodeDeployment != nil {
 		// some pd pods are getting created; set SA and RB here
 		interpolatedBaseConfig.setPDServiceAccount(ctx, modelService, scheme, rbacOptions)
-		// this is role binding with a cluster role
-		interpolatedBaseConfig.setPDRoleBinding(ctx, modelService, scheme, rbacOptions)
 	}
 
 	if interpolatedBaseConfig.InferencePool != nil {
@@ -506,44 +504,6 @@ func (childResource *BaseConfig) setPDServiceAccount(ctx context.Context, msvc *
 	return childResource
 }
 
-// setPDRoleBinding sets a role binding for PDServiceAccount to rbacOptions.PDClusterRole
-func (childResource *BaseConfig) setPDRoleBinding(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme, rbacOptions *RBACOptions) {
-
-	sanitizedMSVCName, err := sanitizeName(msvc.Name)
-	if err != nil {
-		log.FromContext(ctx).V(1).Error(err, "cannot sanitize MSVC name for pd rolebinding creation, using 'default-msvc-name-pd-rolebinding'")
-		sanitizedMSVCName = "default-msvc-name"
-	}
-
-	childResource.PDRoleBinding = &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      sanitizedMSVCName + "-pd-rolebinding",
-			Namespace: msvc.Namespace,
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind: "ServiceAccount",
-				// APIGroup defaults to "" for service account subjects, according to rbacv1.Subject docs
-				// https://pkg.go.dev/k8s.io/api/rbac/v1#Subject
-				APIGroup:  "",
-				Name:      pdServiceAccountName(msvc),
-				Namespace: msvc.Namespace,
-			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			Kind:     "ClusterRole",
-			APIGroup: "rbac.authorization.k8s.io",
-			Name:     rbacOptions.PDClusterRole, // supplied by user, otherwise defaulted
-		},
-	}
-
-	// Set owner reference for PDRoleBinding
-	if err := controllerutil.SetOwnerReference(msvc, childResource.PDRoleBinding, scheme); err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for pd rolebinding")
-	}
-
-}
-
 func (childResource *BaseConfig) setEPPServiceAccount(ctx context.Context, msvc *msv1alpha1.ModelService, rbacOptions *RBACOptions, scheme *runtime.Scheme) {
 	eppServiceAccount := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
@@ -653,13 +613,6 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 		err := childResource.createPDServiceAccount(ctx, r.Client)
 		if err != nil {
 			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
-		}
-	}
-
-	if childResource.PDRoleBinding != nil {
-		err := childResource.createPDRoleBinding(ctx, r.Client)
-		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "unable to create a rolebinding for PD service account")
 		}
 	}
 
@@ -1073,33 +1026,4 @@ func (childResource *BaseConfig) createPDServiceAccount(ctx context.Context, kub
 	}
 
 	return nil
-}
-
-// createPDRoleBinding creates a RoleBinding for PDServiceAccount with PDClusterRole
-func (childResource *BaseConfig) createPDRoleBinding(ctx context.Context, kubeClient client.Client) error {
-
-	if childResource == nil || childResource.PDRoleBinding == nil {
-		return nil
-	}
-
-	roleBindingInCluster := rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      childResource.PDRoleBinding.Name,
-			Namespace: childResource.PDRoleBinding.Namespace,
-		}}
-
-	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &roleBindingInCluster, func() error {
-		roleBindingInCluster.Labels = childResource.PDRoleBinding.Labels
-		roleBindingInCluster.OwnerReferences = childResource.PDRoleBinding.OwnerReferences
-		roleBindingInCluster.Subjects = childResource.PDRoleBinding.Subjects
-		roleBindingInCluster.RoleRef = childResource.PDRoleBinding.RoleRef
-		return nil
-	})
-
-	if err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to create pd rolebinding")
-		return err
-	}
-	return nil
-
 }
