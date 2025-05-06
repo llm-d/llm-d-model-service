@@ -53,9 +53,6 @@ type RBACOptions struct {
 	// EPPClusterRole name of the epp cluster role
 	// this is a cluster role used in the rolebinding for the epp deployment
 	EPPClusterRole string
-	// PDClusterRole name of the pd cluster role
-	// this is a cluster role used in the rolebinding for the pd deployments
-	PDClusterRole string
 }
 
 // ModelServiceReconciler reconciles a ModelService object
