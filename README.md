@@ -1,22 +1,20 @@
 # Model Service
 
-`ModelService` is a Kubernetes operator (CRD + controller) that enables the creation of inference workloads and routing resources for a given base-model. 
+`Model Service` is a Kubernetes operator (CRD + controller) that enables the creation of inference workloads and routing resources for a given base-model. Serving a base-model involves creating a couple of Kubernetes objects.
 
-Serving a base-model using `ModelService` involves creating a couple of Kubernetes objects.
+- `Baseconfig` configmap: this is typically created by the platform owner, and specifies configuration that is common across multiple base-models.
 
-- `BaseConfig` configmap: this is typically created by the platform owner, and specifies configuration that is common across multiple base-models.
-
-- `ModelService` custom resource: this is typically created by the inference model owner; it specifies configuration that is specific to a given base-model, and can optionally refer to a `BaseConfig`.
+- `Modelservice` custom resource: this is typically created by the inference model owner; it specifies configuration that is specific to a given base-model, and can optionally refer to a `Baseconfig`.
 
 ![model-service-arch](model-service-arch.png)
 
 ## Template support & reconciliation
 
-The values in the `baseconfig` configmap, and certain values in `modelservice` resource can be templated. When the `modelservice` resource is reconciled:
+The values in `baseconfig`, and certain values in the `modelservice` resource can be templated. When the `modelservice` resource is reconciled:
 
 1. Template variables in `baseconfig` and `modelservice` are dynamically interpolated based on the `modelservice` spec.
 2. A semantic merge takes place between `baseconfig` and `modelservice`.
-3. Inference workloads, routing resources, and RBACs authorizations needed for running the base-model are dynamically created in the cluster.
+3. Inference workloads, routing resources, and RBACs authorizations needed for running the base-model are created or updated in the cluster.
 
 ## Key Features
 
