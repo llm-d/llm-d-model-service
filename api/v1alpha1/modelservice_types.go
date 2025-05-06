@@ -315,6 +315,31 @@ type ModelServiceStatus struct {
 	// this reference will be nil
 	//
 	InferencePoolRef *string `json:"inferencePoolRef,omitempty"`
+	//
+	// PDServiceAccountRef identifies the service account for PD
+	// if PDServiceAccountRef is yet to be created,
+	// this reference will be nil
+	//
+	PDServiceAccountRef *string `json:"prefillServiceAccountRef,omitempty"`
+	//
+	// DecodeServiceAccountRef identifies the service account for decode
+	// if DecodeServiceAccountRef is yet to be created,
+	// this reference will be nil
+	//
+	DecodeServiceAccountRef *string `json:"decodeServiceAccountRef,omitempty"`
+	//
+	// EppRoleBinding identifies the rolebinding for Epp
+	// if EppRoleBinding is yet to be created,
+	// this reference will be nil
+	//
+	EppRoleBinding *string `json:"eppRoleBinding,omitempty"`
+	//
+	// ConfigMapNames identifies the configmap used for prefill and decode
+	// if ConfigMapNames is yet to be created,
+	// this reference will be nil
+	//
+	ConfigMapNames []string `json:"configMapNames,omitempty"`
+
 	// Combined deployment conditions from prefill and decode deployments
 	// Condition types should be prefixed to indicate their origin
 	// Example types: "PrefillAvailable", "DecodeProgressing", etc.

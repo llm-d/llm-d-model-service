@@ -2080,16 +2080,36 @@ spec:
                   - type
                   type: object
                 type: array
+              configMapNames:
+                description: |-
+                  ConfigMapNames identifies the configmap used for prefill and decode
+                  if ConfigMapNames is yet to be created,
+                  this reference will be nil
+                items:
+                  type: string
+                type: array
               decodeDeploymentRef:
                 description: |-
                   DecodeDeploymentRef identifies the decode deployment
                   if decode deployment is yet to be created,
                   this reference will be nil
                 type: string
+              decodeServiceAccountRef:
+                description: |-
+                  DecodeServiceAccountRef identifies the service account for decode
+                  if DecodeServiceAccountRef is yet to be created,
+                  this reference will be nil
+                type: string
               eppDeploymentRef:
                 description: |-
                   EppDeploymentRef identifies the epp deployment
                   if epp deployment is yet to be created,
+                  this reference will be nil
+                type: string
+              eppRoleBinding:
+                description: |-
+                  EppRoleBinding identifies the rolebinding for Epp
+                  if EppRoleBinding is yet to be created,
                   this reference will be nil
                 type: string
               inferenceModelRef:
@@ -2108,6 +2128,12 @@ spec:
                 description: |-
                   PrefillDeploymentRef identifies the prefill deployment
                   if prefill stanza is omitted, or if prefill deployment is yet to be created,
+                  this reference will be nil
+                type: string
+              prefillServiceAccountRef:
+                description: |-
+                  PDServiceAccountRef identifies the service account for PD
+                  if PDServiceAccountRef is yet to be created,
                   this reference will be nil
                 type: string
             type: object
