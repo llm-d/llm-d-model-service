@@ -1,5 +1,5 @@
 
-# Make image pull policy always
+# Make image pull policy always -- dev deploy requires this
 - op: add
   path: /spec/template/spec/containers/0/imagePullPolicy
   value: Always
@@ -8,4 +8,8 @@
 - op: add
   path: /spec/template/spec/imagePullSecrets
   value: 
-  - name: quay-secret
+  - name: quay-secret-llm-d
+
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --epp-cluster-role=epp-cluster-role
