@@ -175,7 +175,6 @@ var _ = Describe("ModelService Controller", func() {
 				EPPPullSecrets: []string{"secret1", "secret2"},
 				PDPullSecrets:  []string{"pull-secret"},
 				EPPClusterRole: "epp-cluster-role",
-				PDClusterRole:  "pd-cluster-role",
 			}
 
 			// Create dummy secrets required for the test
@@ -253,7 +252,6 @@ var _ = Describe("ModelService Controller", func() {
 					EPPPullSecrets: []string{},
 					PDPullSecrets:  []string{"pull-secret"},
 					EPPClusterRole: "epp-cluster-role",
-					PDClusterRole:  "pd-cluster-role",
 				},
 			}
 			_, err = reconciler.Reconcile(ctx, reconcile.Request{
@@ -336,17 +334,6 @@ var _ = Describe("ModelService Controller", func() {
 			By("Checking that prefill is using the correct SA")
 			Expect(prefill.Spec.Template.Spec.ServiceAccountName).To(Equal(pdServiceAccountName(modelService)))
 
-			By("Checking if a PD RoleBinding was created")
-			rolebinding := rbacv1.RoleBinding{}
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, client.ObjectKey{Name: modelService.Name + "-pd-rolebinding", Namespace: namespace}, &rolebinding)
-				return err == nil
-			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
-
-			By("Checking if PD RoleBinding has correct owner reference")
-			Expect(rolebinding.Name).To(Equal(modelService.Name + "-pd-rolebinding"))
-			Expect(rolebinding.OwnerReferences).ToNot(BeEmpty())
-
 			By("Validating that the EPP ServiceAccount was created")
 
 			sa := corev1.ServiceAccount{}
@@ -373,7 +360,7 @@ var _ = Describe("ModelService Controller", func() {
 			Expect(sa.OwnerReferences).ToNot(BeEmpty())
 
 			By("Checking if a epp RoleBinding was created")
-			rolebinding = rbacv1.RoleBinding{}
+			rolebinding := rbacv1.RoleBinding{}
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, client.ObjectKey{Name: modelService.Name + "-epp-rolebinding", Namespace: namespace}, &rolebinding)
 				return err == nil

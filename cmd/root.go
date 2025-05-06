@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"crypto/tls"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -69,10 +70,10 @@ var logLevel string
 
 func init() {
 	// secrets & cluster roles
-	rootCmd.PersistentFlags().StringVar(&rbacOptions.EPPClusterRole, "epp-cluster-role", "epp-cluster-role", "Name of the epp cluster role")
-	rootCmd.PersistentFlags().StringVar(&rbacOptions.PDClusterRole, "pd-cluster-role", "pd-cluster-role", "Name of the pd cluster role")
-	rootCmd.PersistentFlags().StringSliceVar(&rbacOptions.EPPPullSecrets, "epp-pull-secrets", []string{"epp-pull-secret"}, "List of pull secrets for configuring the epp deployment")
-	rootCmd.PersistentFlags().StringSliceVar(&rbacOptions.PDPullSecrets, "pd-pull-secrets", []string{"pd-pull-secret"}, "List of pull secrets for configuring the prefill and decode deployments")
+	rootCmd.PersistentFlags().StringVar(&rbacOptions.EPPClusterRole, "epp-cluster-role", "", "Name of the epp cluster role")
+	_ = rootCmd.MarkFlagRequired("epp-cluster-role")
+	rootCmd.PersistentFlags().StringSliceVar(&rbacOptions.EPPPullSecrets, "epp-pull-secrets", []string{}, "List of pull secrets for configuring the epp deployment")
+	rootCmd.PersistentFlags().StringSliceVar(&rbacOptions.PDPullSecrets, "pd-pull-secrets", []string{}, "List of pull secrets for configuring the prefill and decode deployments")
 
 	// logger
 	rootCmd.PersistentFlags().StringVarP(&logLevel, "log-level", "l", "info", "Set the logging level (debug, info, warn, error, etc.)")
@@ -280,6 +281,13 @@ var rootCmd = &cobra.Command{
 	Use:   "modelservice",
 	Short: "ModelService controller",
 	Long:  `ModelService Controller`,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if len(rbacOptions.EPPClusterRole) < 1 {
+			err := fmt.Errorf("valid EPP cluster role is required")
+			return err
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		runController()
 	},
