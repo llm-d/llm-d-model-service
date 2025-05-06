@@ -172,8 +172,8 @@ var _ = Describe("ModelService Controller", func() {
 
 			// Set RBAC options with EPPPullSecrets and PDPullSecrets
 			rbacOptions = &RBACOptions{
-				EPPPullSecrets: []string{"secret1", "secret2"},
-				PDPullSecrets:  []string{"pull-secret"},
+				EPPPullSecrets: []string{"epp-pull-secret"},
+				PDPullSecrets:  []string{"secret1", "secret2"},
 				EPPClusterRole: "epp-cluster-role",
 			}
 
@@ -249,8 +249,8 @@ var _ = Describe("ModelService Controller", func() {
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 				RBACOptions: RBACOptions{
-					EPPPullSecrets: []string{},
-					PDPullSecrets:  []string{"pull-secret"},
+					EPPPullSecrets: []string{"epp-pull-secret"},
+					PDPullSecrets:  []string{"secret1", "secret2"},
 					EPPClusterRole: "epp-cluster-role",
 				},
 			}
@@ -320,44 +320,49 @@ var _ = Describe("ModelService Controller", func() {
 			err = k8sClient.Status().Update(ctx, updated)
 			Expect(err).NotTo(HaveOccurred())
 
-			// By("Checking if a PD SA was created")
-			// sa := corev1.ServiceAccount{}
-			// Eventually(func() bool {
-			// 	err := k8sClient.Get(ctx, client.ObjectKey{Name: pdServiceAccountName(modelService), Namespace: namespace}, &sa)
-			// 	return err == nil
-			// }, time.Second*5, time.Millisecond*500).Should(BeTrue())
+			By("Checking if a PD SA was created")
+			sa := corev1.ServiceAccount{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: pdServiceAccountName(modelService), Namespace: namespace}, &sa)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
 
-			// By("Checking if PD SA has the corret owner reference")
-			// Expect(sa.Name).To(Equal(pdServiceAccountName(modelService)))
-			// Expect(sa.OwnerReferences).ToNot(BeEmpty())
+			By("Checking if PD SA has the corret owner reference")
+			Expect(sa.Name).To(Equal(pdServiceAccountName(modelService)))
+			Expect(sa.OwnerReferences).ToNot(BeEmpty())
 
 			By("Checking that prefill is using the correct SA")
 			Expect(prefill.Spec.Template.Spec.ServiceAccountName).To(Equal(pdServiceAccountName(modelService)))
 
+			fmt.Printf("the sa is %v", sa)
+			actualSecrets := make([]string, len(sa.ImagePullSecrets))
+			for i, s := range sa.ImagePullSecrets {
+				actualSecrets[i] = s.Name
+			}
+
+			expectedSecrets := rbacOptions.PDPullSecrets
+			Expect(actualSecrets).To(Equal(expectedSecrets))
+
 			By("Validating that the EPP ServiceAccount was created")
 
-			sa := corev1.ServiceAccount{}
+			eppSA := corev1.ServiceAccount{}
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, client.ObjectKey{Name: eppServiceAccountName(modelService), Namespace: namespace}, &sa)
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: eppServiceAccountName(modelService), Namespace: namespace}, &eppSA)
 				return err == nil
 			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
 
-			// fmt.Printf("the sa is %v", sa)
-			// actualSecrets := make([]string, len(sa.ImagePullSecrets))
-			// for i, s := range sa.ImagePullSecrets {
-			// 	actualSecrets[i] = s.Name
-			// }
+			fmt.Printf("*** eppSA %v\n\n", eppSA)
+			actualSecrets = make([]string, len(eppSA.ImagePullSecrets))
+			for i, s := range eppSA.ImagePullSecrets {
+				actualSecrets[i] = s.Name
+			}
 
-			// expectedSecrets := rbacOptions.EPPPullSecrets
-			// expectedSecretsAny := make([]any, len(expectedSecrets))
-			// for i, s := range expectedSecrets {
-			// 	expectedSecretsAny[i] = s
-			// }
-			// Expect(actualSecrets).To(ContainElements(expectedSecretsAny...))
+			expectedSecrets = rbacOptions.EPPPullSecrets
+			Expect(actualSecrets).To(Equal(expectedSecrets))
 
 			By("Checking if epp SA has the correct owner reference")
-			Expect(sa.Name).To(Equal(eppServiceAccountName(modelService)))
-			Expect(sa.OwnerReferences).ToNot(BeEmpty())
+			Expect(eppSA.Name).To(Equal(eppServiceAccountName(modelService)))
+			Expect(eppSA.OwnerReferences).ToNot(BeEmpty())
 
 			By("Checking if a epp RoleBinding was created")
 			rolebinding := rbacv1.RoleBinding{}
