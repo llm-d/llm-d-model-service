@@ -8,14 +8,15 @@ Serving a base-model using `ModelService` involves creating a couple of Kubernet
 
 - `ModelService` custom resource: this is typically created by the inference model owner; it specifies configuration that is specific to a given base-model, and can optionally refer to a `BaseConfig`.
 
-The values in `BaseConfig`, and some values in `ModelService` are templated. When the `modelservice` resource is reconciled:
+![model-service-arch](model-service-arch.png)
+
+## Template support & reconciliation
+
+The values in the `baseconfig` configmap, and certain values in `modelservice` resource can be templated. When the `modelservice` resource is reconciled:
 
 1. Template variables in `baseconfig` and `modelservice` are dynamically interpolated based on the `modelservice` spec.
 2. A semantic merge takes place between `baseconfig` and `modelservice`.
-3. Inference workloads, routing resources, and RBACs authorizations needed by them are dynamically created in the cluster.
-
-![model-service-arch](model-service-arch.png)
-
+3. Inference workloads, routing resources, and RBACs authorizations needed for running the base-model are dynamically created in the cluster.
 
 ## Key Features
 
@@ -25,6 +26,7 @@ The values in `BaseConfig`, and some values in `ModelService` are templated. Whe
 - Supports independent scaling of prefill and decode instances
 - Supports independent node affinities for prefill and decode instances
 - Supports model loading from OCI images, HuggingFace public and private registries, and PVCs
+- Supports templating for `baseconfig` values and certain `modelservice` values.
 
 ## Samples
 
