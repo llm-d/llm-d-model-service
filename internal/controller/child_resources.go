@@ -1027,32 +1027,3 @@ func (childResource *BaseConfig) createPDServiceAccount(ctx context.Context, kub
 
 	return nil
 }
-
-// createPDRoleBinding creates a RoleBinding for PDServiceAccount with PDClusterRole
-func (childResource *BaseConfig) createPDRoleBinding(ctx context.Context, kubeClient client.Client) error {
-
-	if childResource == nil || childResource.PDRoleBinding == nil {
-		return nil
-	}
-
-	roleBindingInCluster := rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      childResource.PDRoleBinding.Name,
-			Namespace: childResource.PDRoleBinding.Namespace,
-		}}
-
-	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &roleBindingInCluster, func() error {
-		roleBindingInCluster.Labels = childResource.PDRoleBinding.Labels
-		roleBindingInCluster.OwnerReferences = childResource.PDRoleBinding.OwnerReferences
-		roleBindingInCluster.Subjects = childResource.PDRoleBinding.Subjects
-		roleBindingInCluster.RoleRef = childResource.PDRoleBinding.RoleRef
-		return nil
-	})
-
-	if err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to create pd rolebinding")
-		return err
-	}
-	return nil
-
-}

@@ -175,7 +175,6 @@ var _ = Describe("ModelService Controller", func() {
 				EPPPullSecrets: []string{"secret1", "secret2"},
 				PDPullSecrets:  []string{"pull-secret"},
 				EPPClusterRole: "epp-cluster-role",
-				PDClusterRole:  "pd-cluster-role",
 			}
 
 			// Create dummy secrets required for the test
@@ -253,7 +252,6 @@ var _ = Describe("ModelService Controller", func() {
 					EPPPullSecrets: []string{},
 					PDPullSecrets:  []string{"pull-secret"},
 					EPPClusterRole: "epp-cluster-role",
-					PDClusterRole:  "pd-cluster-role",
 				},
 			}
 			_, err = reconciler.Reconcile(ctx, reconcile.Request{
