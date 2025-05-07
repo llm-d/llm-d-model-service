@@ -8,7 +8,7 @@
 - op: add
   path: /spec/template/spec/imagePullSecrets
   value: 
-  - name: quay-secret-llm-d
+  - name: $IMAGE_PULL_SECRET
 
 # to configure pull secrets for pd and epp pods, uncomment and set environemnt variables
 # - op: add

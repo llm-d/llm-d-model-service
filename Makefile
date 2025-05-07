@@ -4,6 +4,7 @@ DEV_VERSION ?= 0.0.1
 PROD_VERSION ?= 0.0.0
 IMAGE_TAG_BASE ?= quay.io/llm-d/$(PROJECT_NAME)
 IMG = $(IMAGE_TAG_BASE):$(DEV_VERSION)
+IMAGE_PULL_SECRET ?= quay-secret-llm-d
 NAMESPACE ?= hc4ai-operator
 LOG_LEVEL ?= info
 
@@ -175,7 +176,7 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 .PHONY: dev-deploy
 dev-deploy: manifests kustomize install
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	LOG_LEVEL=${LOG_LEVEL} EPP_CLUSTER_ROLE=${EPP_CLUSTERROLE} bash -c '$(KUSTOMIZE) build config/dev | envsubst' | $(KUBECTL) apply -f -
+	EPP_CLUSTER_ROLE=${EPP_CLUSTERROLE} LOG_LEVEL=${LOG_LEVEL} IMAGE_PULL_SECRET=${IMAGE_PULL_SECRET} bash -c '$(KUSTOMIZE) build config/dev | envsubst' | $(KUBECTL) apply -f -
 
 ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 ## does not remove the Namespace or ServiceAccount so that any image pull secret is not deleted
@@ -186,7 +187,7 @@ dev-undeploy: kustomize
 .PHONY: summitdemo-manifest
 summitdemo-manifest: manifests kustomize
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	LOG_LEVEL=${LOG_LEVEL} EPP_CLUSTER_ROLE=${EPP_CLUSTERROLE} bash -c '$(KUSTOMIZE) build config/summitdemo | envsubst'
+	EPP_CLUSTER_ROLE=${EPP_CLUSTERROLE} LOG_LEVEL=${LOG_LEVEL} IMAGE_PULL_SECRET=${IMAGE_PULL_SECRET} bash -c '$(KUSTOMIZE) build config/summitdemo | envsubst'
 
 .PHONY: buildah-build
 buildah-build: check-builder load-version-json ## Build and push image (multi-arch if supported)
