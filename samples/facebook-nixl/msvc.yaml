@@ -12,7 +12,7 @@ spec:
     modelName: facebook/opt-125m
 
   modelArtifacts:
-    uri: pvc://facebook-pvc/path/to/model
+    uri: hf://facebook/opt-125m
 
   # describe decode pods
   decode:
@@ -24,8 +24,7 @@ spec:
     containers:
     - name: "vllm"
       args:
-      # Comes from model-storage in the baseconfig's volumeMounts
-      - '/cache/{{ .ModelPath }}'
+      - 'facebook/opt-125m'
   
   # describe the prefill pods 
   prefill:
@@ -37,5 +36,4 @@ spec:
     containers:
     - name: "vllm"
       args:
-      # Comes from model-storage in the baseconfig's volumeMounts
-      - '/cache/{{ .ModelPath }}'
+      - 'facebook/opt-125m'

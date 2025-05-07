@@ -11,9 +11,11 @@ data:
     spec:
       template:
         spec:
+          imagePullSecrets:
+            - name: quay-secret-llm-d
           initContainers:
             - name: routing-proxy
-              image: quay.io/llm-d/llm-d-routing-sidecar@sha256:2682e3ad86d2e741030eb693544e1977f5ce072fe6e3db78ffa18ddf84b6d
+              image: quay.io/llm-d/llm-d-routing-sidecar@sha256:2682e3ad86d2e741030eb693544e1977f5ce072fe6e3db78ffa18ddf84b6dd64
               securityContext:
                 allowPrivilegeEscalation: false
                 runAsNonRoot: true
@@ -54,11 +56,6 @@ data:
               volumeMounts:
                 - name: model-cache
                   mountPath: /vllm-workspace/models
-                  
-                # A volume with this name will be created by MSVC controller
-                # for pvc case
-                - name: model-storage
-                  mountPath: /cache
               resources:
                 limits:
                   nvidia.com/gpu: 1
@@ -77,6 +74,8 @@ data:
     spec:
       template:
         spec:
+          imagePullSecrets:
+            - name: quay-secret-llm-d
           containers:
             - name: vllm
               image: quay.io/llm-d/llm-d-dev@sha256:d6d212de0d1dc0f6da9877eab21800f62d7dd32d825bae9bf1692c4f6e017109
@@ -114,8 +113,6 @@ data:
               volumeMounts:
                 - name: model-cache
                   mountPath: /vllm-workspace/models
-                - name: model-storage
-                  mountPath: /cache
               resources:
                 limits:
                   nvidia.com/gpu: 1
@@ -170,7 +167,8 @@ data:
       template:
         spec:
           containers:
-            - args:
+            - name: "epp"
+              args:
                 # TODO: replace with template vars
                 - -poolName
                 - {{ .InferencePoolName }}
@@ -189,7 +187,7 @@ data:
                   value: "true"
                 - name: PD_PROMPT_LEN_THRESHOLD
                   value: "10"
-              image: quay.io/llm-d/llm-d-gateway-api-inference-extension:0.0.5
+              image: quay.io/llm-d/llm-d-gateway-api-inference-extension-dev@sha256:a7710ced37d5596d77c06f0e38127e51f8f8e7500f3fb3ef468410ac1e747f87
               imagePullPolicy: Always
               livenessProbe:
                 failureThreshold: 3
@@ -217,6 +215,8 @@ data:
                 periodSeconds: 10
                 successThreshold: 1
                 timeoutSeconds: 1
+          imagePullSecrets:
+            - name: quay-secret-llm-d
   
   inferencePool: |
     apiVersion: inference.networking.x-k8s.io/v1alpha2
