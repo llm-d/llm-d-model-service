@@ -177,12 +177,16 @@ func (interpolatedBaseConfig *BaseConfig) MergeChildResources(ctx context.Contex
 	// Idea: updates do the mergo merge
 	if modelService.Spec.Prefill != nil || interpolatedBaseConfig.PrefillDeployment != nil {
 		interpolatedBaseConfig.mergePDDeployment(ctx, modelService, PREFILL_ROLE, scheme)
-		interpolatedBaseConfig.mergePDService(ctx, modelService, PREFILL_ROLE, scheme)
+		if interpolatedBaseConfig.PrefillService != nil {
+			interpolatedBaseConfig.mergePDService(ctx, modelService, PREFILL_ROLE, scheme)
+		}
 	}
 	log.FromContext(ctx).V(1).Info("attempting to update decode deployment")
 	if modelService.Spec.Decode != nil || interpolatedBaseConfig.DecodeDeployment != nil {
 		interpolatedBaseConfig.mergePDDeployment(ctx, modelService, DECODE_ROLE, scheme)
-		interpolatedBaseConfig.mergePDService(ctx, modelService, DECODE_ROLE, scheme)
+		if interpolatedBaseConfig.DecodeService != nil {
+			interpolatedBaseConfig.mergePDService(ctx, modelService, DECODE_ROLE, scheme)
+		}
 	}
 
 	if interpolatedBaseConfig.PrefillDeployment != nil || interpolatedBaseConfig.DecodeDeployment != nil {
@@ -203,7 +207,9 @@ func (interpolatedBaseConfig *BaseConfig) MergeChildResources(ctx context.Contex
 	if interpolatedBaseConfig.EPPDeployment != nil {
 		log.FromContext(ctx).V(1).Info("attempting to update epp deployment and service")
 		interpolatedBaseConfig.mergeEppDeployment(ctx, modelService, scheme)
-		interpolatedBaseConfig.mergeEppService(ctx, modelService, scheme)
+		if interpolatedBaseConfig.EPPService != nil {
+			interpolatedBaseConfig.mergeEppService(ctx, modelService, scheme)
+		}
 		interpolatedBaseConfig.setEPPServiceAccount(ctx, modelService, rbacOptions, scheme)
 		// this is role binding with a cluster role
 		interpolatedBaseConfig.setEPPRoleBinding(ctx, modelService, rbacOptions, scheme)
