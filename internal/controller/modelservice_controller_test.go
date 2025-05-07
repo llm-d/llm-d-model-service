@@ -282,6 +282,20 @@ var _ = Describe("ModelService Controller", func() {
 			err = k8sClient.Status().Update(ctx, updated)
 			Expect(err).NotTo(HaveOccurred())
 
+			By("Eventually expecting the status to be populated with decode deployment name")
+			Eventually(func() (string, error) {
+				ms := &msv1alpha1.ModelService{}
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: modelServiceName, Namespace: namespace}, ms)
+				if err != nil {
+					return "", err
+				}
+				fmt.Printf("the ms object status is %v", ms.Status)
+				if ms.Status.DecodeDeploymentRef == nil {
+					return "", nil
+				}
+				return *ms.Status.DecodeDeploymentRef, nil
+			}, time.Second*5, time.Millisecond*500).Should(Equal(deploymentName(modelService, "decode")))
+
 			By("Checking if prefill deployment was created")
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, client.ObjectKey{Name: prefillWorkloadName, Namespace: namespace}, &prefill)
@@ -304,21 +318,19 @@ var _ = Describe("ModelService Controller", func() {
 			err = k8sClient.Status().Update(ctx, updated)
 			Expect(err).NotTo(HaveOccurred())
 
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, client.ObjectKey{Name: prefillWorkloadName, Namespace: namespace}, &prefill)
-				return err == nil
-			}, time.Second*5, time.Second*5).Should(BeTrue())
-
-			By("Checking if Prefill deployment has correct owner reference")
-			Expect(prefill.OwnerReferences).ToNot(BeEmpty())
-			Expect(ownerRef.Kind).To(Equal("ModelService"))
-			Expect(ownerRef.Name).To(Equal(modelService.Name))
-			Expect(ownerRef.APIVersion).To(Equal("llm-d.ai/v1alpha1"))
-			updated = &msv1alpha1.ModelService{}
-			Expect(k8sClient.Get(ctx, typeNamespacedName, updated)).To(Succeed())
-			updated.Status.PrefillDeploymentRef = ptr.To(prefill.Name)
-			err = k8sClient.Status().Update(ctx, updated)
-			Expect(err).NotTo(HaveOccurred())
+			By("Eventually expecting the status to be populated with prefill deployment name")
+			Eventually(func() (string, error) {
+				ms := &msv1alpha1.ModelService{}
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: modelServiceName, Namespace: namespace}, ms)
+				if err != nil {
+					return "", err
+				}
+				fmt.Printf("the ms object status is %v", ms.Status)
+				if ms.Status.PrefillDeploymentRef == nil {
+					return "", nil
+				}
+				return *ms.Status.PrefillDeploymentRef, nil
+			}, time.Second*5, time.Millisecond*500).Should(Equal(deploymentName(modelService, "prefill")))
 
 			By("Checking if a PD SA was created")
 			sa := corev1.ServiceAccount{}
@@ -367,7 +379,7 @@ var _ = Describe("ModelService Controller", func() {
 			By("Checking if a epp RoleBinding was created")
 			rolebinding := rbacv1.RoleBinding{}
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, client.ObjectKey{Name: modelService.Name + "-epp-rolebinding", Namespace: namespace}, &rolebinding)
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: eppRolebindingName(modelService), Namespace: namespace}, &rolebinding)
 				return err == nil
 			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
 
@@ -394,7 +406,7 @@ var _ = Describe("ModelService Controller", func() {
 			// Expect(actualSecrets).To(ContainElements(expectedSecretsAny...))
 
 			By("Checking if epp RoleBinding has correct owner reference")
-			Expect(rolebinding.Name).To(Equal(modelService.Name + "-epp-rolebinding"))
+			Expect(rolebinding.Name).To(Equal(eppRolebindingName(modelService)))
 			Expect(rolebinding.OwnerReferences).ToNot(BeEmpty())
 
 			By("Checking if ModelService status has been updated")
