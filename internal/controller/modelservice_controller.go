@@ -285,6 +285,12 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 				LastTransitionTime: metav1.Now(),
 			})
 		}
+		totalReady := prefillDeploymentFromCluster.Status.ReadyReplicas
+		totalAvailable := prefillDeploymentFromCluster.Status.AvailableReplicas
+		expected := *prefillDeploymentFromCluster.Spec.Replicas
+		msvc.Status.PrefillReady = fmt.Sprintf("%d/%d", totalReady, expected)
+		msvc.Status.PrefillAvailable = totalAvailable
+
 		for _, c := range prefillDeploymentFromCluster.Status.Conditions {
 			conditions = append(conditions, metav1.Condition{
 				Type:               "Prefill" + string(c.Type),
@@ -311,6 +317,12 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 				LastTransitionTime: metav1.Now(),
 			})
 		}
+		totalReady := decodeDeploymentFromCluster.Status.ReadyReplicas
+		totalAvailable := decodeDeploymentFromCluster.Status.AvailableReplicas
+		expected := *decodeDeploymentFromCluster.Spec.Replicas
+		msvc.Status.DecodeReady = fmt.Sprintf("%d/%d", totalReady, expected)
+		msvc.Status.DecodeAvailable = totalAvailable
+
 		// Mirror conditions with "Decode" prefix
 		for _, c := range decodeDeploymentFromCluster.Status.Conditions {
 			conditions = append(conditions, metav1.Condition{
@@ -338,6 +350,13 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 				LastTransitionTime: metav1.Now(),
 			})
 		}
+
+		totalReady := eppDeploymentFromCluster.Status.ReadyReplicas
+		totalAvailable := eppDeploymentFromCluster.Status.AvailableReplicas
+		expected := *eppDeploymentFromCluster.Spec.Replicas
+		msvc.Status.EppReady = fmt.Sprintf("%d/%d", totalReady, expected)
+		msvc.Status.EppAvailable = totalAvailable
+
 		// Mirror conditions with "Epp" prefix
 		for _, c := range eppDeploymentFromCluster.Status.Conditions {
 			conditions = append(conditions, metav1.Condition{

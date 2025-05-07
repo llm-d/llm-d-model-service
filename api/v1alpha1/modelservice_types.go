@@ -28,6 +28,12 @@ import (
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Decouple Scaling",type=boolean,JSONPath=`.spec.decoupleScaling`
+// +kubebuilder:printcolumn:name="Prefill READY",type=string,JSONPath=`.status.prefillReady`
+// +kubebuilder:printcolumn:name="Prefill AVAIL",type=integer,JSONPath=`.status.prefillAvailable`
+// +kubebuilder:printcolumn:name="Decode READY",type=string,JSONPath=`.status.decodeReady`
+// +kubebuilder:printcolumn:name="Decode AVAIL",type=integer,JSONPath=`.status.decodeAvailable`
+// +kubebuilder:printcolumn:name="EPP READY",type=string,JSONPath=`.status.eppReady`
+// +kubebuilder:printcolumn:name="EPP AVAIL",type=integer,JSONPath=`.status.eppAvailable`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 type ModelService struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -339,6 +345,18 @@ type ModelServiceStatus struct {
 	// this reference will be an empty list
 	//
 	ConfigMapNames []string `json:"configMapNames,omitempty"`
+
+	// READY and AVAILABLE for prefill
+	PrefillReady     string `json:"prefillReady,omitempty"` // e.g. "1/1"
+	PrefillAvailable int32  `json:"prefillAvailable,omitempty"`
+
+	// READY and AVAILABLE for decode
+	DecodeReady     string `json:"decodeReady,omitempty"`
+	DecodeAvailable int32  `json:"decodeAvailable,omitempty"`
+
+	// READY and AVAILABLE for Epp
+	EppReady     string `json:"eppReady,omitempty"`
+	EppAvailable int32  `json:"eppAvailable,omitempty"`
 
 	// Combined deployment conditions from prefill and decode deployments
 	// Condition types should be prefixed to indicate their origin
