@@ -68,7 +68,7 @@ The result is a fully managed inference stack for the base model.
 
 * Platform teams should install *ModelService* and *Baseconfig* presets using the `llm-d` deployer.
 
-* Inference owners should prefer using these presets to streamline model onboarding, rather than creating their own custom presets.
+* Inference owners should prefer using these presets to streamline onboarding of base models, rather than creating their own custom presets.
 
 
 <!-- ## Samples
