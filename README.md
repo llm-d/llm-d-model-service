@@ -38,17 +38,17 @@ The *ModelService* controller reconciles the cluster state to align with the con
 
 * OCI images
 
-🧩 Supports value templating in both *BaseConfig* and *ModelService*
+🧩 Supports value templating in both *BaseConfig* and *ModelService* resources
 
 ## How It Works
 
-When a *ModelService* is reconciled:
+When a *ModelService* resource is reconciled:
 
 1. **Templating**: template variables in *BaseConfig* and *ModelService* are interpolated based on the *ModelService* spec.
 
 2. **Merging**: a semantic merge overlays *ModelService* values on top of the selected *BaseConfig*.
 
-3. **Resource Deployment**: the controller creates or updates the following:
+3. **Orchestration**: the controller creates or updates the following resources:
 
 * Inference workloads (prefill and decode)
 
@@ -68,7 +68,7 @@ The result is a fully managed inference stack for the base model.
 
 * Platform teams should install *Baseconfig* presets using the `llm-d` deployer.
 
-* Base model owners should prefer using these presets to streamline onboarding of base models, rather than creating their own custom *BaseConfigs*.
+* Base model owners should prefer using these presets to streamline onboarding of base models, rather than creating their own *BaseConfigs*.
 
 ## Docs
 
