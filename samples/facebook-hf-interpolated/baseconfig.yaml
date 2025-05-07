@@ -69,7 +69,6 @@ data:
               securityContext:
                 allowPrivilegeEscalation: false
               args:
-                - {{ .HFModelName }}
                 - "--port"
                 - "8200"
                 - "--kv-transfer-config"
@@ -126,7 +125,6 @@ data:
               securityContext:
                 allowPrivilegeEscalation: false
               args:
-                - {{ .HFModelName }}
                 - "--port"
                 - "8000"
                 - "--kv-transfer-config"

@@ -165,14 +165,20 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	log.FromContext(ctx).V(1).Info("attempting to get baseconfig object")
-	// Step 2: Get the interpolated baseconfig object if it exists
-	interpolatedBaseConfig, err := r.getChildResourcesFromConfigMap(ctx, modelService)
+	// Step 1.1: interpolate the modelService since it can include template vars
+	interpolatedModelService, err := InterpolateModelService(ctx, modelService)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	interpolatedBaseConfig = interpolatedBaseConfig.MergeChildResources(ctx, modelService, r.Scheme, &r.RBACOptions)
+	log.FromContext(ctx).V(1).Info("attempting to get baseconfig object")
+	// Step 2: Get the interpolated baseconfig object if it exists
+	interpolatedBaseConfig, err := r.getChildResourcesFromConfigMap(ctx, interpolatedModelService)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	interpolatedBaseConfig = interpolatedBaseConfig.MergeChildResources(ctx, interpolatedModelService, r.Scheme, &r.RBACOptions)
 
 	// TODO: Post-process for decoupled Scaling
 	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate child resources")
@@ -184,13 +190,13 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	//update status
-	original := modelService.DeepCopy()
-	err = r.populateStatus(ctx, modelService)
+	original := interpolatedModelService.DeepCopy()
+	err = r.populateStatus(ctx, interpolatedModelService)
 	if err != nil {
 		log.FromContext(ctx).Error(err, "unable populate status")
 		return ctrl.Result{}, err
 	}
-	if !equality.Semantic.DeepEqual(&original.Status, &modelService.Status) {
+	if !equality.Semantic.DeepEqual(&original.Status, &interpolatedModelService.Status) {
 		latest := &msv1alpha1.ModelService{}
 		if err := r.Client.Get(ctx, req.NamespacedName, latest); err != nil {
 			log.FromContext(ctx).Error(err, "unable to re-fetch ModelService before status update")
