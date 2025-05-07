@@ -50,7 +50,7 @@ When a *ModelService* resource is reconciled:
 
 3. **Orchestration**: the controller creates or updates the following resources:
 
-* Inference workloads (prefill and decode)
+* Inference workloads (prefill and decode deployments)
 
 * Routing resources (e.g., EPP deployment)
 
