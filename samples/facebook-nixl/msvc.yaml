@@ -24,8 +24,8 @@ spec:
     containers:
     - name: "vllm"
       args:
-      - "--model"
-      - '{{ .ModelName }}'
+      # Comes from model-storage in the baseconfig's volumeMounts
+      - '/cache/{{ .ModelPath }}'
   
   # describe the prefill pods 
   prefill:
@@ -37,5 +37,5 @@ spec:
     containers:
     - name: "vllm"
       args:
-      - "--model"
-      - '{{ .ModelName }}'
+      # Comes from model-storage in the baseconfig's volumeMounts
+      - '/cache/{{ .ModelPath }}'

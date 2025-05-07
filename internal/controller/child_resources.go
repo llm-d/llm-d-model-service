@@ -83,6 +83,20 @@ func InterpolateBaseConfigMap(ctx context.Context, cm *corev1.ConfigMap, msvc *m
 	return interpolated, nil
 }
 
+// interpolateContainerArgs interpolates (init) container args
+func interpolateContainerArgs(ctx context.Context, containerSpec *msv1alpha1.ContainerSpec, values *TemplateVars) (*msv1alpha1.ContainerSpec, error) {
+	containerCopy := containerSpec.DeepCopy()
+	for j, argStr := range containerSpec.Args {
+		renderedArg, err := renderTemplate(argStr, values)
+		if err != nil {
+			log.FromContext(ctx).V(1).Error(err, "error with template rendering, cannot render "+argStr)
+			return nil, err
+		}
+		containerCopy.Args[j] = renderedArg
+	}
+	return containerCopy, nil
+}
+
 // interpolateContainerArgsForPDSpec interpolates container args using tempalte variables
 func interpolateContainerArgsForPDSpec(ctx context.Context, msvc *msv1alpha1.ModelService, role string, values *TemplateVars) (*msv1alpha1.PDSpec, error) {
 	// Get the desired pdSpec
@@ -92,18 +106,24 @@ func interpolateContainerArgsForPDSpec(ctx context.Context, msvc *msv1alpha1.Mod
 	} else {
 		pdSpec = *msvc.Spec.Decode
 	}
-
-	// Interpolate the args in pdSpec container
 	pdSpecCopy := pdSpec.DeepCopy()
-	for i, container := range pdSpec.Containers {
-		for j, argStr := range container.Args {
-			renderedArg, err := renderTemplate(argStr, values)
-			if err != nil {
-				log.FromContext(ctx).V(1).Error(err, "error with template rendering, cannot construct "+role+"for arg string "+argStr)
-				return nil, err
-			}
-			pdSpecCopy.Containers[i].Args[j] = renderedArg
+
+	// Interpolate args in pdSpec.initContainers
+	for i, initContainer := range pdSpec.InitContainers {
+		interpolatedInitContainer, err := interpolateContainerArgs(ctx, &initContainer, values)
+		if err != nil {
+			return nil, err
 		}
+		pdSpecCopy.InitContainers[i] = *interpolatedInitContainer
+	}
+
+	// Interpolate the args in pdSpec.Container
+	for i, container := range pdSpec.Containers {
+		interpolatedContainer, err := interpolateContainerArgs(ctx, &container, values)
+		if err != nil {
+			return nil, err
+		}
+		pdSpecCopy.Containers[i] = *interpolatedContainer
 	}
 
 	return pdSpecCopy, nil
@@ -122,18 +142,22 @@ func InterpolateModelService(ctx context.Context, msvc *msv1alpha1.ModelService)
 	msvcCopy := msvc.DeepCopy()
 
 	// interpolate prefill section
-	interpolatedPrefill, err := interpolateContainerArgsForPDSpec(ctx, msvcCopy, PREFILL_ROLE, values)
-	if err != nil {
-		return nil, err
+	if msvc.Spec.Prefill != nil {
+		interpolatedPrefill, err := interpolateContainerArgsForPDSpec(ctx, msvcCopy, PREFILL_ROLE, values)
+		if err != nil {
+			return nil, err
+		}
+		msvcCopy.Spec.Prefill = interpolatedPrefill
 	}
-	msvcCopy.Spec.Prefill = interpolatedPrefill
 
-	// interpolate decode section
-	interpolatedDecode, err := interpolateContainerArgsForPDSpec(ctx, msvcCopy, DECODE_ROLE, values)
-	if err != nil {
-		return nil, err
+	if msvc.Spec.Decode != nil {
+		// interpolate decode section
+		interpolatedDecode, err := interpolateContainerArgsForPDSpec(ctx, msvcCopy, DECODE_ROLE, values)
+		if err != nil {
+			return nil, err
+		}
+		msvcCopy.Spec.Decode = interpolatedDecode
 	}
-	msvcCopy.Spec.Decode = interpolatedDecode
 
 	return msvcCopy, nil
 }

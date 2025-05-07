@@ -17,6 +17,10 @@ spec:
   # describe decode pods
   decode:
     replicas: 1
+    containers:
+    - name: "vllm" 
+      args: 
+        - '{{ .HFModelName }}'
     
     # TODO: override or append for node affinity?
     # should be requiredDuringSchedulingIgnoredDuringExecution
@@ -28,6 +32,10 @@ spec:
   # describe the prefill pods 
   prefill:
     replicas: 1
+    containers:
+    - name: "vllm" 
+      args: 
+        - '{{ .HFModelName }}'
     acceleratorTypes:
       labelKey: nvidia.com/gpu.product
       labelValues:
