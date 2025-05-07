@@ -532,15 +532,9 @@ func (childResource *BaseConfig) setEPPServiceAccount(ctx context.Context, msvc 
 
 func (childResource *BaseConfig) setEPPRoleBinding(ctx context.Context, msvc *msv1alpha1.ModelService, rbacOptions *RBACOptions, scheme *runtime.Scheme) {
 
-	sanitizedMSVCName, err := sanitizeName(msvc.Name)
-	if err != nil {
-		log.FromContext(ctx).V(1).Error(err, "cannot sanitize MSVC name for epp rolebinding creation")
-		sanitizedMSVCName = "default-msvc-name"
-	}
-
 	childResource.EPPRoleBinding = &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      sanitizedMSVCName + "-epp-rolebinding",
+			Name:      eppRolebindingName(msvc),
 			Namespace: msvc.Namespace,
 		},
 		Subjects: []rbacv1.Subject{
