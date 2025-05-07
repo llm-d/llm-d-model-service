@@ -18,7 +18,7 @@ Typically, platform operators define a small set of *BaseConfig* presets, and ba
 
 The *ModelService* controller reconciles the cluster state to align with the configuration declared in the *ModelService* custom resource. This custom resource is the source of truth for resources it owns.
 
-⚠️ Important: Do not manually modify resources owned by a *ModelService*. If your use case is not yet supported, please file an issue in the *ModelService* repository.
+> ⚠️ Important: Do not manually modify resources owned by a *ModelService*. If your use case is not yet supported, please file an issue in the *ModelService* repository.
 
 ## Features
 
