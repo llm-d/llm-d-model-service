@@ -163,28 +163,34 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	log.FromContext(ctx).V(1).Info("attempting to get baseconfig object")
-	// Step 2: Get the interpolated baseconfig object if it exists
-	interpolatedBaseConfig, err := r.getChildResourcesFromConfigMap(ctx, modelService)
+	// Step 1.1: interpolate the modelService since it can include template vars
+	interpolatedModelService, err := InterpolateModelService(ctx, modelService)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	interpolatedBaseConfig = interpolatedBaseConfig.MergeChildResources(ctx, modelService, r.Scheme, &r.RBACOptions)
+	log.FromContext(ctx).V(1).Info("attempting to get baseconfig object")
+	// Step 2: Get the interpolated baseconfig object if it exists
+	interpolatedBaseConfig, err := r.getChildResourcesFromConfigMap(ctx, interpolatedModelService)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	interpolatedBaseConfig = interpolatedBaseConfig.MergeChildResources(ctx, interpolatedModelService, r.Scheme, &r.RBACOptions)
 
 	// TODO: Post-process for decoupled Scaling
 	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate child resources")
 	err = interpolatedBaseConfig.createOrUpdate(ctx, r)
 
 	// we will deal with status later
-	// err = r.updateStatus(modelService)
-	populateStatus(ctx, modelService, r.Client, interpolatedBaseConfig.PrefillDeployment,
+	// err = r.updateStatus(interpolatedModelService)
+	populateStatus(ctx, interpolatedModelService, r.Client, interpolatedBaseConfig.PrefillDeployment,
 		interpolatedBaseConfig.DecodeDeployment,
 		interpolatedBaseConfig.EPPDeployment,
 		interpolatedBaseConfig.InferenceModel,
 		interpolatedBaseConfig.InferencePool)
 
-	if err := r.Status().Update(ctx, modelService); err != nil {
+	if err := r.Status().Update(ctx, interpolatedModelService); err != nil {
 		log.FromContext(ctx).Error(err, "unable to update ModelService status")
 		return ctrl.Result{}, err
 	}

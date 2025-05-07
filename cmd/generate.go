@@ -20,7 +20,7 @@ import (
 	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 )
 
-func readModelService(filename string, logger logr.Logger) (*msv1alpha1.ModelService, error) {
+func readModelService(ctx context.Context, filename string, logger logr.Logger) (*msv1alpha1.ModelService, error) {
 	var modelService msv1alpha1.ModelService
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -34,7 +34,8 @@ func readModelService(filename string, logger logr.Logger) (*msv1alpha1.ModelSer
 		return nil, err
 	}
 
-	return &modelService, nil
+	// interpolate MSVC
+	return controller.InterpolateModelService(ctx, &modelService)
 }
 
 func getBaseChildResources(filename string, msvc *msv1alpha1.ModelService, logger logr.Logger) (*controller.BaseConfig, error) {
@@ -90,8 +91,8 @@ func toYaml(obj interface{}) string {
 func generateManifests(ctx context.Context, manifestFile string, configFile string) (*string, error) {
 	logger := log.FromContext(ctx)
 
-	// get msvc from file
-	msvc, err := readModelService(manifestFile, logger)
+	// get msvc from file and interpolate it
+	msvc, err := readModelService(ctx, manifestFile, logger)
 	if err != nil {
 		logger.Error(err, "unable to read ModelService", "location", manifestFile)
 		return nil, err

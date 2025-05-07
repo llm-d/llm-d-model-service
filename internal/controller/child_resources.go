@@ -83,6 +83,61 @@ func InterpolateBaseConfigMap(ctx context.Context, cm *corev1.ConfigMap, msvc *m
 	return interpolated, nil
 }
 
+// interpolateContainerArgsForPDSpec interpolates container args using tempalte variables
+func interpolateContainerArgsForPDSpec(ctx context.Context, msvc *msv1alpha1.ModelService, role string, values *TemplateVars) (*msv1alpha1.PDSpec, error) {
+	// Get the desired pdSpec
+	var pdSpec msv1alpha1.PDSpec
+	if role == PREFILL_ROLE {
+		pdSpec = *msvc.Spec.Prefill
+	} else {
+		pdSpec = *msvc.Spec.Decode
+	}
+
+	// Interpolate the args in pdSpec container
+	pdSpecCopy := pdSpec.DeepCopy()
+	for i, container := range pdSpec.Containers {
+		for j, argStr := range container.Args {
+			renderedArg, err := renderTemplate(argStr, values)
+			if err != nil {
+				log.FromContext(ctx).V(1).Error(err, "error with template rendering, cannot construct "+role+"for arg string "+argStr)
+				return nil, err
+			}
+			pdSpecCopy.Containers[i].Args[j] = renderedArg
+		}
+	}
+
+	return pdSpecCopy, nil
+}
+
+// InterpolateModelService interpolates strings using msvc template variable values
+func InterpolateModelService(ctx context.Context, msvc *msv1alpha1.ModelService) (*msv1alpha1.ModelService, error) {
+	values := &TemplateVars{}
+	err := values.from(ctx, msvc)
+	if err != nil {
+		log.FromContext(ctx).V(1).Error(err, "cannot get template variable values from msvc")
+		return nil, err
+	}
+
+	// interpolate container args
+	msvcCopy := msvc.DeepCopy()
+
+	// interpolate prefill section
+	interpolatedPrefill, err := interpolateContainerArgsForPDSpec(ctx, msvcCopy, PREFILL_ROLE, values)
+	if err != nil {
+		return nil, err
+	}
+	msvcCopy.Spec.Prefill = interpolatedPrefill
+
+	// interpolate decode section
+	interpolatedDecode, err := interpolateContainerArgsForPDSpec(ctx, msvcCopy, DECODE_ROLE, values)
+	if err != nil {
+		return nil, err
+	}
+	msvcCopy.Spec.Decode = interpolatedDecode
+
+	return msvcCopy, nil
+}
+
 func (r *ModelServiceReconciler) getChildResourcesFromConfigMap(
 	ctx context.Context,
 	msvc *msv1alpha1.ModelService,

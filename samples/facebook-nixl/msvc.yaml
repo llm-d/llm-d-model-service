@@ -25,7 +25,7 @@ spec:
     - name: "vllm"
       args:
       - "--model"
-      - "facebook/opt-125m"
+      - '{{ .ModelName }}'
   
   # describe the prefill pods 
   prefill:
@@ -38,4 +38,4 @@ spec:
     - name: "vllm"
       args:
       - "--model"
-      - "facebook/opt-125m"
+      - '{{ .ModelName }}'
