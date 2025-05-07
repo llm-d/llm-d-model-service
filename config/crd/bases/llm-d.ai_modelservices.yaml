@@ -2172,6 +2172,10 @@ spec:
                   if PDServiceAccountRef is yet to be created,
                   this reference will be nil
                 type: string
+            required:
+            - decodeAvailable
+            - eppAvailable
+            - prefillAvailable
             type: object
         type: object
     served: true

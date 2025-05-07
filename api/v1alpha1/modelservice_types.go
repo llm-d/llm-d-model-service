@@ -348,15 +348,15 @@ type ModelServiceStatus struct {
 
 	// READY and AVAILABLE for prefill
 	PrefillReady     string `json:"prefillReady,omitempty"` // e.g. "1/1"
-	PrefillAvailable int32  `json:"prefillAvailable,omitempty"`
+	PrefillAvailable int32  `json:"prefillAvailable"`
 
 	// READY and AVAILABLE for decode
 	DecodeReady     string `json:"decodeReady,omitempty"`
-	DecodeAvailable int32  `json:"decodeAvailable,omitempty"`
+	DecodeAvailable int32  `json:"decodeAvailable"`
 
 	// READY and AVAILABLE for Epp
 	EppReady     string `json:"eppReady,omitempty"`
-	EppAvailable int32  `json:"eppAvailable,omitempty"`
+	EppAvailable int32  `json:"eppAvailable"`
 
 	// Combined deployment conditions from prefill and decode deployments
 	// Condition types should be prefixed to indicate their origin
