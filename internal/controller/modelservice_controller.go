@@ -178,9 +178,18 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate child resources")
 	err = interpolatedBaseConfig.createOrUpdate(ctx, r)
 
+	if err != nil {
+		log.FromContext(ctx).Error(err, "unable createorupdate from interpolatedBaseConfig")
+		return ctrl.Result{}, err
+	}
+
 	//update status
 	original := modelService.DeepCopy()
-	r.populateStatus(ctx, modelService)
+	err = r.populateStatus(ctx, modelService)
+	if err != nil {
+		log.FromContext(ctx).Error(err, "unable populate status")
+		return ctrl.Result{}, err
+	}
 	if !equality.Semantic.DeepEqual(&original.Status, &modelService.Status) {
 		latest := &msv1alpha1.ModelService{}
 		if err := r.Client.Get(ctx, req.NamespacedName, latest); err != nil {
@@ -194,7 +203,7 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, err
 		}
 	}
-	return ctrl.Result{}, err
+	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -233,8 +242,12 @@ func (r *ModelServiceReconciler) deploymentMapFunc(ctx context.Context, obj clie
 	return []reconcile.Request{}
 }
 
-func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1alpha1.ModelService) {
+func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1alpha1.ModelService) error {
 	var conditions []metav1.Condition
+	baseConfig, err := r.getChildResourcesFromConfigMap(ctx, msvc)
+	if err != nil {
+		return err
+	}
 	infModelName := infModelName(msvc)
 	msvc.Status.InferenceModelRef = &infModelName
 
@@ -250,7 +263,6 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 	eppRoleBinding := eppRolebindingName(msvc)
 	msvc.Status.EppRoleBinding = &eppRoleBinding
 
-	baseConfig, _ := r.getChildResourcesFromConfigMap(ctx, msvc)
 	var configMapNames []string
 	for _, v := range baseConfig.ConfigMaps {
 		configMapNames = append(configMapNames, v.Name)
@@ -311,30 +323,34 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 		}
 	}
 
-	eppName := eppDeploymentName(msvc)
-	msvc.Status.EppDeploymentRef = &eppName
-	eppDeploymentFromCluster := &appsv1.Deployment{}
-	err := r.Client.Get(ctx, client.ObjectKey{Name: eppName, Namespace: msvc.Namespace}, eppDeploymentFromCluster)
-	if err != nil {
-		log.FromContext(ctx).Error(err, "unable to get Epp deployment")
-		conditions = append(conditions, metav1.Condition{
-			Type:               "EppDeploymentAvailable",
-			Status:             metav1.ConditionFalse,
-			Reason:             "GetFailed",
-			Message:            fmt.Sprintf("Failed to fetch Epp Deployment: %v", err),
-			LastTransitionTime: metav1.Now(),
-		})
-	}
-	// Mirror conditions with "Epp" prefix
-	for _, c := range eppDeploymentFromCluster.Status.Conditions {
-		conditions = append(conditions, metav1.Condition{
-			Type:               "Epp" + string(c.Type),
-			Status:             metav1.ConditionStatus(c.Status),
-			Reason:             c.Reason,
-			Message:            c.Message,
-			LastTransitionTime: c.LastUpdateTime,
-		})
+	if baseConfig.EPPDeployment != nil {
+		eppName := eppDeploymentName(msvc)
+		msvc.Status.EppDeploymentRef = &eppName
+		eppDeploymentFromCluster := &appsv1.Deployment{}
+		err := r.Client.Get(ctx, client.ObjectKey{Name: eppName, Namespace: msvc.Namespace}, eppDeploymentFromCluster)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "unable to get Epp deployment")
+			conditions = append(conditions, metav1.Condition{
+				Type:               "EppDeploymentAvailable",
+				Status:             metav1.ConditionFalse,
+				Reason:             "GetFailed",
+				Message:            fmt.Sprintf("Failed to fetch Epp Deployment: %v", err),
+				LastTransitionTime: metav1.Now(),
+			})
+		}
+		// Mirror conditions with "Epp" prefix
+		for _, c := range eppDeploymentFromCluster.Status.Conditions {
+			conditions = append(conditions, metav1.Condition{
+				Type:               "Epp" + string(c.Type),
+				Status:             metav1.ConditionStatus(c.Status),
+				Reason:             c.Reason,
+				Message:            c.Message,
+				LastTransitionTime: c.LastUpdateTime,
+			})
+		}
 	}
 
 	msvc.Status.Conditions = conditions
+
+	return nil
 }
