@@ -32,8 +32,6 @@ import (
 // +kubebuilder:printcolumn:name="Prefill AVAIL",type=integer,JSONPath=`.status.prefillAvailable`
 // +kubebuilder:printcolumn:name="Decode READY",type=string,JSONPath=`.status.decodeReady`
 // +kubebuilder:printcolumn:name="Decode AVAIL",type=integer,JSONPath=`.status.decodeAvailable`
-// +kubebuilder:printcolumn:name="EPP READY",type=string,JSONPath=`.status.eppReady`
-// +kubebuilder:printcolumn:name="EPP AVAIL",type=integer,JSONPath=`.status.eppAvailable`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 type ModelService struct {
 	metav1.TypeMeta   `json:",inline"`

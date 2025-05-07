@@ -32,12 +32,6 @@ spec:
     - jsonPath: .status.decodeAvailable
       name: Decode AVAIL
       type: integer
-    - jsonPath: .status.eppReady
-      name: EPP READY
-      type: string
-    - jsonPath: .status.eppAvailable
-      name: EPP AVAIL
-      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
