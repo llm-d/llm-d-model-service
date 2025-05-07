@@ -136,8 +136,8 @@ func (t *TemplateVars) from(ctx context.Context, msvc *msv1alpha1.ModelService) 
 // +kubebuilder:rbac:groups=inference.networking.x-k8s.io,resources=inferencepool,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=serviceaccount,verbs=create;update;delete
-// +kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=rolebinding,verbs=create;update;delete
+// +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
 
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
