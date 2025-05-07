@@ -2,13 +2,13 @@
 
 > The *ModelService* declaratively provisions and maintains the Kubernetes resources needed to serve a base model for inference.
 
-A *ModelService* custom resource encapsulates the desired state of deployments and routing associated with a single base model. It automates the management of Kubernetes resources, including:
+A *ModelService* custom resource encapsulates the desired state of workloads and routing associated with a single base model. It automates the management of Kubernetes resources, including:
 
 * Prefill and decode deployments
 
 * Inference pool and model defined by [Gateway API Inference Extension](https://gateway-api-inference-extension.sigs.k8s.io)
 
-* Endpoint picker (EPP) deployment and service
+* [Endpoint picker (EPP) deployment and service](https://gateway-api-inference-extension.sigs.k8s.io/?h=endpoint#endpoint-selection-extension)
 
 * Relevant RBAC permissions
 
@@ -32,29 +32,29 @@ The *ModelService* controller reconciles the cluster state to align with the con
 
 📦 Supports model loading from:
 
-* OCI images
-
 * HuggingFace (public or private)
 
 * Kubernetes PVCs
 
-🧩 Supports value templating in both BaseConfig and ModelService
+* OCI images
+
+🧩 Supports value templating in both *BaseConfig* and *ModelService*
 
 ## How It Works
 
-When a ModelService is reconciled:
+When a *ModelService* is reconciled:
 
-1. **Templating**: Template variables in *BaseConfig* and *ModelService* are interpolated based on the *ModelService* spec.
+1. **Templating**: template variables in *BaseConfig* and *ModelService* are interpolated based on the *ModelService* spec.
 
-2. **Merging**: A semantic merge overlays *ModelService* values on top of the selected *BaseConfig*.
+2. **Merging**: a semantic merge overlays *ModelService* values on top of the selected *BaseConfig*.
 
-3. **Resource Deployment**: The controller creates or updates the following:
+3. **Resource Deployment**: the controller creates or updates the following:
 
-* Inference deployments (prefill and decode)
+* Inference workloads (prefill and decode)
 
 * Routing resources (e.g., EPP deployment)
 
-* RBAC authorizations
+* RBAC permissions
 
 The result is a fully managed inference stack for the base model.
 
