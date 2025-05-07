@@ -1,8 +1,8 @@
 # ModelService
 
-> The `ModelService` custom resource declaratively manages all Kubernetes components required to serve inference for a given base model.
+> The *ModelService* declaratively provisions and maintains the Kubernetes resources needed to serve a base model for inference.
 
-A *ModelService* encapsulates the desired state of deployments and routing associated with a single base model. It automates the management of Kubernetes resources, including:
+A *ModelService* custom resource encapsulates the desired state of deployments and routing associated with a single base model. It automates the management of Kubernetes resources, including:
 
 * Prefill and decode deployments
 
