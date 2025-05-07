@@ -1,16 +1,28 @@
 # Model Service
 
-> A Modelservice manages the inference workloads and routing resources for a given base-model. 
+> A Modelservice manages the inference workloads and routing resources for a given base-model.
 
-A *Modelservice* provides declarative updates for prefill and decode deployments, inference pool, inference model, the endpoint picker (epp) deployment and service associated with the inference pool, and the RBAC resources associated with them.
+A *Modelservice* provides declarative updates for all the Kubernetes resources that are specific to a given base-model. The resources include prefill and decode deployments, inference pool, inference model, the endpoint picker (epp) deployment and service, and the RBAC resources associated with them.
 
-You describe the desired state of the base-model in a *Modelservice* and in an optional *Baseconfig* config map that is referred to by the Modelservice. The `Modelservice` controller changes the actual state of the base-model to the desired state. 
+The base-model owner describes the desired state of the base-model in a *Modelservice*. The *Modelservice* can optionally reference a *Baseconfig*, a Kubernetes config map that provides additional behaviors for the base-model. 
 
-> Note: Do not manage the objects owned by a ModelService. Consider opening an issue in the main llm-d repository if your use case is not covered below.
+It is expected that the platform owner creates a few `Baseconfig` presets, and over time, multiple *Modelservices* reference a given *BaseConfig*.
 
-![model-service-arch](model-service-arch.png)
+The `Modelservice` controller changes the actual state of the base-model to the desired state. 
 
-## Reconcilation
+> Note: Do not manage the objects owned by a ModelService. Consider opening an issue in the `Modelservice` repository if your use case is not covered by `Modelservice` features.
+
+## Features
+
+- Supports disaggregated prefill
+- Supports creation of [Gateway API Inference Extension](https://gateway-api-inference-extension.sigs.k8s.io) resources for routing
+- Supports auto-scaling of prefill and decode deployments with HPA and/or other auto-scalers
+- Supports independent scaling of prefill and decode instances
+- Supports independent node affinities for prefill and decode instances
+- Supports model loading from OCI images, HuggingFace public and private registries, and PVCs
+- Supports templating for `baseconfig` values and certain `modelservice` values.
+
+## How it works
 
 The values in `baseconfig`, and certain values in the `modelservice` resource can be templated. When the `modelservice` resource is reconciled:
 
@@ -18,17 +30,11 @@ The values in `baseconfig`, and certain values in the `modelservice` resource ca
 2. A semantic merge takes place between `baseconfig` and `modelservice`.
 3. Inference workloads, routing resources, and RBACs authorizations needed for running the base-model are created or updated in the cluster.
 
+![model-service-arch](model-service-arch.png)
+
+
 > Note on best-practice: `Baseconfig` is intended to capture configuration that is common across a collection of base-models. `Modelservice` is intended to capture configuration specific to a single base-model, and extend or selectively override the values in `Baseconfig` it refers to. The platform owner is expected to install `llm-d` with a collection of `Baseconfig` presets. Inference owners are expected to take advantage of these presets to serve their base-models using the simplified `Modelservice` spec.
 
-## Key Features
-
-- Enables disaggregated prefill
-- Supports creation of [Gateway API Inference Extension](https://gateway-api-inference-extension.sigs.k8s.io) resources for routing
-- Supports auto-scaling of prefill and decode deployments with HPA and/or other auto-scalers
-- Supports independent scaling of prefill and decode instances
-- Supports independent node affinities for prefill and decode instances
-- Supports model loading from OCI images, HuggingFace public and private registries, and PVCs
-- Supports templating for `baseconfig` values and certain `modelservice` values.
 
 ## Samples
 

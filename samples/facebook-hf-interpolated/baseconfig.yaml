@@ -69,7 +69,7 @@ data:
               securityContext:
                 allowPrivilegeEscalation: false
               args:
-                - {{ .HFModelName }}
+                - {{ default .HFModelName .ModelPath }}
                 - "--port"
                 - "8200"
                 - "--kv-transfer-config"
