@@ -66,9 +66,9 @@ The result is a fully managed inference stack for the base model.
 
 * Use *ModelService* to define behavior specific to a given base model, and override *BaseConfig* values only when necessary.
 
-* Platform teams should install *ModelService* and *Baseconfig* presets using the `llm-d` deployer.
+* Platform teams should install *Baseconfig* presets using the `llm-d` deployer.
 
-* Inference owners should prefer using these presets to streamline onboarding of base models, rather than creating their own custom presets.
+* Inference owners should prefer using these presets to streamline onboarding of base models, rather than creating their own custom *BaseConfigs*.
 
 
 <!-- ## Samples
