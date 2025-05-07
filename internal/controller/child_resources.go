@@ -768,7 +768,9 @@ func (childResource *BaseConfig) createOrUpdatePDDeployment(ctx context.Context,
 		})
 		log.FromContext(ctx).V(1).Info("from CreateOrUpdate", "op", op)
 		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "unable to create deployment for "+role)
+			if op != controllerutil.OperationResultNone {
+				log.FromContext(ctx).V(1).Error(err, "unable to create deployment for "+role, "operation", op)
+			}
 		}
 	}
 }
