@@ -1,42 +1,77 @@
-# Model Service
+# ModelService
 
-> A Modelservice manages the inference workloads and routing resources for a given base-model.
+> The `ModelService` custom resource declaratively manages all Kubernetes components required to serve inference for a given base model.
 
-A *Modelservice* provides declarative updates for all the Kubernetes resources that are specific to a given base-model. The resources include prefill and decode deployments, inference pool, inference model, the endpoint picker (epp) deployment and service, and the RBAC resources associated with them.
+A *ModelService* encapsulates the desired state of deployments and routing associated with a single base model. It automates the management of Kubernetes resources, including:
 
-The base-model owner describes the desired state of the base-model in a *Modelservice*. The *Modelservice* can optionally reference a *Baseconfig*, a Kubernetes config map that provides additional behaviors for the base-model. 
+* Prefill and decode deployments
 
-It is expected that the platform owner creates a few `Baseconfig` presets, and over time, multiple *Modelservices* reference a given *BaseConfig*.
+* Inference pool and model defined by [Gateway API Inference Extension](https://gateway-api-inference-extension.sigs.k8s.io)
 
-The `Modelservice` controller changes the actual state of the base-model to the desired state. 
+* Endpoint picker (EPP) deployment and service
 
-> Note: Do not manage the objects owned by a ModelService. Consider opening an issue in the `Modelservice` repository if your use case is not covered by `Modelservice` features.
+* Relevant RBAC permissions
+
+A *ModelService* may optionally reference a **BaseConfig** — a Kubernetes ConfigMap that defines reusable, platform-managed presets for shared behavior across multiple base models.
+
+Typically, platform operators define a small set of *BaseConfig* presets, and base model owners reference them in their respective *ModelService* resources.
+
+The *ModelService* controller reconciles the cluster state to align with the configuration declared in the *ModelService* custom resource. This custom resource is the source of truth for resources it owns.
+
+⚠️ Important: Do not manually modify resources owned by a *ModelService*. If your use case is not yet supported, please file an issue in the *ModelService* repository.
 
 ## Features
 
-- Supports disaggregated prefill
-- Supports creation of [Gateway API Inference Extension](https://gateway-api-inference-extension.sigs.k8s.io) resources for routing
-- Supports auto-scaling of prefill and decode deployments with HPA and/or other auto-scalers
-- Supports independent scaling of prefill and decode instances
-- Supports independent node affinities for prefill and decode instances
-- Supports model loading from OCI images, HuggingFace public and private registries, and PVCs
-- Supports templating for `baseconfig` values and certain `modelservice` values.
+✅ Supports disaggregated prefill and decode workloads
 
-## How it works
+🌐 Integrates with Gateway API Inference Extension for request routing
 
-The values in `baseconfig`, and certain values in the `modelservice` resource can be templated. When the `modelservice` resource is reconciled:
+📈 Enables auto-scaling via HPA or custom controllers
 
-1. Template variables in `baseconfig` and `modelservice` are dynamically interpolated based on the `modelservice` spec.
-2. A semantic merge takes place between `baseconfig` and `modelservice`.
-3. Inference workloads, routing resources, and RBACs authorizations needed for running the base-model are created or updated in the cluster.
+🔧 Allows independent scaling and node affinity for prefill and decode deployments
+
+📦 Supports model loading from:
+
+* OCI images
+
+* HuggingFace (public or private)
+
+* Kubernetes PVCs
+
+🧩 Supports value templating in both BaseConfig and ModelService
+
+## How It Works
+
+When a ModelService is reconciled:
+
+1. **Templating**: Template variables in *BaseConfig* and *ModelService* are interpolated based on the *ModelService* spec.
+
+2. **Merging**: A semantic merge overlays *ModelService* values on top of the selected *BaseConfig*.
+
+3. **Resource Deployment**: The controller creates or updates the following:
+
+* Inference deployments (prefill and decode)
+
+* Routing resources (e.g., EPP deployment)
+
+* RBAC authorizations
+
+The result is a fully managed inference stack for the base model.
 
 ![model-service-arch](model-service-arch.png)
 
+## Best Practices
 
-> Note on best-practice: `Baseconfig` is intended to capture configuration that is common across a collection of base-models. `Modelservice` is intended to capture configuration specific to a single base-model, and extend or selectively override the values in `Baseconfig` it refers to. The platform owner is expected to install `llm-d` with a collection of `Baseconfig` presets. Inference owners are expected to take advantage of these presets to serve their base-models using the simplified `Modelservice` spec.
+* Use *BaseConfig* to capture platform-level defaults and shared configurations across multiple base models.
+
+* Use *ModelService* to define behavior specific to a given base model, and override *BaseConfig* values only when necessary.
+
+* Platform teams should install *ModelService* and *Baseconfig* presets using the `llm-d` deployer.
+
+* Inference owners should prefer using these presets to streamline model onboarding, rather than creating their own custom presets.
 
 
-## Samples
+<!-- ## Samples
 
 Refer to the [`samples` folder](samples).
 
@@ -87,4 +122,4 @@ For example
 go run main.go generate -m samples/facebook/msvc.yaml -b samples/facebook/baseconfig.yaml > output.yaml
 ```
 
-And `output.yaml` will contain the YAML manifest for the resources that ModelService will create in the cluster. This feature purely for development purposes, and is intended to provide a quick way of debugging without a cluster. Note that some fields will not be included, such as `owner references` and `name` which require a cluster.
+And `output.yaml` will contain the YAML manifest for the resources that ModelService will create in the cluster. This feature purely for development purposes, and is intended to provide a quick way of debugging without a cluster. Note that some fields will not be included, such as `owner references` and `name` which require a cluster. -->
