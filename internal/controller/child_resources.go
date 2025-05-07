@@ -97,7 +97,7 @@ func interpolateContainerArgs(ctx context.Context, containerSpec *msv1alpha1.Con
 	return containerCopy, nil
 }
 
-// interpolateContainerArgsForPDSpec interpolates container args using tempalte variables
+// interpolateContainerArgsForPDSpec interpolates container args using template variables
 func interpolateContainerArgsForPDSpec(ctx context.Context, msvc *msv1alpha1.ModelService, role string, values *TemplateVars) (*msv1alpha1.PDSpec, error) {
 	// Get the desired pdSpec
 	var pdSpec msv1alpha1.PDSpec
@@ -150,8 +150,8 @@ func InterpolateModelService(ctx context.Context, msvc *msv1alpha1.ModelService)
 		msvcCopy.Spec.Prefill = interpolatedPrefill
 	}
 
+	// interpolate decode section
 	if msvc.Spec.Decode != nil {
-		// interpolate decode section
 		interpolatedDecode, err := interpolateContainerArgsForPDSpec(ctx, msvcCopy, DECODE_ROLE, values)
 		if err != nil {
 			return nil, err
