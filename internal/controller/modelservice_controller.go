@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -177,13 +178,21 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate child resources")
 	err = interpolatedBaseConfig.createOrUpdate(ctx, r)
 
-	// we will deal with status later
-	// err = r.updateStatus(modelService)
+	//update status
+	original := modelService.DeepCopy()
 	r.populateStatus(ctx, modelService)
+	if !equality.Semantic.DeepEqual(&original.Status, &modelService.Status) {
+		latest := &msv1alpha1.ModelService{}
+		if err := r.Client.Get(ctx, req.NamespacedName, latest); err != nil {
+			log.FromContext(ctx).Error(err, "unable to re-fetch ModelService before status update")
+			return ctrl.Result{}, err
+		}
+		latest.Status = modelService.Status
 
-	if err := r.Status().Update(ctx, modelService); err != nil {
-		log.FromContext(ctx).Error(err, "unable to update ModelService status")
-		return ctrl.Result{}, err
+		if err := r.Status().Update(ctx, latest); err != nil {
+			log.FromContext(ctx).Error(err, "unable to update ModelService status")
+			return ctrl.Result{}, err
+		}
 	}
 	return ctrl.Result{}, err
 }
@@ -238,8 +247,7 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 	eppSA := eppServiceAccountName(msvc)
 	msvc.Status.PDServiceAccountRef = &eppSA
 
-	eppPrefix, _ := sanitizeName(msvc.Name)
-	eppRoleBinding := eppPrefix + "-epp-rolebinding"
+	eppRoleBinding := eppRolebindingName(msvc)
 	msvc.Status.EppRoleBinding = &eppRoleBinding
 
 	baseConfig, _ := r.getChildResourcesFromConfigMap(ctx, msvc)
@@ -249,59 +257,64 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 	}
 	msvc.Status.ConfigMapNames = configMapNames
 
-	prefillDeploymentName := deploymentName(msvc, PREFILL_ROLE)
-	msvc.Status.PrefillDeploymentRef = &prefillDeploymentName
-	prefillDeploymentFromCluster := &appsv1.Deployment{}
-	// Mirror conditions with "Prefill" prefix
-	err := r.Client.Get(ctx, client.ObjectKey{Name: prefillDeploymentName, Namespace: msvc.Namespace}, prefillDeploymentFromCluster)
-	if err != nil {
-		log.FromContext(ctx).Error(err, "unable to get prefill deployment")
-		conditions = append(conditions, metav1.Condition{
-			Type:               "PrefillDeploymentAvailable",
-			Status:             metav1.ConditionFalse,
-			Reason:             "GetFailed",
-			Message:            fmt.Sprintf("Failed to fetch Prefill Deployment: %v", err),
-			LastTransitionTime: metav1.Now(),
-		})
+	if msvc.Spec.Prefill != nil {
+		prefillDeploymentName := deploymentName(msvc, PREFILL_ROLE)
+		msvc.Status.PrefillDeploymentRef = &prefillDeploymentName
+		prefillDeploymentFromCluster := &appsv1.Deployment{}
+		// Mirror conditions with "Prefill" prefix
+		err := r.Client.Get(ctx, client.ObjectKey{Name: prefillDeploymentName, Namespace: msvc.Namespace}, prefillDeploymentFromCluster)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "unable to get prefill deployment")
+			conditions = append(conditions, metav1.Condition{
+				Type:               "PrefillDeploymentAvailable",
+				Status:             metav1.ConditionFalse,
+				Reason:             "GetFailed",
+				Message:            fmt.Sprintf("Failed to fetch Prefill Deployment: %v", err),
+				LastTransitionTime: metav1.Now(),
+			})
+		}
+		for _, c := range prefillDeploymentFromCluster.Status.Conditions {
+			conditions = append(conditions, metav1.Condition{
+				Type:               "Prefill" + string(c.Type),
+				Status:             metav1.ConditionStatus(c.Status),
+				Reason:             c.Reason,
+				Message:            c.Message,
+				LastTransitionTime: c.LastUpdateTime,
+			})
+		}
 	}
-	for _, c := range prefillDeploymentFromCluster.Status.Conditions {
-		conditions = append(conditions, metav1.Condition{
-			Type:               "Prefill" + string(c.Type),
-			Status:             metav1.ConditionStatus(c.Status),
-			Reason:             c.Reason,
-			Message:            c.Message,
-			LastTransitionTime: c.LastUpdateTime,
-		})
-	}
-	decodeDeploymentName := deploymentName(msvc, DECODE_ROLE)
-	msvc.Status.DecodeDeploymentRef = &decodeDeploymentName
-	decodeDeploymentFromCluster := &appsv1.Deployment{}
-	err = r.Client.Get(ctx, client.ObjectKey{Name: decodeDeploymentName, Namespace: msvc.Namespace}, decodeDeploymentFromCluster)
-	if err != nil {
-		log.FromContext(ctx).Error(err, "unable to get prefill deployment")
-		conditions = append(conditions, metav1.Condition{
-			Type:               "DecodeDeploymentAvailable",
-			Status:             metav1.ConditionFalse,
-			Reason:             "GetFailed",
-			Message:            fmt.Sprintf("Failed to fetch Decode Deployment: %v", err),
-			LastTransitionTime: metav1.Now(),
-		})
-	}
-	// Mirror conditions with "Decode" prefix
-	for _, c := range decodeDeploymentFromCluster.Status.Conditions {
-		conditions = append(conditions, metav1.Condition{
-			Type:               "Decode" + string(c.Type),
-			Status:             metav1.ConditionStatus(c.Status),
-			Reason:             c.Reason,
-			Message:            c.Message,
-			LastTransitionTime: c.LastUpdateTime,
-		})
+
+	if msvc.Spec.Decode != nil {
+		decodeDeploymentName := deploymentName(msvc, DECODE_ROLE)
+		msvc.Status.DecodeDeploymentRef = &decodeDeploymentName
+		decodeDeploymentFromCluster := &appsv1.Deployment{}
+		err := r.Client.Get(ctx, client.ObjectKey{Name: decodeDeploymentName, Namespace: msvc.Namespace}, decodeDeploymentFromCluster)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "unable to get prefill deployment")
+			conditions = append(conditions, metav1.Condition{
+				Type:               "DecodeDeploymentAvailable",
+				Status:             metav1.ConditionFalse,
+				Reason:             "GetFailed",
+				Message:            fmt.Sprintf("Failed to fetch Decode Deployment: %v", err),
+				LastTransitionTime: metav1.Now(),
+			})
+		}
+		// Mirror conditions with "Decode" prefix
+		for _, c := range decodeDeploymentFromCluster.Status.Conditions {
+			conditions = append(conditions, metav1.Condition{
+				Type:               "Decode" + string(c.Type),
+				Status:             metav1.ConditionStatus(c.Status),
+				Reason:             c.Reason,
+				Message:            c.Message,
+				LastTransitionTime: c.LastUpdateTime,
+			})
+		}
 	}
 
 	eppName := eppDeploymentName(msvc)
 	msvc.Status.EppDeploymentRef = &eppName
 	eppDeploymentFromCluster := &appsv1.Deployment{}
-	err = r.Client.Get(ctx, client.ObjectKey{Name: eppName, Namespace: msvc.Namespace}, eppDeploymentFromCluster)
+	err := r.Client.Get(ctx, client.ObjectKey{Name: eppName, Namespace: msvc.Namespace}, eppDeploymentFromCluster)
 	if err != nil {
 		log.FromContext(ctx).Error(err, "unable to get Epp deployment")
 		conditions = append(conditions, metav1.Condition{

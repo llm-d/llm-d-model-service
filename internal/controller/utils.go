@@ -94,6 +94,16 @@ func eppServiceAccountName(modelService *msv1alpha1.ModelService) string {
 	return sanitizedName
 }
 
+// eppServiceAccountName returns the name of the eppServiceAccountName object
+// defaults it to "epp-sa"
+func eppRolebindingName(modelService *msv1alpha1.ModelService) string {
+	sanitizedName, err := sanitizeName(modelService.Name + "-epp-rolebinding")
+	if err != nil {
+		return "epp-rolebinding"
+	}
+	return sanitizedName
+}
+
 // infModelName returns the name of the inference model object
 func infModelName(modelService *msv1alpha1.ModelService) string {
 	return modelService.Name
