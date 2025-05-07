@@ -336,7 +336,7 @@ type ModelServiceStatus struct {
 	//
 	// ConfigMapNames identifies the configmap used for prefill and decode
 	// if ConfigMapNames is yet to be created,
-	// this reference will be nil
+	// this reference will be an empty list
 	//
 	ConfigMapNames []string `json:"configMapNames,omitempty"`
 
