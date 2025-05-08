@@ -1,0 +1,67 @@
+apiVersion: llm-d.ai/v1alpha1
+kind: ModelService
+metadata:
+  name: facebook-opt-125m-with-nixl
+spec:
+  decoupleScaling: false
+
+  baseConfigMapRef:
+    name: universal-base-config
+
+  routing: 
+    modelName: facebook/opt-125m
+
+  modelArtifacts:
+    uri: hf://facebook/opt-125m
+
+  # describe decode pods
+  decode:
+    replicas: 1
+    acceleratorTypes:
+      labelKey: nvidia.com/gpu.product
+      labelValues:
+        - NVIDIA-A100-SXM4-80GB
+    containers:
+    - name: "vllm"
+      # This image includes LMCache and multiconnector support
+      image: quay.io/llm-d/llm-d-dev@sha256:d6d212de0d1dc0f6da9877eab21800f62d7dd32d825bae9bf1692c4f6e017109
+      args:
+        - "--model"
+        - "{{ .HFModelName }}"
+        - "--kv-transfer-config"
+        - '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_consumer","kv_connector_extra_config": {"discard_partial_chunks": false, "lmcache_rpc_port": "consumer1"}}'
+      env:
+        - name: LMCACHE_CONFIG_FILE
+          value: /vllm-workspace/lmcache-decoder-config.yaml
+        - name: LMCACHE_USE_EXPERIMENTAL
+          value: "True"
+        - name: VLLM_ENABLE_V1_MULTIPROCESSING
+          value: "1"
+        - name: VLLM_WORKER_MULTIPROC_METHOD
+          value: spawn
+
+  # describe the prefill pods 
+  prefill:
+    replicas: 1
+    acceleratorTypes:
+      labelKey: nvidia.com/gpu.product
+      labelValues:
+        - NVIDIA-A100-SXM4-80GB
+    containers:
+      - name: "vllm"
+        image: quay.io/llm-d/llm-d-dev@sha256:d6d212de0d1dc0f6da9877eab21800f62d7dd32d825bae9bf1692c4f6e017109
+        args:
+          - "--model"
+          - "{{ .HFModelName }}"
+          - "--kv-transfer-config"
+          - '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_producer","kv_connector_extra_config": {"discard_partial_chunks": false, "lmcache_rpc_port": "producer1"}}'
+        env:  
+          - name: LMCACHE_CONFIG_FILE
+            value: /vllm-workspace/lmcache-prefiller-config.yaml
+          - name: LMCACHE_USE_EXPERIMENTAL
+            value: "True"
+          - name: VLLM_ENABLE_V1_MULTIPROCESSING
+            value: "1"
+          - name: VLLM_WORKER_MULTIPROC_METHOD
+            value: spawn
+
