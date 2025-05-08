@@ -192,24 +192,10 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	//update status
-	original := interpolatedModelService.DeepCopy()
 	err = r.populateStatus(ctx, interpolatedModelService)
 	if err != nil {
 		log.FromContext(ctx).Error(err, "unable populate status")
 		return ctrl.Result{}, err
-	}
-	if !equality.Semantic.DeepEqual(&original.Status, &interpolatedModelService.Status) {
-		latest := &msv1alpha1.ModelService{}
-		if err := r.Client.Get(ctx, req.NamespacedName, latest); err != nil {
-			log.FromContext(ctx).Error(err, "unable to re-fetch ModelService before status update")
-			return ctrl.Result{}, err
-		}
-		latest.Status = modelService.Status
-
-		if err := r.Status().Update(ctx, latest); err != nil {
-			log.FromContext(ctx).Error(err, "unable to update ModelService status")
-			return ctrl.Result{}, err
-		}
 	}
 	return ctrl.Result{}, nil
 }
@@ -252,6 +238,7 @@ func (r *ModelServiceReconciler) deploymentMapFunc(ctx context.Context, obj clie
 
 func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1alpha1.ModelService) error {
 	var conditions []metav1.Condition
+	original := msvc.DeepCopy()
 	baseConfig, err := r.getChildResourcesFromConfigMap(ctx, msvc)
 	if err != nil {
 		return err
@@ -293,9 +280,10 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 				LastTransitionTime: metav1.Now(),
 			})
 		}
-		totalReady := prefillDeploymentFromCluster.Status.ReadyReplicas
+		totalReady, expected := int32(0), int32(0)
+		totalReady = prefillDeploymentFromCluster.Status.ReadyReplicas
 		totalAvailable := prefillDeploymentFromCluster.Status.AvailableReplicas
-		expected := *prefillDeploymentFromCluster.Spec.Replicas
+		expected = *prefillDeploymentFromCluster.Spec.Replicas
 		msvc.Status.PrefillReady = fmt.Sprintf("%d/%d", totalReady, expected)
 		msvc.Status.PrefillAvailable = totalAvailable
 
@@ -378,6 +366,19 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 	}
 
 	msvc.Status.Conditions = conditions
+
+	latest := &msv1alpha1.ModelService{}
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: msvc.Name, Namespace: msvc.Namespace}, latest); err != nil {
+		log.FromContext(ctx).Error(err, "unable to re-fetch ModelService before status update")
+		return err
+	}
+	latest.Status = msvc.Status
+	if !equality.Semantic.DeepEqual(&original.Status, &latest.Status) {
+		if err := r.Status().Update(ctx, latest); err != nil {
+			log.FromContext(ctx).Error(err, "unable to update ModelService status")
+			return err
+		}
+	}
 
 	return nil
 }
