@@ -235,6 +235,26 @@ func (in *ModelServiceStatus) DeepCopyInto(out *ModelServiceStatus) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.PDServiceAccountRef != nil {
+		in, out := &in.PDServiceAccountRef, &out.PDServiceAccountRef
+		*out = new(string)
+		**out = **in
+	}
+	if in.DecodeServiceAccountRef != nil {
+		in, out := &in.DecodeServiceAccountRef, &out.DecodeServiceAccountRef
+		*out = new(string)
+		**out = **in
+	}
+	if in.EppRoleBinding != nil {
+		in, out := &in.EppRoleBinding, &out.EppRoleBinding
+		*out = new(string)
+		**out = **in
+	}
+	if in.ConfigMapNames != nil {
+		in, out := &in.ConfigMapNames, &out.ConfigMapNames
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make([]metav1.Condition, len(*in))

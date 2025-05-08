@@ -8,6 +8,7 @@ rules:
   - ""
   resources:
   - configmaps
+  - serviceaccounts
   verbs:
   - create
   - delete
@@ -19,11 +20,11 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - serviceaccount
+  - pods
   verbs:
-  - create
-  - delete
-  - update
+  - get
+  - list
+  - watch
 - apiGroups:
   - ""
   resources:
@@ -55,10 +56,18 @@ rules:
   - patch
   - update
 - apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - inference.networking.x-k8s.io
   resources:
-  - inferencemodel
-  - inferencepool
+  - inferencemodels
+  - inferencepools
   verbs:
   - create
   - delete
@@ -96,8 +105,12 @@ rules:
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
-  - rolebinding
+  - rolebindings
   verbs:
   - create
   - delete
+  - get
+  - list
+  - patch
   - update
+  - watch
