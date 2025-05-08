@@ -69,7 +69,6 @@ data:
               securityContext:
                 allowPrivilegeEscalation: false
               args:
-                - /stored/models/{{ .ModelPath }}
                 - "--port"
                 - "8200"
                 - "--kv-transfer-config"

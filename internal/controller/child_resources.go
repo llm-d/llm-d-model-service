@@ -83,6 +83,85 @@ func InterpolateBaseConfigMap(ctx context.Context, cm *corev1.ConfigMap, msvc *m
 	return interpolated, nil
 }
 
+// interpolateContainerArgs interpolates (init) container args
+func interpolateContainerArgs(ctx context.Context, containerSpec *msv1alpha1.ContainerSpec, values *TemplateVars) (*msv1alpha1.ContainerSpec, error) {
+	containerCopy := containerSpec.DeepCopy()
+	for j, argStr := range containerSpec.Args {
+		renderedArg, err := renderTemplate(argStr, values)
+		if err != nil {
+			log.FromContext(ctx).V(1).Error(err, "error with template rendering, cannot render "+argStr)
+			return nil, err
+		}
+		containerCopy.Args[j] = renderedArg
+	}
+	return containerCopy, nil
+}
+
+// interpolateContainerArgsForPDSpec interpolates container args using template variables
+func interpolateContainerArgsForPDSpec(ctx context.Context, msvc *msv1alpha1.ModelService, role string, values *TemplateVars) (*msv1alpha1.PDSpec, error) {
+	// Get the desired pdSpec
+	var pdSpec msv1alpha1.PDSpec
+	if role == PREFILL_ROLE {
+		pdSpec = *msvc.Spec.Prefill
+	} else {
+		pdSpec = *msvc.Spec.Decode
+	}
+	pdSpecCopy := pdSpec.DeepCopy()
+
+	// Interpolate args in pdSpec.initContainers
+	for i, initContainer := range pdSpec.InitContainers {
+		interpolatedInitContainer, err := interpolateContainerArgs(ctx, &initContainer, values)
+		if err != nil {
+			return nil, err
+		}
+		pdSpecCopy.InitContainers[i] = *interpolatedInitContainer
+	}
+
+	// Interpolate the args in pdSpec.Container
+	for i, container := range pdSpec.Containers {
+		interpolatedContainer, err := interpolateContainerArgs(ctx, &container, values)
+		if err != nil {
+			return nil, err
+		}
+		pdSpecCopy.Containers[i] = *interpolatedContainer
+	}
+
+	return pdSpecCopy, nil
+}
+
+// InterpolateModelService interpolates strings using msvc template variable values
+func InterpolateModelService(ctx context.Context, msvc *msv1alpha1.ModelService) (*msv1alpha1.ModelService, error) {
+	values := &TemplateVars{}
+	err := values.from(ctx, msvc)
+	if err != nil {
+		log.FromContext(ctx).V(1).Error(err, "cannot get template variable values from msvc")
+		return nil, err
+	}
+
+	// interpolate container args
+	msvcCopy := msvc.DeepCopy()
+
+	// interpolate prefill section
+	if msvc.Spec.Prefill != nil {
+		interpolatedPrefill, err := interpolateContainerArgsForPDSpec(ctx, msvcCopy, PREFILL_ROLE, values)
+		if err != nil {
+			return nil, err
+		}
+		msvcCopy.Spec.Prefill = interpolatedPrefill
+	}
+
+	// interpolate decode section
+	if msvc.Spec.Decode != nil {
+		interpolatedDecode, err := interpolateContainerArgsForPDSpec(ctx, msvcCopy, DECODE_ROLE, values)
+		if err != nil {
+			return nil, err
+		}
+		msvcCopy.Spec.Decode = interpolatedDecode
+	}
+
+	return msvcCopy, nil
+}
+
 func (r *ModelServiceReconciler) getChildResourcesFromConfigMap(
 	ctx context.Context,
 	msvc *msv1alpha1.ModelService,
@@ -177,12 +256,16 @@ func (interpolatedBaseConfig *BaseConfig) MergeChildResources(ctx context.Contex
 	// Idea: updates do the mergo merge
 	if modelService.Spec.Prefill != nil || interpolatedBaseConfig.PrefillDeployment != nil {
 		interpolatedBaseConfig.mergePDDeployment(ctx, modelService, PREFILL_ROLE, scheme)
-		interpolatedBaseConfig.mergePDService(ctx, modelService, PREFILL_ROLE, scheme)
+		if interpolatedBaseConfig.PrefillService != nil {
+			interpolatedBaseConfig.mergePDService(ctx, modelService, PREFILL_ROLE, scheme)
+		}
 	}
 	log.FromContext(ctx).V(1).Info("attempting to update decode deployment")
 	if modelService.Spec.Decode != nil || interpolatedBaseConfig.DecodeDeployment != nil {
 		interpolatedBaseConfig.mergePDDeployment(ctx, modelService, DECODE_ROLE, scheme)
-		interpolatedBaseConfig.mergePDService(ctx, modelService, DECODE_ROLE, scheme)
+		if interpolatedBaseConfig.DecodeService != nil {
+			interpolatedBaseConfig.mergePDService(ctx, modelService, DECODE_ROLE, scheme)
+		}
 	}
 
 	if interpolatedBaseConfig.PrefillDeployment != nil || interpolatedBaseConfig.DecodeDeployment != nil {
@@ -203,7 +286,9 @@ func (interpolatedBaseConfig *BaseConfig) MergeChildResources(ctx context.Contex
 	if interpolatedBaseConfig.EPPDeployment != nil {
 		log.FromContext(ctx).V(1).Info("attempting to update epp deployment and service")
 		interpolatedBaseConfig.mergeEppDeployment(ctx, modelService, scheme)
-		interpolatedBaseConfig.mergeEppService(ctx, modelService, scheme)
+		if interpolatedBaseConfig.EPPService != nil {
+			interpolatedBaseConfig.mergeEppService(ctx, modelService, scheme)
+		}
 		interpolatedBaseConfig.setEPPServiceAccount(ctx, modelService, rbacOptions, scheme)
 		// this is role binding with a cluster role
 		interpolatedBaseConfig.setEPPRoleBinding(ctx, modelService, rbacOptions, scheme)
@@ -526,15 +611,9 @@ func (childResource *BaseConfig) setEPPServiceAccount(ctx context.Context, msvc 
 
 func (childResource *BaseConfig) setEPPRoleBinding(ctx context.Context, msvc *msv1alpha1.ModelService, rbacOptions *RBACOptions, scheme *runtime.Scheme) {
 
-	sanitizedMSVCName, err := sanitizeName(msvc.Name)
-	if err != nil {
-		log.FromContext(ctx).V(1).Error(err, "cannot sanitize MSVC name for epp rolebinding creation")
-		sanitizedMSVCName = "default-msvc-name"
-	}
-
 	childResource.EPPRoleBinding = &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      sanitizedMSVCName + "-epp-rolebinding",
+			Name:      eppRolebindingName(msvc),
 			Namespace: msvc.Namespace,
 		},
 		Subjects: []rbacv1.Subject{

@@ -2,4 +2,9 @@
 namespace: e2e-solution
 
 resources:
-- ../ips
+- ../default
+
+patches:
+- target:
+    kind: Deployment
+  path: manager_patch.yaml
