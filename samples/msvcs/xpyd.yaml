@@ -1,39 +1,41 @@
 apiVersion: llm-d.ai/v1alpha1
 kind: ModelService
 metadata:
-  name: facebook-opt-125m-nixl
+  name: facebook-opt-125m-xpyd
 spec:
   decoupleScaling: false
 
   baseConfigMapRef:
-    name: facebook-base-config-nixl
+    name: generic-base-config
 
   routing: 
     modelName: facebook/opt-125m
 
   modelArtifacts:
-    uri: hf://facebook/opt-125m
+    uri: pvc://facebook-pvc/path/to/opt-125m
 
   # describe decode pods
   decode:
     replicas: 1
+    containers:
+    - name: "vllm"
+      args:
+      # Comes from baseconfig's volume mounts path
+      - '/stored/models/{{ .ModelPath }}'
     acceleratorTypes:
       labelKey: nvidia.com/gpu.product
       labelValues:
         - NVIDIA-A100-SXM4-80GB
-    containers:
-    - name: "vllm"
-      args:
-      - 'facebook/opt-125m'
   
   # describe the prefill pods 
   prefill:
     replicas: 1
+    containers:
+    - name: "vllm"
+      args:
+      # Comes from baseconfig's volume mounts path
+      - '/stored/models/{{ .ModelPath }}'
     acceleratorTypes:
       labelKey: nvidia.com/gpu.product
       labelValues:
         - NVIDIA-A100-SXM4-80GB
-    containers:
-    - name: "vllm"
-      args:
-      - 'facebook/opt-125m'
