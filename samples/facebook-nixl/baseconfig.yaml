@@ -20,6 +20,7 @@ data:
                 allowPrivilegeEscalation: false
                 runAsNonRoot: true
               args:
+                # Note: this port has to match the prefill port
                 - "--port=8000"
                 - "--vllm-port=8200"
                 - "--connector=nixl"
@@ -85,8 +86,9 @@ data:
               securityContext:
                 allowPrivilegeEscalation: false
               args:
+                # Note: this port has to match the proxy --port arg
                 - "--port"
-                - "8100"
+                - "8000"
                 - "--enforce-eager"
                 - "--kv-transfer-config"
                 - '{"kv_connector":"NixlConnector","kv_role":"kv_both"}'  
@@ -187,7 +189,7 @@ data:
                   value: "true"
                 - name: PD_PROMPT_LEN_THRESHOLD
                   value: "10"
-              image: quay.io/llm-d/llm-d-gateway-api-inference-extension-dev@sha256:48612d0b905f7147c334a9b0fae01a46fff2d854f56a1376b0acf2d71e7d4791
+              image: quay.io/llm-d/llm-d-gateway-api-inference-extension-dev:0.0.5
               imagePullPolicy: Always
               livenessProbe:
                 failureThreshold: 3
