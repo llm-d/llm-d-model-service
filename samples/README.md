@@ -1,6 +1,6 @@
 # Sample ModelService CRs and BaseConfigs
 
-This folder contains example baseconfigs (ConfigMap) and ModelService CRs for various scenarios, including downloading models from Hugging Face or loading from a PVC. In particular, we provide a "universal" baseconfig that can be used for those scenarios. We will also show how to apply to an OpenShift cluster and the results you can expect from apply the ModelService CR and its referenced baseconfig. 
+This folder contains example baseconfigs (ConfigMap) and ModelService CRs for various scenarios, including downloading models from Hugging Face or loading from a PVC. In particular, we provide a "universal" baseconfig that can be used for those scenarios. We will also show how to apply to an OpenShift cluster and the results you can expect from applying the ModelService CR and its referenced baseconfig. 
 
 👉 [baseconfigs](./baseconfigs/)
 
@@ -8,9 +8,17 @@ This folder contains example baseconfigs (ConfigMap) and ModelService CRs for va
 
 👉 [test](./test/) (for local development usage only)
 
+## Pre-reqs
+Before you get started, ensure that you have the following install and running.
+
+- Access to an OpenShift cluster 
+- ModelService controller running with required RBACs
+- External CRDs install on cluster for routing
+- Other components such as [Inference Gateway Extension](https://github.com/kubernetes-sigs/gateway-api-inference-extension)
+
 ## Scenarios 
 
-### Scenario 1: serving a base model on vllm on one pod
+### Scenario 1: serving a base model on vLLM on one pod
 A simple use case is online serving a model on vLLM using one deployment. We will serve [`ibm-granite/granite-3.3-2b-base`](https://huggingface.co/ibm-granite/granite-3.3-2b-base) which can be downloaded from Hugging Face without the need for a token.
 
 - [msvcs/granite3.2.yaml](./msvcs/granite3.2.yaml)
@@ -57,14 +65,14 @@ You should expect to see the following resources created for this scenario:
 - Model components:
   - A decode deployment
   - A prefill deployment
-- Networking components 
-  - A service for decode deployment
-  - A service for prefill deployment
-  - A service for EPP deployment
 - Routing components:
   - An InferencePool
   - An InferenceModel
   - An EPP deployment 
+- Networking components 
+  - A service for decode deployment
+  - A service for prefill deployment
+  - A service for EPP deployment
 - RBAC components 
   - A service account for P/D deployments (for custom image pulls)
   - A service account for EPP deployment 
@@ -85,7 +93,7 @@ curl  http://localhost:8000/v1/completions \
 ### Scenario 3: serving a model with xPyD disaggregation
 Previously, we have looked at MSVCs which have just one replica for decode and prefill workloads. ModelService can help you achieve xPyD disaggregation, and all that is required is using different `replica` in the prefill and decode specs. 
 
-Note that in this scenario, we are using the same baseconfig used in the last scenario, because there is really no different in terms of the base configuration between the two other than model-specific behaviors such as replica count and model name.
+Note that in this scenario, we are using the same baseconfig used in the last scenario, because there is really no difference in terms of the base configuration between the two other than model-specific behaviors such as replica count and model name.
 
 - [msvcs/xpyd.yaml](./msvcs/xpyd.yaml)
 - [baseconfigs/universal-baseconfig.yaml](./baseconfigs/universal-baseconfig.yaml)
@@ -97,7 +105,7 @@ oc apply -f samples/msvcs/xpyd.yaml
 and you should see the corresponding number of pods spin up for each deployment.
 
 ### Scenario 4: loading a large model from a PVC 
-Downloading a model from Hugging Face takes a long time for large models like `meta-llama/Llama-4-Scout-17B-16E`, and one way to circumvent the long container creation time is to download a model to a PVC ahead of time and mount the PVC in the vLLM container. We have provided a baseconfig with the volume mounts configured, and all is needed in the ModelService CR is to specify the path to which the model can be found.
+Downloading a model from Hugging Face takes a long time for large models like `meta-llama/Llama-4-Scout-17B-16E`, and one way to circumvent the long container creation time is to download a model to a PVC ahead of time and mount the PVC in the vLLM container. We have provided a baseconfig with the volume mounts configured, and all that is needed in the ModelService CR is to specify the path to which the model can be found.
 
 - [msvcs/llama4.yaml](./msvcs/llama4.yaml)
 - [baseconfigs/universal-baseconfig-pvc.yaml](./baseconfigs/universal-baseconfig-pvc.yaml)
