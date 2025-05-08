@@ -711,7 +711,7 @@ func (childResource *BaseConfig) createOrUpdateInferenceModel(ctx context.Contex
 		},
 	}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, infModelInCluster, func() error {
+	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, infModelInCluster, func() error {
 		infModelInCluster.Labels = childResource.InferenceModel.Labels
 		infModelInCluster.OwnerReferences = childResource.InferenceModel.OwnerReferences
 		infModelInCluster.Spec = childResource.InferenceModel.Spec
@@ -719,7 +719,9 @@ func (childResource *BaseConfig) createOrUpdateInferenceModel(ctx context.Contex
 	})
 
 	if err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to create inference model")
+		if op != controllerutil.OperationResultNone {
+			log.FromContext(ctx).V(1).Error(err, "unable to create inference model")
+		}
 	}
 }
 
@@ -731,14 +733,16 @@ func (childResource *BaseConfig) createOrUpdateConfigMaps(ctx context.Context, r
 				Namespace: childResource.ConfigMaps[i].Namespace,
 			}}
 
-		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, cm, func() error {
+		op, err := controllerutil.CreateOrUpdate(ctx, r.Client, cm, func() error {
 			cm.OwnerReferences = childResource.ConfigMaps[i].OwnerReferences
 			cm.Labels = childResource.ConfigMaps[i].Labels
 			cm.Data = childResource.ConfigMaps[i].Data
 			return nil
 		})
 		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "unable to create configmap")
+			if op != controllerutil.OperationResultNone {
+				log.FromContext(ctx).V(1).Error(err, "unable to create configmap")
+			}
 		}
 	}
 }
@@ -768,7 +772,9 @@ func (childResource *BaseConfig) createOrUpdatePDDeployment(ctx context.Context,
 		})
 		log.FromContext(ctx).V(1).Info("from CreateOrUpdate", "op", op)
 		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "unable to create deployment for "+role)
+			if op != controllerutil.OperationResultNone {
+				log.FromContext(ctx).V(1).Error(err, "unable to create deployment for "+role, "operation", op)
+			}
 		}
 	}
 }
@@ -796,7 +802,7 @@ func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.
 				Namespace: service.Namespace,
 			}}
 
-		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, svcInCluster, func() error {
+		op, err := controllerutil.CreateOrUpdate(ctx, r.Client, svcInCluster, func() error {
 			svcInCluster.Labels = service.Labels
 			svcInCluster.OwnerReferences = service.OwnerReferences
 			svcInCluster.Spec = service.Spec
@@ -804,7 +810,9 @@ func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.
 		})
 
 		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "unable to create service for "+role)
+			if op != controllerutil.OperationResultNone {
+				log.FromContext(ctx).V(1).Error(err, "unable to create service for "+role)
+			}
 		}
 	}
 }
@@ -955,7 +963,7 @@ func (childResource *BaseConfig) createOrUpdateInferencePool(ctx context.Context
 		},
 	}
 	log.FromContext(ctx).V(1).Info("merged inf pool", "data", childResource.InferencePool)
-	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, inferencePoolInCluster, func() error {
+	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, inferencePoolInCluster, func() error {
 		inferencePoolInCluster.Labels = childResource.InferenceModel.Labels
 		inferencePoolInCluster.OwnerReferences = childResource.InferenceModel.OwnerReferences
 		inferencePoolInCluster.Spec = childResource.InferencePool.Spec
@@ -963,7 +971,9 @@ func (childResource *BaseConfig) createOrUpdateInferencePool(ctx context.Context
 	})
 
 	if err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to create inference pool")
+		if op != controllerutil.OperationResultNone {
+			log.FromContext(ctx).V(1).Error(err, "unable to create inference pool")
+		}
 	}
 
 }
@@ -987,7 +997,7 @@ func (childResource *BaseConfig) createEppDeployment(ctx context.Context, kubeCl
 		},
 	}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, deploymentTobeCreatedOrUpdated, func() error {
+	op, err := controllerutil.CreateOrUpdate(ctx, kubeClient, deploymentTobeCreatedOrUpdated, func() error {
 		deploymentTobeCreatedOrUpdated.Labels = childResource.EPPDeployment.Labels
 		deploymentTobeCreatedOrUpdated.OwnerReferences = childResource.EPPDeployment.OwnerReferences
 		deploymentTobeCreatedOrUpdated.Spec = childResource.EPPDeployment.Spec
@@ -995,8 +1005,10 @@ func (childResource *BaseConfig) createEppDeployment(ctx context.Context, kubeCl
 	})
 
 	if err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to create epp deployment from immutable base configmap ")
-		return err
+		if op != controllerutil.OperationResultNone {
+			log.FromContext(ctx).V(1).Error(err, "unable to create epp deployment from immutable base configmap ")
+			return err
+		}
 	}
 	return nil
 }
@@ -1013,7 +1025,7 @@ func (childResource *BaseConfig) createEppService(ctx context.Context, kubeClien
 		Namespace: childResource.EPPService.Namespace,
 	}}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &serviceTobeCreatedOrUpdated, func() error {
+	op, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &serviceTobeCreatedOrUpdated, func() error {
 		serviceTobeCreatedOrUpdated.Labels = childResource.EPPService.Labels
 		serviceTobeCreatedOrUpdated.OwnerReferences = childResource.EPPService.OwnerReferences
 		serviceTobeCreatedOrUpdated.Spec = childResource.EPPService.Spec
@@ -1021,8 +1033,10 @@ func (childResource *BaseConfig) createEppService(ctx context.Context, kubeClien
 	})
 
 	if err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to create epp service from immutable base configmap ")
-		return err
+		if op != controllerutil.OperationResultNone {
+			log.FromContext(ctx).V(1).Error(err, "unable to create epp service from immutable base configmap ")
+			return err
+		}
 	}
 	return nil
 }
@@ -1041,7 +1055,7 @@ func (childResource *BaseConfig) createEppServiceAccount(ctx context.Context, ku
 		},
 	}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, saTobeCreatedOrUpdated, func() error {
+	op, err := controllerutil.CreateOrUpdate(ctx, kubeClient, saTobeCreatedOrUpdated, func() error {
 		saTobeCreatedOrUpdated.Labels = childResource.EPPServiceAccount.Labels
 		saTobeCreatedOrUpdated.OwnerReferences = childResource.EPPServiceAccount.OwnerReferences
 		saTobeCreatedOrUpdated.ImagePullSecrets = childResource.EPPServiceAccount.ImagePullSecrets
@@ -1049,8 +1063,10 @@ func (childResource *BaseConfig) createEppServiceAccount(ctx context.Context, ku
 	})
 
 	if err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
-		return err
+		if op != controllerutil.OperationResultNone {
+			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
+			return err
+		}
 	}
 	return nil
 }
@@ -1067,7 +1083,7 @@ func (childResource *BaseConfig) createEppRoleBinding(ctx context.Context, kubeC
 			Namespace: childResource.EPPRoleBinding.Namespace,
 		}}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &eppRoleBindingInCluster, func() error {
+	op, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &eppRoleBindingInCluster, func() error {
 		eppRoleBindingInCluster.Labels = childResource.EPPRoleBinding.Labels
 		eppRoleBindingInCluster.OwnerReferences = childResource.EPPRoleBinding.OwnerReferences
 		eppRoleBindingInCluster.Subjects = childResource.EPPRoleBinding.Subjects
@@ -1075,8 +1091,10 @@ func (childResource *BaseConfig) createEppRoleBinding(ctx context.Context, kubeC
 		return nil
 	})
 	if err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to create epp rolebinding from immutable base configmap ")
-		return err
+		if op != controllerutil.OperationResultNone {
+			log.FromContext(ctx).V(1).Error(err, "unable to create epp rolebinding from immutable base configmap ")
+			return err
+		}
 	}
 	return nil
 }
@@ -1092,7 +1110,7 @@ func (childResource *BaseConfig) createPDServiceAccount(ctx context.Context, kub
 		Namespace: childResource.PDServiceAccount.Namespace,
 	}}
 
-	_, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &saToBeCreatedOrUpdated, func() error {
+	op, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &saToBeCreatedOrUpdated, func() error {
 		saToBeCreatedOrUpdated.Labels = childResource.PDServiceAccount.Labels
 		saToBeCreatedOrUpdated.OwnerReferences = childResource.PDServiceAccount.OwnerReferences
 		saToBeCreatedOrUpdated.ImagePullSecrets = childResource.PDServiceAccount.ImagePullSecrets
@@ -1100,8 +1118,10 @@ func (childResource *BaseConfig) createPDServiceAccount(ctx context.Context, kub
 	})
 
 	if err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to create pd service account")
-		return err
+		if op != controllerutil.OperationResultNone {
+			log.FromContext(ctx).V(1).Error(err, "unable to create pd service account")
+			return err
+		}
 	}
 
 	return nil
