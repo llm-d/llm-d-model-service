@@ -50,8 +50,8 @@ rules:
 - apiGroups:
   - inference.networking.x-k8s.io
   resources:
-  - inferencemodel
-  - inferencepool
+  - inferencemodels
+  - inferencepools
   verbs:
   - create
   - delete
