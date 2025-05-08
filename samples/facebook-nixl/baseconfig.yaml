@@ -187,7 +187,7 @@ data:
                   value: "true"
                 - name: PD_PROMPT_LEN_THRESHOLD
                   value: "10"
-              image: quay.io/llm-d/llm-d-gateway-api-inference-extension-dev@sha256:a7710ced37d5596d77c06f0e38127e51f8f8e7500f3fb3ef468410ac1e747f87
+              image: quay.io/llm-d/llm-d-gateway-api-inference-extension-dev@sha256:48612d0b905f7147c334a9b0fae01a46fff2d854f56a1376b0acf2d71e7d4791
               imagePullPolicy: Always
               livenessProbe:
                 failureThreshold: 3
