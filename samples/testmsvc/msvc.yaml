@@ -17,8 +17,12 @@ spec:
   # describe decode pods
   decode:
     replicas: 1
+    initContainers:
+    - name: "proxy"
+      args: 
+      - "{{ .ModelPath }}"
     containers:
     - name: "llm"
       image: busybox
       args:
-      - "50000"
+      - "{{ .ModelName }}"

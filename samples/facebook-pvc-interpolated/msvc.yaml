@@ -17,9 +17,11 @@ spec:
   # describe decode pods
   decode:
     replicas: 1
-    
-    # TODO: override or append for node affinity?
-    # should be requiredDuringSchedulingIgnoredDuringExecution
+    containers:
+    - name: "vllm"
+      args:
+      # Comes from baseconfig's volume mounts path
+      - '/stored/models/{{ .ModelPath }}'
     acceleratorTypes:
       labelKey: nvidia.com/gpu.product
       labelValues:
@@ -28,6 +30,11 @@ spec:
   # describe the prefill pods 
   prefill:
     replicas: 1
+    containers:
+    - name: "vllm"
+      args:
+      # Comes from baseconfig's volume mounts path
+      - '/stored/models/{{ .ModelPath }}'
     acceleratorTypes:
       labelKey: nvidia.com/gpu.product
       labelValues:
