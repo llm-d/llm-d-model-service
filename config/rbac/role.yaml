@@ -20,6 +20,14 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - services
   verbs:
   - create
@@ -48,10 +56,18 @@ rules:
   - patch
   - update
 - apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - inference.networking.x-k8s.io
   resources:
-  - inferencemodel
-  - inferencepool
+  - inferencemodels
+  - inferencepools
   verbs:
   - create
   - delete
