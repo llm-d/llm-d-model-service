@@ -76,7 +76,7 @@ spec:
       sleep 3
 
       echo "🚀 Reinstalling OpenShift deployment..."
-      make install && make dev-deploy IMG=$IMAGE_TAG_BASE:$VERSION
+      make install && make dev-deploy EPP_CLUSTERROLE=dummy IMG=$IMAGE_TAG_BASE:$VERSION
       
       # make install-openshift NAMESPACE=$NS PROJECT_NAME=$PROJECT_NAME IMAGE_TAG_BASE=$IMAGE_TAG_BASE VERSION=$VERSION
 

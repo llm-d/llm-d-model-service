@@ -22,6 +22,8 @@ import (
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
+	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 )
 
 const HF_PREFIX string = "hf://"
@@ -192,24 +195,10 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	//update status
-	original := interpolatedModelService.DeepCopy()
 	err = r.populateStatus(ctx, interpolatedModelService)
 	if err != nil {
 		log.FromContext(ctx).Error(err, "unable populate status")
 		return ctrl.Result{}, err
-	}
-	if !equality.Semantic.DeepEqual(&original.Status, &interpolatedModelService.Status) {
-		latest := &msv1alpha1.ModelService{}
-		if err := r.Client.Get(ctx, req.NamespacedName, latest); err != nil {
-			log.FromContext(ctx).Error(err, "unable to re-fetch ModelService before status update")
-			return ctrl.Result{}, err
-		}
-		latest.Status = modelService.Status
-
-		if err := r.Status().Update(ctx, latest); err != nil {
-			log.FromContext(ctx).Error(err, "unable to update ModelService status")
-			return ctrl.Result{}, err
-		}
 	}
 	return ctrl.Result{}, nil
 }
@@ -221,6 +210,12 @@ func (r *ModelServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Named("modelservice").
 		Owns(&msv1alpha1.ModelService{}).
 		Watches(&appsv1.Deployment{}, handler.EnqueueRequestsFromMapFunc(r.deploymentMapFunc)).
+		Watches(&corev1.Service{}, handler.EnqueueRequestsFromMapFunc(r.serviceMapFunc)).
+		Watches(&rbacv1.RoleBinding{}, handler.EnqueueRequestsFromMapFunc(r.roleBindingMapFunc)).
+		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(r.configMapMapFunc)).
+		Watches(&giev1alpha2.InferenceModel{}, handler.EnqueueRequestsFromMapFunc(r.inferenceModelMapFunc)).
+		Watches(&giev1alpha2.InferencePool{}, handler.EnqueueRequestsFromMapFunc(r.inferencePoolMapFunc)).
+		Watches(&corev1.ServiceAccount{}, handler.EnqueueRequestsFromMapFunc(r.serviceAccountMapFunc)).
 		Complete(r)
 }
 
@@ -252,6 +247,7 @@ func (r *ModelServiceReconciler) deploymentMapFunc(ctx context.Context, obj clie
 
 func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1alpha1.ModelService) error {
 	var conditions []metav1.Condition
+	original := msvc.DeepCopy()
 	baseConfig, err := r.getChildResourcesFromConfigMap(ctx, msvc)
 	if err != nil {
 		return err
@@ -293,9 +289,10 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 				LastTransitionTime: metav1.Now(),
 			})
 		}
-		totalReady := prefillDeploymentFromCluster.Status.ReadyReplicas
+		totalReady, expected := int32(0), int32(0)
+		totalReady = prefillDeploymentFromCluster.Status.ReadyReplicas
 		totalAvailable := prefillDeploymentFromCluster.Status.AvailableReplicas
-		expected := *prefillDeploymentFromCluster.Spec.Replicas
+		expected = *prefillDeploymentFromCluster.Spec.Replicas
 		msvc.Status.PrefillReady = fmt.Sprintf("%d/%d", totalReady, expected)
 		msvc.Status.PrefillAvailable = totalAvailable
 
@@ -379,5 +376,105 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 
 	msvc.Status.Conditions = conditions
 
+	latest := &msv1alpha1.ModelService{}
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: msvc.Name, Namespace: msvc.Namespace}, latest); err != nil {
+		log.FromContext(ctx).Error(err, "unable to re-fetch ModelService before status update")
+		return err
+	}
+	latest.Status = msvc.Status
+	if !equality.Semantic.DeepEqual(&original.Status, &latest.Status) {
+		if err := r.Status().Update(ctx, latest); err != nil {
+			log.FromContext(ctx).Error(err, "unable to update ModelService status")
+			return err
+		}
+	}
+
 	return nil
+}
+
+func (r *ModelServiceReconciler) serviceMapFunc(ctx context.Context, obj client.Object) []reconcile.Request {
+	svc, ok := obj.(*corev1.Service)
+	if !ok {
+		return nil
+	}
+	shouldReturn, result := requeueMsvcReq(ctx, svc)
+	if shouldReturn {
+		return result
+	}
+	return nil
+}
+
+func (r *ModelServiceReconciler) serviceAccountMapFunc(ctx context.Context, obj client.Object) []reconcile.Request {
+	sa, ok := obj.(*corev1.ServiceAccount)
+	if !ok {
+		return nil
+	}
+	shouldReturn, result := requeueMsvcReq(ctx, sa)
+	if shouldReturn {
+		return result
+	}
+	return nil
+}
+
+func (r *ModelServiceReconciler) roleBindingMapFunc(ctx context.Context, obj client.Object) []reconcile.Request {
+	rb, ok := obj.(*rbacv1.RoleBinding)
+	if !ok {
+		return nil
+	}
+	shouldReturn, result := requeueMsvcReq(ctx, rb)
+	if shouldReturn {
+		return result
+	}
+	return nil
+}
+
+func (r *ModelServiceReconciler) configMapMapFunc(ctx context.Context, obj client.Object) []reconcile.Request {
+	cm, ok := obj.(*corev1.ConfigMap)
+	if !ok {
+		return nil
+	}
+	shouldReturn, result := requeueMsvcReq(ctx, cm)
+	if shouldReturn {
+		return result
+	}
+	return nil
+}
+
+func (r *ModelServiceReconciler) inferencePoolMapFunc(ctx context.Context, obj client.Object) []reconcile.Request {
+	ip, ok := obj.(*giev1alpha2.InferencePool)
+	if !ok {
+		return nil
+	}
+	shouldReturn, result := requeueMsvcReq(ctx, ip)
+	if shouldReturn {
+		return result
+	}
+	return nil
+}
+
+func (r *ModelServiceReconciler) inferenceModelMapFunc(ctx context.Context, obj client.Object) []reconcile.Request {
+	im, ok := obj.(*giev1alpha2.InferenceModel)
+	if !ok {
+		return nil
+	}
+	shouldReturn, result := requeueMsvcReq(ctx, im)
+	if shouldReturn {
+		return result
+	}
+	return nil
+}
+
+func requeueMsvcReq(ctx context.Context, obj client.Object) (bool, []reconcile.Request) {
+	for _, owner := range obj.GetOwnerReferences() {
+		if owner.Kind == "ModelService" && owner.APIVersion == "llm-d.ai/v1alpha1" {
+			log.FromContext(ctx).V(1).Info("Found owner", "object owner", owner.Name)
+			return true, []reconcile.Request{{
+				NamespacedName: types.NamespacedName{
+					Namespace: obj.GetNamespace(),
+					Name:      owner.Name,
+				},
+			}}
+		}
+	}
+	return false, nil
 }
