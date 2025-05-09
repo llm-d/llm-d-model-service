@@ -187,6 +187,12 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// TODO: Post-process for decoupled Scaling
 	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate child resources")
+	if modelService.Spec.DecoupleScaling {
+		log.FromContext(ctx).V(1).Info("scaling is decoupled, resetting prefill and decode replicas to 1")
+		resetReplicas := int32(1)
+		interpolatedBaseConfig.DecodeDeployment.Spec.Replicas = &resetReplicas
+		interpolatedBaseConfig.PrefillDeployment.Spec.Replicas = &resetReplicas
+	}
 	err = interpolatedBaseConfig.createOrUpdate(ctx, r)
 
 	if err != nil {
