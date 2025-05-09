@@ -39,7 +39,7 @@ modelservices.llm-d.ai                                            2025-05-08T13:
 You can run the ModelService controller locally operating against the cluster defined by your current Kubernetes configuration.
 
 ```shell
-make run EPP_CLUSTERRROLE=pod-read
+make run EPP_CLUSTERROLE=pod-read
 ```
 
 You can now create `ModelService` objects. See [samples](https://github.com/neuralmagic/llm-d-model-service/tree/dev/samples) for details.
@@ -57,7 +57,7 @@ Deploy the controller to the cluster:
 2. Deploy the controller:
 
     ```shell
-    make dev-deploy EPP_CLUSTERRROLE=pod-read
+    make dev-deploy EPP_CLUSTERROLE=pod-read
     ```
 
     You should see a `modelservice-controller-manager` pod start in the `modelservice-system` namespace.
