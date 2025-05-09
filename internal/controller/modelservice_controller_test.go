@@ -309,7 +309,7 @@ var _ = Describe("ModelService Controller", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, client.ObjectKey{Name: deploymentName(modelService, "decode"), Namespace: namespace}, &prefill)
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: deploymentName(modelService, "decode"), Namespace: namespace}, &decode)
 				return err == nil
 			}, 5*time.Second, 500*time.Millisecond).Should(BeTrue())
 
