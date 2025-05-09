@@ -1,8 +1,6 @@
 apiVersion: llm-d.ai/v1alpha1
 kind: ModelService
 metadata:
-  # TODO: remember to change this
-  # leaving as-is because HTTPRoute is hardcoded to this name
   name: granite-base-model
 spec:
   decoupleScaling: false

@@ -74,7 +74,7 @@ The result is a fully managed inference stack for the base model.
 
 ### [Install](docs/install.md)
 
-### [Samples](docs/samples.md)
+### [Samples](./samples/README.md)
 
 ### [User Guide](docs/userguide.md)
 
