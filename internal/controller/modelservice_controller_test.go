@@ -35,6 +35,7 @@ import (
 	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 )
 
 const namespace = "default"
@@ -296,6 +297,22 @@ var _ = Describe("ModelService Controller", func() {
 				return *ms.Status.DecodeDeploymentRef, nil
 			}, time.Second*5, time.Millisecond*500).Should(Equal(deploymentName(modelService, "decode")))
 
+			By("Deleting the decode deployment")
+			Expect(k8sClient.Delete(ctx, &decode)).To(Succeed())
+
+			By("Ensuring the decode deployment is recreated")
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: client.ObjectKey{
+					Name:      modelServiceName,
+					Namespace: namespace,
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: deploymentName(modelService, "decode"), Namespace: namespace}, &decode)
+				return err == nil
+			}, 5*time.Second, 500*time.Millisecond).Should(BeTrue())
+
 			By("Checking if prefill deployment was created")
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, client.ObjectKey{Name: prefillWorkloadName, Namespace: namespace}, &prefill)
@@ -317,6 +334,22 @@ var _ = Describe("ModelService Controller", func() {
 			updated.Status.PrefillDeploymentRef = ptr.To(prefill.Name)
 			err = k8sClient.Status().Update(ctx, updated)
 			Expect(err).NotTo(HaveOccurred())
+
+			By("Deleting the prefill deployment")
+			Expect(k8sClient.Delete(ctx, &prefill)).To(Succeed())
+
+			By("Ensuring the prefill deployment is recreated")
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: client.ObjectKey{
+					Name:      modelServiceName,
+					Namespace: namespace,
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: deploymentName(modelService, "prefill"), Namespace: namespace}, &prefill)
+				return err == nil
+			}, 5*time.Second, 500*time.Millisecond).Should(BeTrue())
 
 			By("Eventually expecting the status to be populated with prefill deployment name")
 			Eventually(func() (string, error) {
@@ -346,7 +379,6 @@ var _ = Describe("ModelService Controller", func() {
 			By("Checking that prefill is using the correct SA")
 			Expect(prefill.Spec.Template.Spec.ServiceAccountName).To(Equal(pdServiceAccountName(modelService)))
 
-			fmt.Printf("the sa is %v", sa)
 			actualSecrets := make([]string, len(sa.ImagePullSecrets))
 			for i, s := range sa.ImagePullSecrets {
 				actualSecrets[i] = s.Name
@@ -355,15 +387,29 @@ var _ = Describe("ModelService Controller", func() {
 			expectedSecrets := rbacOptions.PDPullSecrets
 			Expect(actualSecrets).To(Equal(expectedSecrets))
 
-			By("Validating that the EPP ServiceAccount was created")
+			By("Deleting the pd service account")
+			Expect(k8sClient.Delete(ctx, &sa)).To(Succeed())
 
+			By("Ensuring the pd service is recreated")
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: client.ObjectKey{
+					Name:      modelServiceName,
+					Namespace: namespace,
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: pdServiceAccountName(modelService), Namespace: namespace}, &sa)
+				return err == nil
+			}, 5*time.Second, 500*time.Millisecond).Should(BeTrue())
+
+			By("Validating that the EPP ServiceAccount was created")
 			eppSA := corev1.ServiceAccount{}
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, client.ObjectKey{Name: eppServiceAccountName(modelService), Namespace: namespace}, &eppSA)
 				return err == nil
 			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
 
-			fmt.Printf("*** eppSA %v\n\n", eppSA)
 			actualSecrets = make([]string, len(eppSA.ImagePullSecrets))
 			for i, s := range eppSA.ImagePullSecrets {
 				actualSecrets[i] = s.Name
@@ -376,6 +422,22 @@ var _ = Describe("ModelService Controller", func() {
 			Expect(eppSA.Name).To(Equal(eppServiceAccountName(modelService)))
 			Expect(eppSA.OwnerReferences).ToNot(BeEmpty())
 
+			By("Deleting the epp service account")
+			Expect(k8sClient.Delete(ctx, &eppSA)).To(Succeed())
+
+			By("Ensuring the epp service account is recreated")
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: client.ObjectKey{
+					Name:      modelServiceName,
+					Namespace: namespace,
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: eppServiceAccountName(modelService), Namespace: namespace}, &eppSA)
+				return err == nil
+			}, 5*time.Second, 500*time.Millisecond).Should(BeTrue())
+
 			By("Checking if a epp RoleBinding was created")
 			rolebinding := rbacv1.RoleBinding{}
 			Eventually(func() bool {
@@ -383,27 +445,21 @@ var _ = Describe("ModelService Controller", func() {
 				return err == nil
 			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
 
-			By("Checking if the EPP ServiceAccount was created with correct ImagePullSecrets")
-			serviceAccount := corev1.ServiceAccount{}
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, client.ObjectKey{
-					Name:      eppServiceAccountName(modelService),
-					Namespace: namespace,
-				}, &serviceAccount)
-				return err == nil
-			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+			By("Deleting the epp RoleBinding")
+			Expect(k8sClient.Delete(ctx, &rolebinding)).To(Succeed())
 
-			// expectedSecrets = []string{"secret1", "secret2"}
-			// actualSecrets = make([]string, len(serviceAccount.ImagePullSecrets))
-			// for i, s := range serviceAccount.ImagePullSecrets {
-			// 	actualSecrets[i] = s.Name
-			// }
-			// // Convert []string to []any
-			// expectedSecretsAny = make([]any, len(expectedSecrets))
-			// for i, s := range expectedSecrets {
-			// 	expectedSecretsAny[i] = s
-			// }
-			// Expect(actualSecrets).To(ContainElements(expectedSecretsAny...))
+			By("Ensuring the epp RoleBinding is recreated")
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: client.ObjectKey{
+					Name:      modelServiceName,
+					Namespace: namespace,
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: eppRolebindingName(modelService), Namespace: namespace}, &rolebinding)
+				return err == nil
+			}, 5*time.Second, 500*time.Millisecond).Should(BeTrue())
 
 			By("Checking if epp RoleBinding has correct owner reference")
 			Expect(rolebinding.Name).To(Equal(eppRolebindingName(modelService)))
@@ -414,7 +470,6 @@ var _ = Describe("ModelService Controller", func() {
 				updatedModelService := &msv1alpha1.ModelService{}
 				err := k8sClient.Get(ctx, typeNamespacedName, updatedModelService)
 				if err != nil || updatedModelService.Status.DecodeDeploymentRef == nil {
-					fmt.Printf("%v", updatedModelService)
 					return ""
 				}
 				return *updatedModelService.Status.DecodeDeploymentRef
@@ -424,13 +479,12 @@ var _ = Describe("ModelService Controller", func() {
 				updatedModelService := &msv1alpha1.ModelService{}
 				err := k8sClient.Get(ctx, typeNamespacedName, updatedModelService)
 				if err != nil || updatedModelService.Status.PrefillDeploymentRef == nil {
-					fmt.Printf("%v", updatedModelService)
 					return ""
 				}
 				return *updatedModelService.Status.PrefillDeploymentRef
 			}, time.Second*5, time.Millisecond*500).Should(Equal(prefillWorkloadName))
 
-			By("Eventually seeing updated status on ModelService")
+			By("Eventually checking replica count on ModelService")
 
 			Eventually(func() bool {
 				updatedMSVC := &msv1alpha1.ModelService{}
@@ -458,6 +512,54 @@ var _ = Describe("ModelService Controller", func() {
 
 				return true
 			}, time.Second*10, time.Millisecond*500).Should(BeTrue())
+
+			By("Validating that the inferencepool was created")
+			infPool := giev1alpha2.InferencePool{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: infPoolName(modelService), Namespace: namespace}, &infPool)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+			Expect(infPool.OwnerReferences).ToNot(BeEmpty())
+
+			By("Deleting the inferencepool")
+			Expect(k8sClient.Delete(ctx, &infPool)).To(Succeed())
+
+			By("Ensuring the inferencepool is recreated")
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: client.ObjectKey{
+					Name:      modelServiceName,
+					Namespace: namespace,
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: infPoolName(modelService), Namespace: namespace}, &infPool)
+				return err == nil
+			}, 5*time.Second, 500*time.Millisecond).Should(BeTrue())
+
+			By("Validating that the inferencemodel was created")
+			infModel := giev1alpha2.InferenceModel{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: infModelName(modelService), Namespace: namespace}, &infModel)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+			Expect(infModel.OwnerReferences).ToNot(BeEmpty())
+
+			By("Deleting the inferencemodel")
+			Expect(k8sClient.Delete(ctx, &infPool)).To(Succeed())
+
+			By("Ensuring the inferencemodel is recreated")
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: client.ObjectKey{
+					Name:      modelServiceName,
+					Namespace: namespace,
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: infModelName(modelService), Namespace: namespace}, &infModel)
+				return err == nil
+			}, 5*time.Second, 500*time.Millisecond).Should(BeTrue())
 		})
 
 	})
