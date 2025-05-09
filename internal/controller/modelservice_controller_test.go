@@ -429,6 +429,35 @@ var _ = Describe("ModelService Controller", func() {
 				}
 				return *updatedModelService.Status.PrefillDeploymentRef
 			}, time.Second*5, time.Millisecond*500).Should(Equal(prefillWorkloadName))
+
+			By("Eventually seeing updated status on ModelService")
+
+			Eventually(func() bool {
+				updatedMSVC := &msv1alpha1.ModelService{}
+				err := k8sClient.Get(ctx, typeNamespacedName, updatedMSVC)
+				if err != nil {
+					return false
+				}
+
+				if updatedMSVC.Status.PrefillReady != "0/1" {
+					return false
+				}
+				if updatedMSVC.Status.DecodeReady != "0/1" {
+					return false
+				}
+				if updatedMSVC.Status.EppReady != "0/1" {
+					return false
+				}
+				if updatedMSVC.Status.PrefillAvailable != 0 {
+					return false
+				}
+
+				if updatedMSVC.Status.EppAvailable != 0 {
+					return false
+				}
+
+				return true
+			}, time.Second*10, time.Millisecond*500).Should(BeTrue())
 		})
 
 	})
