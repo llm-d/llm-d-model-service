@@ -76,18 +76,6 @@ func getBaseChildResources(filename string, msvc *msv1alpha1.ModelService, logge
 	return baseChildResources, nil
 }
 
-func toYaml(obj interface{}) string {
-	var yamlStr string
-
-	yamlBytes, err := yaml.Marshal(&obj)
-	if err != nil {
-		yamlStr = "message: not able to marshal object\nerror: " + err.Error()
-	} else {
-		yamlStr = string(yamlBytes)
-	}
-	return yamlStr
-}
-
 func generateManifests(ctx context.Context, manifestFile string, configFile string) (*string, error) {
 	logger := log.FromContext(ctx)
 
@@ -124,7 +112,7 @@ func generateManifests(ctx context.Context, manifestFile string, configFile stri
 	logger.V(1).Info("generateManifest", "baseResources", cR)
 
 	// add apiVersion and kind
-	for i, _ := range cR.ConfigMaps {
+	for i := range cR.ConfigMaps {
 		cR.ConfigMaps[i].APIVersion = "v1"
 		cR.ConfigMaps[i].Kind = "ConfigMap"
 	}
