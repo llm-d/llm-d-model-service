@@ -1,50 +1,90 @@
 # Developer Docs
 
-## Run `ModelService` locally
+The ModelService controller is available in the GitHub repository [neuralmagic/llm-d-model-service](https://github.com/neuralmagic/llm-d-model-service). 
+Clone the repository to take advantage of the `make` commands described below.
 
-### Create kind cluster
+Execution of the ModelService controller requires access to a cluster.
+A local cluster, such as a `kind` cluster suffices for basic execution and development testing.
+However, full function may not be available if the cluster does not have sufficient resources.
 
-```sh
-kind create cluster
-```
-### Install InferenceModels and InferencePool CRDs
+If a cluster is not available, you can do a dry-run to find out which Kubernetes resources will be created for a given `ModelService CR`. See [ModelService Dry Run](#modelservice-dry-run) below.
 
-```sh
+## Prerequisites
+
+### Install Kubernetes Gateway API Inference Extension CRDs
+
+```shell
 VERSION=v0.3.0
 kubectl apply -f https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/$VERSION/manifests.yaml
 ```
 
-### Running controller
+### Define Cluster Role for Endpoint Picker (EPP)
 
-```sh
-make install && make run
+For the endpoint picker used in the [samples](), the `pod-read` cluster role defined [here](https://github.com/neuralmagic/gateway-api-inference-extension/blob/dev/config/manifests/inferencepool-resources.yaml#L84-L112) works.
+
+### Install ModelService CRDs
+
+```shell
+make install
 ```
 
-### Uninstall
+## Local Execution
 
-```sh
+You can run the ModelService controller locally operating against the cluster defined by your current Kubernetes configurtion.
+
+```shell
+make run EPP_CLUSTERRROLE=pod-read
+```
+
+You can now create `ModelService` objects. See [samples]() for details.
+
+## Running in a Cluster
+
+Deploy the controller to the cluster:
+
+1. Create the target namespace `modelservice-system`
+
+By default, the ModelService controller is deployed to the `modelservice-system` namespace. To change the target namespace, create a kustomize overlay (see `config/dev-deploy`).
+
+2. Create an image pull secret for quay.io organization [`llm-d`](https://quay.io/organization/llm-d) named `quay-secret-llm-d` in the target namespace.
+
+3. Deploy the controller:
+
+```shell
+make dev-deploy EPP_CLUSTERRROLE=pod-read
+```
+
+You can now create `ModelService` objects. See [samples]() for details.
+
+## Uninstall
+
+```shell
 make uninstall && make undeploy 
 ```
 
-### Delete cluster
-```sh
-kind delete cluster
-```
+## ModelService Dry-Run
+View the components that ModelService will create given a `ModelService` CR and a base config `ConfigMap`. This command does not require cluster access.
 
-### ModelService dry run
-View the components that ModelService will create given a ModelService CR and a base config ConfigMap. 
-
-Make sure you are at the root directory of `llm-d-model-service`
+In the `llm-d-model-service`project root directory:
 
 ```
-cd llm-d-model-service
-go run main.go generate --modelservice <path-to-msvc-cr> --baseconfig <path-to-baseconfig>
+go run main.go generate \
+--EPP_CLUSTERROLE=<name-of-endpoint-picker-cluster-role> \
+--modelservice <path-to-msvc-cr> \
+--baseconfig <path-to-baseconfig>
 ```
 
-For example
+Note that because no cluster access is required, it is not necessary to create an endpoint picker cluster role resource.
+
+For example:
 
 ```
-go run main.go generate -m samples/facebook/msvc.yaml -b samples/facebook/baseconfig.yaml > output.yaml
+go run main.go generate \
+--EPP_CLUSTERROLE=pod-read \
+--modelservice samples/msvcs/granite3.2.yaml \
+--baseconfig samples/baseconfigs/simple-baseconfig.yaml
 ```
 
-And `output.yaml` will contain the YAML manifest for the resources that ModelService will create in the cluster. This feature purely for development purposes, and is intended to provide a quick way of debugging without a cluster. Note that some fields will not be included, such as `owner references` and `name` which require a cluster.
+will output the YAML manifest for the resources that ModelService will create in the cluster. Some fields that require cluster access to define, will not be included, such as `owner references` and `name`.
+
+This feature purely for development purposes, and is intended to provide a quick way of debugging without a cluster. 
