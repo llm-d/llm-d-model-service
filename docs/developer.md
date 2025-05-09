@@ -1,7 +1,6 @@
 # Developer Docs
 
-The ModelService controller is available in the GitHub repository [neuralmagic/llm-d-model-service](https://github.com/neuralmagic/llm-d-model-service). 
-Clone the repository to take advantage of the `make` commands described below.
+Clone the [ModelService GitHub repository](https://github.com/neuralmagic/llm-d-model-service) to take advantage of the `make` commands described below.
 
 Execution of the ModelService controller requires access to a cluster.
 A local cluster, such as a `kind` cluster suffices for basic execution and development testing.
@@ -44,7 +43,7 @@ Deploy the controller to the cluster:
 
 1. Create the target namespace `modelservice-system`
 
-    By default, the ModelService controller is deployed to the `modelservice-system` namespace. To change the target namespace, create a kustomize overlay (see `config/dev-deploy`).
+    By default, the ModelService controller is deployed to the `modelservice-system` namespace. To change the target namespace, create a kustomize overlay (see `config/dev`).
 
 2. Deploy the controller:
 
@@ -87,6 +86,6 @@ go run main.go generate \
 --baseconfig samples/baseconfigs/simple-baseconfig.yaml
 ```
 
-will output the YAML manifest for the resources that ModelService will create in the cluster. Some fields that require cluster access to define, will not be included, such as `owner references` and `name`.
+will output the YAML manifest for the resources that ModelService will create in the cluster. Some fields that require cluster access to define, will not be included, such as `metadata.ownerReference.uid`.
 
 This feature purely for development purposes, and is intended to provide a quick way of debugging without a cluster. 
