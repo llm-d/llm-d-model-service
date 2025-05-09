@@ -1,45 +1,41 @@
 apiVersion: llm-d.ai/v1alpha1
 kind: ModelService
 metadata:
-  name: llama-4-scout-17b-model-service
+  name: facebook-opt-125m-nixl
 spec:
   decoupleScaling: false
 
   baseConfigMapRef:
-    name: llama-4-base-config
+    name: universal-base-config
 
   routing: 
-    modelName: llama-4/scout/17b
+    modelName: facebook/opt-125m
 
   modelArtifacts:
-    uri: pvc://llama4-pvc/path/to/model
+    uri: hf://facebook/opt-125m
 
   # describe decode pods
   decode:
     replicas: 1
-    parallelism:
-      tensor: 8
     acceleratorTypes:
       labelKey: nvidia.com/gpu.product
       labelValues:
         - NVIDIA-A100-SXM4-80GB
     containers:
-    - name: "llm"
-      image: busybox
+    - name: "vllm"
+      # The baseconfig image includes LMCache and multiconnector support
       args:
-      - "50000"
+        - "{{ .HFModelName }}"
   
   # describe the prefill pods 
   prefill:
     replicas: 1
-    parallelism:
-      tensor: 8
     acceleratorTypes:
       labelKey: nvidia.com/gpu.product
       labelValues:
         - NVIDIA-A100-SXM4-80GB
     containers:
-    - name: "llm"
-      image: busybox
-      args:
-      - "50000"
+      - name: "vllm"
+        args:
+          - "{{ .HFModelName }}"
+      
