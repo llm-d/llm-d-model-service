@@ -1,50 +1,104 @@
 # Developer Docs
 
-## Run `ModelService` locally
+Clone the [ModelService GitHub repository](https://github.com/neuralmagic/llm-d-model-service) (or a fork of it) to take advantage of the `make` commands described below.  All commands are from the project root directory.
 
-### Create kind cluster
+Execution of the ModelService controller requires access to a cluster.
+A local cluster, such as a `kind` cluster, suffices for basic execution and development testing.
+However, testing end-to-end with a large language model may not be possible if the cluster does not have sufficient resources or if the [inference gateway](https://github.com/neuralmagic/gateway-api-inference-extension) is not fully configured.
 
-```sh
-kind create cluster
-```
-### Install InferenceModels and InferencePool CRDs
+If a cluster is not available, you can do a dry-run to identify the Kubernetes resources that will be created for a given `ModelService CR`. See [ModelService Dry Run](#modelservice-dry-run) below.
 
-```sh
+## Prerequisites
+
+### Install Kubernetes Gateway API Inference Extension CRDs
+
+```shell
 VERSION=v0.3.0
 kubectl apply -f https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/$VERSION/manifests.yaml
 ```
 
-### Running controller
+### Define Cluster Role for Endpoint Picker (EPP)
 
-```sh
-make install && make run
+For the endpoint picker used in the [samples](https://github.com/neuralmagic/llm-d-model-service/tree/dev/samples), the `pod-read` cluster role defined [here](https://github.com/neuralmagic/gateway-api-inference-extension/blob/dev/config/manifests/inferencepool-resources.yaml#L84-L112) works.
+
+### Install ModelService CRDs
+
+```shell
+make install
 ```
 
-### Uninstall
+If successful, you should see something like:
 
-```sh
+```shell
+% kubectl get crd | grep modelservice
+modelservices.llm-d.ai                                            2025-05-08T13:37:32Z
+```
+
+## Local Execution
+
+You can run the ModelService controller locally operating against the cluster defined by your current Kubernetes configuration.
+
+```shell
+make run EPP_CLUSTERRROLE=pod-read
+```
+
+You can now create `ModelService` objects. See [samples](https://github.com/neuralmagic/llm-d-model-service/tree/dev/samples) for details.
+
+To avoid long image and model downloads, you can create dummy model services such as those in[ `samples/test`](https://github.com/neuralmagic/llm-d-model-service/tree/dev/samples/test).
+
+## Running in a Cluster
+
+Deploy the controller to the cluster:
+
+1. Create the target namespace `modelservice-system`
+
+    By default, the ModelService controller is deployed to the `modelservice-system` namespace. To change the target namespace, create a kustomize overlay (see [`config/dev`](https://github.com/neuralmagic/llm-d-model-service/tree/dev/config/dev)).
+
+2. Deploy the controller:
+
+    ```shell
+    make dev-deploy EPP_CLUSTERRROLE=pod-read
+    ```
+
+    You should see a `modelservice-controller-manager` pod start in the `modelservice-system` namespace.
+
+    If an image pull secret is required, you can specify it with the environment variable `IMAGE_PULL_SECRET`.
+
+You can now create `ModelService` objects. See [samples](https://github.com/neuralmagic/llm-d-model-service/tree/dev/samples) for details.
+
+## Uninstall
+
+The controller and `ModelService` CRDs can be removed:
+
+```shell
 make uninstall && make undeploy 
 ```
 
-### Delete cluster
-```sh
-kind delete cluster
+Supporting resources like the endpoint picker cluster role, the inference gateway, and the Kubernetes Gateway APi Inference Extension CRDs can also be uninstalled.
+
+## ModelService Dry-Run
+View the components that ModelService will create given a `ModelService` CR and a base config `ConfigMap`. This command does not require cluster access.
+
+In the `llm-d-model-service`project root directory:
+
+```shell
+go run main.go generate \
+--epp-cluster-role=<name-of-endpoint-picker-cluster-role> \
+--modelservice <path-to-msvc-cr> \
+--baseconfig <path-to-baseconfig>
 ```
 
-### ModelService dry run
-View the components that ModelService will create given a ModelService CR and a base config ConfigMap. 
+Note that because no cluster access is required, it is not necessary to create an endpoint picker cluster role resource.
 
-Make sure you are at the root directory of `llm-d-model-service`
+For example:
 
-```
-cd llm-d-model-service
-go run main.go generate --modelservice <path-to-msvc-cr> --baseconfig <path-to-baseconfig>
-```
-
-For example
-
-```
-go run main.go generate -m samples/facebook/msvc.yaml -b samples/facebook/baseconfig.yaml > output.yaml
+```shell
+go run main.go generate \
+--epp-cluster-role=pod-read \
+--modelservice samples/msvcs/granite3.2.yaml \
+--baseconfig samples/baseconfigs/simple-baseconfig.yaml
 ```
 
-And `output.yaml` will contain the YAML manifest for the resources that ModelService will create in the cluster. This feature purely for development purposes, and is intended to provide a quick way of debugging without a cluster. Note that some fields will not be included, such as `owner references` and `name` which require a cluster.
+will output the YAML manifest for the resources that ModelService will create in the cluster. Some fields that require cluster access to define, will not be included, such as `metadata.namespace`.
+
+This feature purely for development purposes, and is intended to provide a quick way of debugging without a cluster. 

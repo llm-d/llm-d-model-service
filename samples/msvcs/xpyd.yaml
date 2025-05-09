@@ -16,7 +16,8 @@ spec:
 
   # describe decode pods
   decode:
-    replicas: 1
+    # Note a different replica count from spec.prefill.replicas
+    replicas: 2
     containers:
     - name: "vllm"
       args:

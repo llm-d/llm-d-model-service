@@ -8,13 +8,15 @@ This folder contains example baseconfigs (ConfigMap) and ModelService CRs for va
 
 👉 [test](./test/) (for local development usage only)
 
-## Pre-reqs
+## Prerequisite
 Before you get started, ensure that you have the following install and running.
 
 - Access to an OpenShift cluster 
-- ModelService controller running with required RBACs
+- ModelService controller running with required RBACs and image pull secrets for P/D and EPP deployments
 - External CRDs install on cluster for routing
 - Other components such as [Inference Gateway Extension](https://github.com/kubernetes-sigs/gateway-api-inference-extension)
+
+If you need more guidance, refer to the [developer docs](../docs/developer.md) on how to properly install the ModelService controller and other components on your system.
 
 ## Scenarios 
 
@@ -105,7 +107,7 @@ oc apply -f samples/msvcs/xpyd.yaml
 and you should see the corresponding number of pods spin up for each deployment.
 
 ### Scenario 4: loading a large model from a PVC 
-Downloading a model from Hugging Face takes a long time for large models like `meta-llama/Llama-4-Scout-17B-16E`, and one way to circumvent the long container creation time is to download a model to a PVC ahead of time and mount the PVC in the vLLM container. We have provided a baseconfig with the volume mounts configured, and all that is needed in the ModelService CR is to specify the path to which the model can be found.
+Downloading a model from Hugging Face takes a long time for large models like [`meta-llama/Llama-4-Scout-17B-16E`](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E), and one way to circumvent the long container creation time is to download a model to a PVC ahead of time and mount the PVC in the vLLM container. We have provided a baseconfig with the volume mounts configured, and all that is needed in the ModelService CR is to specify the path to which the model can be found.
 
 - [msvcs/llama4.yaml](./msvcs/llama4.yaml)
 - [baseconfigs/universal-baseconfig-pvc.yaml](./baseconfigs/universal-baseconfig-pvc.yaml)
@@ -115,4 +117,4 @@ oc apply -f samples/baseconfigs/universal-baseconfig-pvc.yaml
 oc apply -f samples/msvcs/llama4.yaml
 ```
 
-This should dramatically shorten the wait time for pod creation. 
+This should drastically shorten the wait time for pod creation. 
