@@ -13,7 +13,7 @@ data:
         spec:
           initContainers:
             - name: routing-proxy
-              image: quay.io/llm-d/llm-d-routing-sidecar@sha256:2682e3ad86d2e741030eb693544e1977f5ce072fe6e3db78ffa18ddf84b6dd64
+              image: quay.io/llm-d/llm-d-routing-sidecar:0.0.5
               securityContext:
                 allowPrivilegeEscalation: false
                 runAsNonRoot: true
@@ -28,7 +28,7 @@ data:
               restartPolicy: Always
           containers:
             - name: vllm
-              image: quay.io/llm-d/llm-d-dev@sha256:d6d212de0d1dc0f6da9877eab21800f62d7dd32d825bae9bf1692c4f6e017109
+              image: quay.io/llm-d/llm-d:0.0.6
               command:
                 - vllm
                 - serve
@@ -75,7 +75,7 @@ data:
         spec:
           containers:
             - name: vllm
-              image: quay.io/llm-d/llm-d-dev@sha256:d6d212de0d1dc0f6da9877eab21800f62d7dd32d825bae9bf1692c4f6e017109
+              image: quay.io/llm-d/llm-d:0.0.6
               command:
                 - vllm
                 - serve
@@ -186,8 +186,6 @@ data:
                 periodSeconds: 10
                 successThreshold: 1
                 timeoutSeconds: 1
-          imagePullSecrets: 
-            - name: quay-secret-llm-d
   
   inferencePool: |
     apiVersion: inference.networking.x-k8s.io/v1alpha2

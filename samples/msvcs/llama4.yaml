@@ -12,6 +12,8 @@ spec:
     modelName: meta-llama/Llama-4-Scout-17B-16E
 
   modelArtifacts:
+    # When specfying the URI with `pvc` prefix, the string after the pvc name (llama-pvc)
+    # is extracted and exposed as a template variable that can be used as {{ .ModelPath }}
     uri: pvc://llama-pvc/path/to/llama4
 
   # describe decode pods
