@@ -22,6 +22,8 @@ import (
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
+	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 )
 
 const HF_PREFIX string = "hf://"
@@ -207,6 +210,11 @@ func (r *ModelServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Named("modelservice").
 		Owns(&msv1alpha1.ModelService{}).
 		Watches(&appsv1.Deployment{}, handler.EnqueueRequestsFromMapFunc(r.deploymentMapFunc)).
+		Watches(&corev1.Service{}, handler.EnqueueRequestsFromMapFunc(r.serviceMapFunc)).
+		Watches(&rbacv1.RoleBinding{}, handler.EnqueueRequestsFromMapFunc(r.roleBindingMapFunc)).
+		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(r.configMapMapFunc)).
+		Watches(&giev1alpha2.InferenceModel{}, handler.EnqueueRequestsFromMapFunc(r.inferenceModelMapFunc)).
+		Watches(&giev1alpha2.InferencePool{}, handler.EnqueueRequestsFromMapFunc(r.inferencePoolMapFunc)).
 		Complete(r)
 }
 
@@ -380,5 +388,100 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 		}
 	}
 
+	return nil
+}
+
+func (r *ModelServiceReconciler) serviceMapFunc(ctx context.Context, obj client.Object) []reconcile.Request {
+	svc, ok := obj.(*corev1.Service)
+	if !ok {
+		return nil
+	}
+	for _, owner := range svc.OwnerReferences {
+		if owner.Kind == "ModelService" && owner.APIVersion == "llm-d.ai/v1alpha1" {
+			log.FromContext(ctx).V(1).Info("Found service owner", "service owner", owner.Name)
+			return []reconcile.Request{{
+				NamespacedName: types.NamespacedName{
+					Namespace: svc.Namespace,
+					Name:      owner.Name,
+				},
+			}}
+		}
+	}
+	return nil
+}
+
+func (r *ModelServiceReconciler) roleBindingMapFunc(ctx context.Context, obj client.Object) []reconcile.Request {
+	rb, ok := obj.(*rbacv1.RoleBinding)
+	if !ok {
+		return nil
+	}
+	for _, owner := range rb.OwnerReferences {
+		if owner.Kind == "ModelService" && owner.APIVersion == "llm-d.ai/v1alpha1" {
+			log.FromContext(ctx).V(1).Info("Found rolebinding owner", "rolebinding owner", owner.Name)
+			return []reconcile.Request{{
+				NamespacedName: types.NamespacedName{
+					Namespace: rb.Namespace,
+					Name:      owner.Name,
+				},
+			}}
+		}
+	}
+	return nil
+}
+
+func (r *ModelServiceReconciler) configMapMapFunc(ctx context.Context, obj client.Object) []reconcile.Request {
+	cm, ok := obj.(*corev1.ConfigMap)
+	if !ok {
+		return nil
+	}
+	for _, owner := range cm.OwnerReferences {
+		if owner.Kind == "ModelService" && owner.APIVersion == "llm-d.ai/v1alpha1" {
+			log.FromContext(ctx).V(1).Info("Found configmap owner", "configmap owner", owner.Name)
+			return []reconcile.Request{{
+				NamespacedName: types.NamespacedName{
+					Namespace: cm.Namespace,
+					Name:      owner.Name,
+				},
+			}}
+		}
+	}
+	return nil
+}
+
+func (r *ModelServiceReconciler) inferencePoolMapFunc(ctx context.Context, obj client.Object) []reconcile.Request {
+	ip, ok := obj.(*giev1alpha2.InferencePool)
+	if !ok {
+		return nil
+	}
+	for _, owner := range ip.OwnerReferences {
+		if owner.Kind == "ModelService" && owner.APIVersion == "llm-d.ai/v1alpha1" {
+			log.FromContext(ctx).V(1).Info("Found configmap owner", "configmap owner", owner.Name)
+			return []reconcile.Request{{
+				NamespacedName: types.NamespacedName{
+					Namespace: ip.Namespace,
+					Name:      owner.Name,
+				},
+			}}
+		}
+	}
+	return nil
+}
+
+func (r *ModelServiceReconciler) inferenceModelMapFunc(ctx context.Context, obj client.Object) []reconcile.Request {
+	im, ok := obj.(*giev1alpha2.InferenceModel)
+	if !ok {
+		return nil
+	}
+	for _, owner := range im.OwnerReferences {
+		if owner.Kind == "ModelService" && owner.APIVersion == "llm-d.ai/v1alpha1" {
+			log.FromContext(ctx).V(1).Info("Found configmap owner", "configmap owner", owner.Name)
+			return []reconcile.Request{{
+				NamespacedName: types.NamespacedName{
+					Namespace: im.Namespace,
+					Name:      owner.Name,
+				},
+			}}
+		}
+	}
 	return nil
 }
