@@ -44,7 +44,7 @@ make run EPP_CLUSTERRROLE=pod-read
 
 You can now create `ModelService` objects. See [samples](https://github.com/neuralmagic/llm-d-model-service/tree/dev/samples) for details.
 
-To avoid long image and model downloads, you can create dummy model services such as those in `samples/test`.
+To avoid long image and model downloads, you can create dummy model services such as those in[ `samples/test`](https://github.com/neuralmagic/llm-d-model-service/tree/dev/samples/test).
 
 ## Running in a Cluster
 
@@ -52,7 +52,7 @@ Deploy the controller to the cluster:
 
 1. Create the target namespace `modelservice-system`
 
-    By default, the ModelService controller is deployed to the `modelservice-system` namespace. To change the target namespace, create a kustomize overlay (see `config/dev`).
+    By default, the ModelService controller is deployed to the `modelservice-system` namespace. To change the target namespace, create a kustomize overlay (see [`config/dev`](https://github.com/neuralmagic/llm-d-model-service/tree/dev/config/dev)).
 
 2. Deploy the controller:
 
