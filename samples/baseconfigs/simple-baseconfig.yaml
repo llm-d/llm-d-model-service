@@ -1,0 +1,58 @@
+# A simple baseconfig to serve a model downloaded from Hugging Face without a token on a pod
+# Make sure that the model can fit on the sizeLimit specified
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: simple-base-config
+immutable: true
+data:
+  decodeDeployment: |
+    apiVersion: apps/v1
+    kind: Deployment
+    spec:
+      template:
+        spec:
+          containers:
+            - name: vllm
+              image: vllm/vllm-openai:v0.8.5
+              command:
+                - vllm
+                - serve
+              securityContext:
+                allowPrivilegeEscalation: false
+              args:
+                - "--port"
+                - "8000"
+              env:
+                - name: CUDA_VISIBLE_DEVICES
+                  value: "0"
+                - name: UCX_TLS
+                  value: "cuda_ipc,cuda_copy,tcp"
+                - name: HF_HUB_CACHE
+                  value: /cache
+              volumeMounts:
+                - name: model-cache
+                  mountPath: /cache
+              resources:
+                limits:
+                  nvidia.com/gpu: 1
+                requests:
+                  cpu: "16"
+                  memory: 16Gi
+                  nvidia.com/gpu: 1
+          volumes:
+            - name: model-cache
+              emptyDir:
+                sizeLimit: 5Gi
+
+  # A service for the deployment is optional
+  decodeService: |
+    apiVersion: v1
+    kind: Service
+    spec:
+      clusterIP: None
+      ports:
+      - name: vllm
+        port: 8000
+        protocol: TCP
+  

@@ -76,7 +76,7 @@ func init() {
 	rootCmd.PersistentFlags().StringSliceVar(&rbacOptions.PDPullSecrets, "pd-pull-secrets", []string{}, "List of pull secrets for configuring the prefill and decode deployments")
 
 	// logger
-	rootCmd.PersistentFlags().StringVarP(&logLevel, "log-level", "l", "info", "Set the logging level (debug, info, warn, error, etc.)")
+	rootCmd.PersistentFlags().StringVarP(&logLevel, "log-level", "l", "info", "Set the logging level (debug, info, warn, error, dpanic, panic, fatal)")
 
 	// added by kubebuilder
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
