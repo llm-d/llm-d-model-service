@@ -171,12 +171,11 @@ func generateManifests(ctx context.Context, manifestFile string, configFile stri
 	yamlStr := ""
 	yamlBytes, err := yaml.Marshal(&cR)
 	if err != nil {
-		yamlStr = "message: not able to marshal object\nerror: " + err.Error()
-	} else {
-		yamlStr = string(yamlBytes)
+		logger.Error(err, "unable to marshal object to YAML")
+		return nil, err
 	}
 
-	// allYaml := toYaml(cR)
+	yamlStr = string(yamlBytes)
 	return &yamlStr, nil
 }
 
@@ -187,7 +186,7 @@ var generateCmd = &cobra.Command{
 	Use:   "generate",
 	Short: "Generate manifest",
 	Long:  `Generate manifest for objects created by ModelService controller`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 		var opts = zap.Options{
 			Development: false,
@@ -199,8 +198,13 @@ var generateCmd = &cobra.Command{
 		log.SetLogger(logger)
 		log.IntoContext(ctx, logger)
 
-		result, _ := generateManifests(ctx, modelServiceManifest, baseConfigurationManifest)
+		result, err := generateManifests(ctx, modelServiceManifest, baseConfigurationManifest)
+		if err != nil {
+			return err
+		}
+
 		fmt.Println(*result)
+		return nil
 	},
 }
 
