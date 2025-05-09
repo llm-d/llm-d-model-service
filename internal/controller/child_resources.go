@@ -300,6 +300,8 @@ func (interpolatedBaseConfig *BaseConfig) MergeChildResources(ctx context.Contex
 // mergeConfigMaps creates config maps for found in base config
 func (childResource *BaseConfig) mergeConfigMaps(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
 	for i := range childResource.ConfigMaps {
+		childResource.ConfigMaps[i].APIVersion = "v1"
+		childResource.ConfigMaps[i].Kind = "ConfigMap"
 		// if there's no namespace, set it to msvc's
 		if strings.TrimSpace(childResource.ConfigMaps[i].Namespace) == "" {
 			childResource.ConfigMaps[i].Namespace = msvc.Namespace
@@ -346,6 +348,8 @@ func (childResources *BaseConfig) mergeInferenceModel(ctx context.Context, msvc 
 
 	im := childResources.InferenceModel
 
+	im.APIVersion = "inference.networking.x-k8s.io/v1alpha2"
+	im.Kind = "InferenceModel"
 	im.Name = infModelName(msvc)
 	im.Namespace = msvc.Namespace
 	im.Labels = getCommonLabels(ctx, msvc)
@@ -404,6 +408,9 @@ func (childResource *BaseConfig) mergePDService(ctx context.Context, msvc *msv1a
 			return childResource
 		}
 	}
+
+	destService.APIVersion = "v1"
+	destService.Kind = "Service"
 
 	// At this point, we are going to create a service for role
 	// srcService contains ownerRef, name for service, and selector labels
@@ -466,7 +473,12 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 	var err error
 
 	// Step 1: Create an empty deployment
-	depl := &appsv1.Deployment{}
+	depl := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
+	}
 
 	// Step 3: Define object meta
 	// Sanitize modelName into a valid label
@@ -567,6 +579,10 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 // setPDServiceAccount defines a servicd account for the P and D deployments
 func (childResource *BaseConfig) setPDServiceAccount(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme, rbacOptions *RBACOptions) *BaseConfig {
 	sa := &corev1.ServiceAccount{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ServiceAccount",
+			APIVersion: "v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pdServiceAccountName(msvc),
 			Namespace: msvc.Namespace,
@@ -591,6 +607,10 @@ func (childResource *BaseConfig) setPDServiceAccount(ctx context.Context, msvc *
 
 func (childResource *BaseConfig) setEPPServiceAccount(ctx context.Context, msvc *msv1alpha1.ModelService, rbacOptions *RBACOptions, scheme *runtime.Scheme) {
 	eppServiceAccount := &corev1.ServiceAccount{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ServiceAccount",
+			APIVersion: "v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      eppServiceAccountName(msvc),
 			Namespace: msvc.Namespace,
@@ -612,6 +632,10 @@ func (childResource *BaseConfig) setEPPServiceAccount(ctx context.Context, msvc 
 func (childResource *BaseConfig) setEPPRoleBinding(ctx context.Context, msvc *msv1alpha1.ModelService, rbacOptions *RBACOptions, scheme *runtime.Scheme) {
 
 	childResource.EPPRoleBinding = &rbacv1.RoleBinding{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "RoleBinding",
+			APIVersion: "rbac.authorization.k8s.io/v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      eppRolebindingName(msvc),
 			Namespace: msvc.Namespace,
@@ -837,6 +861,10 @@ func (childResources *BaseConfig) mergeEppDeployment(ctx context.Context, msvc *
 	dest := *childResources.EPPDeployment
 
 	src := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      eppDeploymentName(msvc),
 			Namespace: msvc.Namespace,
@@ -881,11 +909,17 @@ func (childResources *BaseConfig) mergeEppService(ctx context.Context, msvc *msv
 		"llm-d.ai/epp": eppDeploymentName(msvc),
 	}
 	dest := *childResources.EPPService
-	src := corev1.Service{ObjectMeta: metav1.ObjectMeta{
-		Name:      eppServiceName(msvc),
-		Namespace: msvc.Namespace,
-		Labels:    eppLabels,
-	}}
+	src := corev1.Service{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Service",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      eppServiceName(msvc),
+			Namespace: msvc.Namespace,
+			Labels:    eppLabels,
+		},
+	}
 
 	src.Spec.Selector = eppLabels
 	if err := mergo.Merge(&dest, src, mergo.WithOverride); err != nil {
@@ -916,6 +950,10 @@ func (childResources *BaseConfig) mergeInferencePool(ctx context.Context, msvc *
 	// srcService contains ownerRef, name for service, and selector labels
 	// srcService contains the stuff we want to override destService with
 	src := &giev1alpha2.InferencePool{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "InferencePool",
+			APIVersion: "inference.networking.x-k8s.io/v1alpha2",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      infPoolName(msvc),
 			Namespace: msvc.Namespace,
