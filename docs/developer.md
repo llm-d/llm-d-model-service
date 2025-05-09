@@ -1,10 +1,10 @@
 # Developer Docs
 
-Clone the [ModelService GitHub repository](https://github.com/neuralmagic/llm-d-model-service) to take advantage of the `make` commands described below.
+Clone the [ModelService GitHub repository](https://github.com/neuralmagic/llm-d-model-service) (or a fork of it) to take advantage of the `make` commands described below.
 
 Execution of the ModelService controller requires access to a cluster.
-A local cluster, such as a `kind` cluster suffices for basic execution and development testing.
-However, full function may not be available if the cluster does not have sufficient resources or if the [inference gateway](https://github.com/neuralmagic/gateway-api-inference-extension) is not fully configured.
+A local cluster, such as a `kind` cluster, suffices for basic execution and development testing.
+However, testing end-to-end with a large language model may not be possible if the cluster does not have sufficient resources or if the [inference gateway](https://github.com/neuralmagic/gateway-api-inference-extension) is not fully configured.
 
 If a cluster is not available, you can do a dry-run to identify the Kubernetes resources that will be created for a given `ModelService CR`. See [ModelService Dry Run](#modelservice-dry-run) below.
 
@@ -25,6 +25,13 @@ For the endpoint picker used in the [samples](https://github.com/neuralmagic/llm
 
 ```shell
 make install
+```
+
+If successful, you should see something like:
+
+```shell
+% kubectl get crd | grep modelservice
+modelservices.llm-d.ai                                            2025-05-08T13:37:32Z
 ```
 
 ## Local Execution
@@ -51,7 +58,9 @@ Deploy the controller to the cluster:
     make dev-deploy EPP_CLUSTERRROLE=pod-read
     ```
 
-If an image pull secret is required, you can specify it with the environment variable `IMAGE_PULL_SECRET`.
+    You should see a `modelservice-controller-manager` pod start in the `modelservice-system` namespace.
+
+    If an image pull secret is required, you can specify it with the environment variable `IMAGE_PULL_SECRET`.
 
 You can now create `ModelService` objects. See [samples](https://github.com/neuralmagic/llm-d-model-service/tree/dev/samples) for details.
 
@@ -63,12 +72,14 @@ The controller and `ModelService` CRDs can be removed:
 make uninstall && make undeploy 
 ```
 
+Supporting resources like the endpoint picker cluster role, the inference gateway, and the Kubernetes Gateway APi Inference Extension CRDs can also be uninstalled.
+
 ## ModelService Dry-Run
 View the components that ModelService will create given a `ModelService` CR and a base config `ConfigMap`. This command does not require cluster access.
 
 In the `llm-d-model-service`project root directory:
 
-```
+```shell
 go run main.go generate \
 --epp-cluster-role=<name-of-endpoint-picker-cluster-role> \
 --modelservice <path-to-msvc-cr> \
@@ -79,13 +90,13 @@ Note that because no cluster access is required, it is not necessary to create a
 
 For example:
 
-```
+```shell
 go run main.go generate \
 --epp-cluster-role=pod-read \
 --modelservice samples/msvcs/granite3.2.yaml \
 --baseconfig samples/baseconfigs/simple-baseconfig.yaml
 ```
 
-will output the YAML manifest for the resources that ModelService will create in the cluster. Some fields that require cluster access to define, will not be included, such as `metadata.ownerReference.uid`.
+will output the YAML manifest for the resources that ModelService will create in the cluster. Some fields that require cluster access to define, will not be included, such as `metadata.namespace`.
 
 This feature purely for development purposes, and is intended to provide a quick way of debugging without a cluster. 
