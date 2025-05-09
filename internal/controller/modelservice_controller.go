@@ -215,6 +215,7 @@ func (r *ModelServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(r.configMapMapFunc)).
 		Watches(&giev1alpha2.InferenceModel{}, handler.EnqueueRequestsFromMapFunc(r.inferenceModelMapFunc)).
 		Watches(&giev1alpha2.InferencePool{}, handler.EnqueueRequestsFromMapFunc(r.inferencePoolMapFunc)).
+		Watches(&corev1.ServiceAccount{}, handler.EnqueueRequestsFromMapFunc(r.serviceAccountMapFunc)).
 		Complete(r)
 }
 
@@ -396,16 +397,21 @@ func (r *ModelServiceReconciler) serviceMapFunc(ctx context.Context, obj client.
 	if !ok {
 		return nil
 	}
-	for _, owner := range svc.OwnerReferences {
-		if owner.Kind == "ModelService" && owner.APIVersion == "llm-d.ai/v1alpha1" {
-			log.FromContext(ctx).V(1).Info("Found service owner", "service owner", owner.Name)
-			return []reconcile.Request{{
-				NamespacedName: types.NamespacedName{
-					Namespace: svc.Namespace,
-					Name:      owner.Name,
-				},
-			}}
-		}
+	shouldReturn, result := requeueMsvcReq(ctx, svc)
+	if shouldReturn {
+		return result
+	}
+	return nil
+}
+
+func (r *ModelServiceReconciler) serviceAccountMapFunc(ctx context.Context, obj client.Object) []reconcile.Request {
+	sa, ok := obj.(*corev1.ServiceAccount)
+	if !ok {
+		return nil
+	}
+	shouldReturn, result := requeueMsvcReq(ctx, sa)
+	if shouldReturn {
+		return result
 	}
 	return nil
 }
@@ -415,16 +421,9 @@ func (r *ModelServiceReconciler) roleBindingMapFunc(ctx context.Context, obj cli
 	if !ok {
 		return nil
 	}
-	for _, owner := range rb.OwnerReferences {
-		if owner.Kind == "ModelService" && owner.APIVersion == "llm-d.ai/v1alpha1" {
-			log.FromContext(ctx).V(1).Info("Found rolebinding owner", "rolebinding owner", owner.Name)
-			return []reconcile.Request{{
-				NamespacedName: types.NamespacedName{
-					Namespace: rb.Namespace,
-					Name:      owner.Name,
-				},
-			}}
-		}
+	shouldReturn, result := requeueMsvcReq(ctx, rb)
+	if shouldReturn {
+		return result
 	}
 	return nil
 }
@@ -434,16 +433,9 @@ func (r *ModelServiceReconciler) configMapMapFunc(ctx context.Context, obj clien
 	if !ok {
 		return nil
 	}
-	for _, owner := range cm.OwnerReferences {
-		if owner.Kind == "ModelService" && owner.APIVersion == "llm-d.ai/v1alpha1" {
-			log.FromContext(ctx).V(1).Info("Found configmap owner", "configmap owner", owner.Name)
-			return []reconcile.Request{{
-				NamespacedName: types.NamespacedName{
-					Namespace: cm.Namespace,
-					Name:      owner.Name,
-				},
-			}}
-		}
+	shouldReturn, result := requeueMsvcReq(ctx, cm)
+	if shouldReturn {
+		return result
 	}
 	return nil
 }
@@ -453,16 +445,9 @@ func (r *ModelServiceReconciler) inferencePoolMapFunc(ctx context.Context, obj c
 	if !ok {
 		return nil
 	}
-	for _, owner := range ip.OwnerReferences {
-		if owner.Kind == "ModelService" && owner.APIVersion == "llm-d.ai/v1alpha1" {
-			log.FromContext(ctx).V(1).Info("Found configmap owner", "configmap owner", owner.Name)
-			return []reconcile.Request{{
-				NamespacedName: types.NamespacedName{
-					Namespace: ip.Namespace,
-					Name:      owner.Name,
-				},
-			}}
-		}
+	shouldReturn, result := requeueMsvcReq(ctx, ip)
+	if shouldReturn {
+		return result
 	}
 	return nil
 }
@@ -472,16 +457,24 @@ func (r *ModelServiceReconciler) inferenceModelMapFunc(ctx context.Context, obj 
 	if !ok {
 		return nil
 	}
-	for _, owner := range im.OwnerReferences {
+	shouldReturn, result := requeueMsvcReq(ctx, im)
+	if shouldReturn {
+		return result
+	}
+	return nil
+}
+
+func requeueMsvcReq(ctx context.Context, obj client.Object) (bool, []reconcile.Request) {
+	for _, owner := range obj.GetOwnerReferences() {
 		if owner.Kind == "ModelService" && owner.APIVersion == "llm-d.ai/v1alpha1" {
-			log.FromContext(ctx).V(1).Info("Found configmap owner", "configmap owner", owner.Name)
-			return []reconcile.Request{{
+			log.FromContext(ctx).V(1).Info("Found owner", "object owner", owner.Name)
+			return true, []reconcile.Request{{
 				NamespacedName: types.NamespacedName{
-					Namespace: im.Namespace,
+					Namespace: obj.GetNamespace(),
 					Name:      owner.Name,
 				},
 			}}
 		}
 	}
-	return nil
+	return false, nil
 }
