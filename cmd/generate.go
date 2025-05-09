@@ -76,18 +76,6 @@ func getBaseChildResources(filename string, msvc *msv1alpha1.ModelService, logge
 	return baseChildResources, nil
 }
 
-func toYaml(obj interface{}) string {
-	var yamlStr string
-
-	yamlBytes, err := yaml.Marshal(&obj)
-	if err != nil {
-		yamlStr = "message: not able to marshal object\nerror: " + err.Error()
-	} else {
-		yamlStr = string(yamlBytes)
-	}
-	return yamlStr
-}
-
 func generateManifests(ctx context.Context, manifestFile string, configFile string) (*string, error) {
 	logger := log.FromContext(ctx)
 
@@ -97,7 +85,7 @@ func generateManifests(ctx context.Context, manifestFile string, configFile stri
 		logger.Error(err, "unable to read ModelService", "location", manifestFile)
 		return nil, err
 	}
-	logger.Info("generateManifest", "modelService", msvc)
+	logger.V(1).Info("generateManifest", "modelService", msvc)
 
 	// get base child resources from file
 	config, err := getBaseChildResources(configFile, msvc, logger)
@@ -105,7 +93,7 @@ func generateManifests(ctx context.Context, manifestFile string, configFile stri
 		logger.Error(err, "unable to read basic configuration", "location", configFile)
 		return nil, err
 	}
-	logger.Info("generateManifest", "baseResources", config)
+	logger.V(1).Info("generateManifest", "baseResources", config)
 
 	// create scheme
 	err = msv1alpha1.AddToScheme(scheme.Scheme)
@@ -121,52 +109,17 @@ func generateManifests(ctx context.Context, manifestFile string, configFile stri
 
 	// update child resources
 	cR := config.MergeChildResources(ctx, msvc, scheme.Scheme, &rbacOptions)
-	logger.Info("generateManifest", "baseResources", cR)
+	logger.V(1).Info("generateManifest", "baseResources", cR)
 
-	// generate yaml for chile resources
-	allYaml := ""
-	for _, cm := range cR.ConfigMaps {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cm))
-	}
-	if cR.PrefillDeployment != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.PrefillDeployment))
-	}
-	if cR.DecodeDeployment != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.DecodeDeployment))
-	}
-	if cR.PrefillService != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.PrefillService))
-	}
-	if cR.DecodeService != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.DecodeService))
-	}
-	if cR.InferencePool != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.InferencePool))
-	}
-	if cR.InferenceModel != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.InferenceModel))
-	}
-	if cR.EPPDeployment != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.EPPDeployment))
-	}
-	if cR.EPPService != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.EPPService))
-	}
-	if cR.EPPServiceAccount != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.EPPServiceAccount))
-	}
-	if cR.EPPRoleBinding != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.EPPRoleBinding))
-	}
-	if cR.PDServiceAccount != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.PDServiceAccount))
-	}
-	if cR.PDRoleBinding != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.PDRoleBinding))
+	yamlStr := ""
+	yamlBytes, err := yaml.Marshal(&cR)
+	if err != nil {
+		logger.Error(err, "unable to marshal object to YAML")
+		return nil, err
 	}
 
-	logger.Info("generateManifest", "yaml", allYaml)
-	return &allYaml, nil
+	yamlStr = string(yamlBytes)
+	return &yamlStr, nil
 }
 
 var modelServiceManifest string
@@ -176,7 +129,7 @@ var generateCmd = &cobra.Command{
 	Use:   "generate",
 	Short: "Generate manifest",
 	Long:  `Generate manifest for objects created by ModelService controller`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 		var opts = zap.Options{
 			Development: false,
@@ -188,8 +141,13 @@ var generateCmd = &cobra.Command{
 		log.SetLogger(logger)
 		log.IntoContext(ctx, logger)
 
-		result, _ := generateManifests(ctx, modelServiceManifest, baseConfigurationManifest)
+		result, err := generateManifests(ctx, modelServiceManifest, baseConfigurationManifest)
+		if err != nil {
+			return err
+		}
+
 		fmt.Println(*result)
+		return nil
 	},
 }
 
