@@ -300,7 +300,7 @@ spec:
                             Cannot be updated.
                           items:
                             description: EnvFromSource represents the source of a
-                              set of ConfigMaps
+                              set of ConfigMaps or Secrets
                             properties:
                               configMapRef:
                                 description: The ConfigMap to select from
@@ -321,8 +321,8 @@ spec:
                                 type: object
                                 x-kubernetes-map-type: atomic
                               prefix:
-                                description: An optional identifier to prepend to
-                                  each key in the ConfigMap. Must be a C_IDENTIFIER.
+                                description: Optional text to prepend to the name
+                                  of each environment variable. Must be a C_IDENTIFIER.
                                 type: string
                               secretRef:
                                 description: The Secret to select from
@@ -591,7 +591,7 @@ spec:
                             Cannot be updated.
                           items:
                             description: EnvFromSource represents the source of a
-                              set of ConfigMaps
+                              set of ConfigMaps or Secrets
                             properties:
                               configMapRef:
                                 description: The ConfigMap to select from
@@ -612,8 +612,8 @@ spec:
                                 type: object
                                 x-kubernetes-map-type: atomic
                               prefix:
-                                description: An optional identifier to prepend to
-                                  each key in the ConfigMap. Must be a C_IDENTIFIER.
+                                description: Optional text to prepend to the name
+                                  of each environment variable. Must be a C_IDENTIFIER.
                                 type: string
                               secretRef:
                                 description: The Secret to select from
@@ -882,7 +882,7 @@ spec:
                             Cannot be updated.
                           items:
                             description: EnvFromSource represents the source of a
-                              set of ConfigMaps
+                              set of ConfigMaps or Secrets
                             properties:
                               configMapRef:
                                 description: The ConfigMap to select from
@@ -903,8 +903,8 @@ spec:
                                 type: object
                                 x-kubernetes-map-type: atomic
                               prefix:
-                                description: An optional identifier to prepend to
-                                  each key in the ConfigMap. Must be a C_IDENTIFIER.
+                                description: Optional text to prepend to the name
+                                  of each environment variable. Must be a C_IDENTIFIER.
                                 type: string
                               secretRef:
                                 description: The Secret to select from
@@ -1258,7 +1258,7 @@ spec:
                             Cannot be updated.
                           items:
                             description: EnvFromSource represents the source of a
-                              set of ConfigMaps
+                              set of ConfigMaps or Secrets
                             properties:
                               configMapRef:
                                 description: The ConfigMap to select from
@@ -1279,8 +1279,8 @@ spec:
                                 type: object
                                 x-kubernetes-map-type: atomic
                               prefix:
-                                description: An optional identifier to prepend to
-                                  each key in the ConfigMap. Must be a C_IDENTIFIER.
+                                description: Optional text to prepend to the name
+                                  of each environment variable. Must be a C_IDENTIFIER.
                                 type: string
                               secretRef:
                                 description: The Secret to select from
@@ -1549,7 +1549,7 @@ spec:
                             Cannot be updated.
                           items:
                             description: EnvFromSource represents the source of a
-                              set of ConfigMaps
+                              set of ConfigMaps or Secrets
                             properties:
                               configMapRef:
                                 description: The ConfigMap to select from
@@ -1570,8 +1570,8 @@ spec:
                                 type: object
                                 x-kubernetes-map-type: atomic
                               prefix:
-                                description: An optional identifier to prepend to
-                                  each key in the ConfigMap. Must be a C_IDENTIFIER.
+                                description: Optional text to prepend to the name
+                                  of each environment variable. Must be a C_IDENTIFIER.
                                 type: string
                               secretRef:
                                 description: The Secret to select from
@@ -1840,7 +1840,7 @@ spec:
                             Cannot be updated.
                           items:
                             description: EnvFromSource represents the source of a
-                              set of ConfigMaps
+                              set of ConfigMaps or Secrets
                             properties:
                               configMapRef:
                                 description: The ConfigMap to select from
@@ -1861,8 +1861,8 @@ spec:
                                 type: object
                                 x-kubernetes-map-type: atomic
                               prefix:
-                                description: An optional identifier to prepend to
-                                  each key in the ConfigMap. Must be a C_IDENTIFIER.
+                                description: Optional text to prepend to the name
+                                  of each environment variable. Must be a C_IDENTIFIER.
                                 type: string
                               secretRef:
                                 description: The Secret to select from
