@@ -390,12 +390,7 @@ func sanitizeModelName(msvc *msv1alpha1.ModelService) string {
 func (childResource *BaseConfig) mergePDService(ctx context.Context, msvc *msv1alpha1.ModelService, role string, scheme *runtime.Scheme) *BaseConfig {
 
 	// Get dest Service
-	destService := corev1.Service{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Service",
-			APIVersion: "v1",
-		},
-	}
+	destService := corev1.Service{}
 
 	if role == PREFILL_ROLE {
 		if childResource.PrefillService != nil {
@@ -413,6 +408,9 @@ func (childResource *BaseConfig) mergePDService(ctx context.Context, msvc *msv1a
 			return childResource
 		}
 	}
+
+	destService.APIVersion = "v1"
+	destService.Kind = "Service"
 
 	// At this point, we are going to create a service for role
 	// srcService contains ownerRef, name for service, and selector labels
