@@ -97,7 +97,7 @@ func generateManifests(ctx context.Context, manifestFile string, configFile stri
 		logger.Error(err, "unable to read ModelService", "location", manifestFile)
 		return nil, err
 	}
-	logger.Info("generateManifest", "modelService", msvc)
+	logger.V(1).Info("generateManifest", "modelService", msvc)
 
 	// get base child resources from file
 	config, err := getBaseChildResources(configFile, msvc, logger)
@@ -105,7 +105,7 @@ func generateManifests(ctx context.Context, manifestFile string, configFile stri
 		logger.Error(err, "unable to read basic configuration", "location", configFile)
 		return nil, err
 	}
-	logger.Info("generateManifest", "baseResources", config)
+	logger.V(1).Info("generateManifest", "baseResources", config)
 
 	// create scheme
 	err = msv1alpha1.AddToScheme(scheme.Scheme)
@@ -121,7 +121,7 @@ func generateManifests(ctx context.Context, manifestFile string, configFile stri
 
 	// update child resources
 	cR := config.MergeChildResources(ctx, msvc, scheme.Scheme, &rbacOptions)
-	logger.Info("generateManifest", "baseResources", cR)
+	logger.V(1).Info("generateManifest", "baseResources", cR)
 
 	// add apiVersion and kind
 	for i, _ := range cR.ConfigMaps {
