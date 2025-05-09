@@ -228,10 +228,6 @@ type PDSpec struct {
 	//
 	// +optional
 	InitContainers []ContainerSpec `json:"initContainers,omitempty"`
-	// EmphemeralContainers holds vllm ephemeral container details that will be overriden from base config when present.
-	//
-	// +optional
-	EphemeralContainers []ContainerSpec `json:"ephemeralContainers,omitempty"`
 }
 
 // ConvertToContainerSlice converts []Containers to []corev1.Container
