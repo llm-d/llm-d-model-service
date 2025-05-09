@@ -1,6 +1,6 @@
 # Developer Docs
 
-Clone the [ModelService GitHub repository](https://github.com/neuralmagic/llm-d-model-service) (or a fork of it) to take advantage of the `make` commands described below.
+Clone the [ModelService GitHub repository](https://github.com/neuralmagic/llm-d-model-service) (or a fork of it) to take advantage of the `make` commands described below.  All commands are from the project root directory.
 
 Execution of the ModelService controller requires access to a cluster.
 A local cluster, such as a `kind` cluster, suffices for basic execution and development testing.
@@ -36,13 +36,15 @@ modelservices.llm-d.ai                                            2025-05-08T13:
 
 ## Local Execution
 
-You can run the ModelService controller locally operating against the cluster defined by your current Kubernetes configurtion.
+You can run the ModelService controller locally operating against the cluster defined by your current Kubernetes configuration.
 
 ```shell
 make run EPP_CLUSTERRROLE=pod-read
 ```
 
 You can now create `ModelService` objects. See [samples](https://github.com/neuralmagic/llm-d-model-service/tree/dev/samples) for details.
+
+To avoid long image and model downloads, you can create dummy model services such as those in `samples/test`.
 
 ## Running in a Cluster
 
