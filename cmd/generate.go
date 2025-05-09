@@ -123,50 +123,73 @@ func generateManifests(ctx context.Context, manifestFile string, configFile stri
 	cR := config.MergeChildResources(ctx, msvc, scheme.Scheme, &rbacOptions)
 	logger.Info("generateManifest", "baseResources", cR)
 
-	// generate yaml for chile resources
-	allYaml := ""
-	for _, cm := range cR.ConfigMaps {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cm))
-	}
-	if cR.PrefillDeployment != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.PrefillDeployment))
-	}
-	if cR.DecodeDeployment != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.DecodeDeployment))
-	}
-	if cR.PrefillService != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.PrefillService))
-	}
-	if cR.DecodeService != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.DecodeService))
-	}
-	if cR.InferencePool != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.InferencePool))
-	}
-	if cR.InferenceModel != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.InferenceModel))
-	}
-	if cR.EPPDeployment != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.EPPDeployment))
-	}
-	if cR.EPPService != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.EPPService))
-	}
-	if cR.EPPServiceAccount != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.EPPServiceAccount))
-	}
-	if cR.EPPRoleBinding != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.EPPRoleBinding))
-	}
-	if cR.PDServiceAccount != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.PDServiceAccount))
-	}
-	if cR.PDRoleBinding != nil {
-		allYaml = fmt.Sprintf("%s---\n%s", allYaml, toYaml(cR.PDRoleBinding))
+	// add apiVersion and kind
+	for i, _ := range cR.ConfigMaps {
+		cR.ConfigMaps[i].APIVersion = "v1"
+		cR.ConfigMaps[i].Kind = "ConfigMap"
 	}
 
-	logger.Info("generateManifest", "yaml", allYaml)
-	return &allYaml, nil
+	if cR.PrefillDeployment != nil {
+		cR.PrefillDeployment.APIVersion = "apps/v1"
+		cR.PrefillDeployment.Kind = "Deployment"
+	}
+	if cR.PrefillService != nil {
+		cR.PrefillService.APIVersion = "v1"
+		cR.PrefillService.Kind = "Service"
+	}
+	if cR.DecodeDeployment != nil {
+		cR.DecodeDeployment.APIVersion = "apps/v1"
+		cR.DecodeDeployment.Kind = "Deployment"
+	}
+	if cR.DecodeService != nil {
+		cR.DecodeService.APIVersion = "v1"
+		cR.DecodeService.Kind = "Service"
+	}
+	if cR.PDServiceAccount != nil {
+		cR.PDServiceAccount.APIVersion = "v1"
+		cR.PDServiceAccount.Kind = "ServiceAccount"
+	}
+	if cR.PDRoleBinding != nil {
+		cR.PDRoleBinding.APIVersion = "rbac.authorization.k8s.io/v1"
+		cR.PDRoleBinding.Kind = "RoleBinding"
+	}
+
+	if cR.EPPDeployment != nil {
+		cR.EPPDeployment.APIVersion = "apps/v1"
+		cR.EPPDeployment.Kind = "Deployment"
+	}
+	if cR.EPPService != nil {
+		cR.EPPService.APIVersion = "v1"
+		cR.EPPService.Kind = "Service"
+	}
+	if cR.EPPServiceAccount != nil {
+		cR.EPPServiceAccount.APIVersion = "v1"
+		cR.EPPServiceAccount.Kind = "ServiceAccount"
+	}
+	if cR.EPPRoleBinding != nil {
+		cR.EPPRoleBinding.APIVersion = "rbac.authorization.k8s.io/v1"
+		cR.EPPRoleBinding.Kind = "RoleBinding"
+	}
+
+	if cR.InferencePool != nil {
+		cR.InferencePool.APIVersion = "inference.networking.x-k8s.io/v1alpha2"
+		cR.InferencePool.Kind = "InferencePool"
+	}
+	if cR.InferenceModel != nil {
+		cR.InferenceModel.APIVersion = "inference.networking.x-k8s.io/v1alpha2"
+		cR.InferenceModel.Kind = "InferencePool"
+	}
+
+	yamlStr := ""
+	yamlBytes, err := yaml.Marshal(&cR)
+	if err != nil {
+		yamlStr = "message: not able to marshal object\nerror: " + err.Error()
+	} else {
+		yamlStr = string(yamlBytes)
+	}
+
+	// allYaml := toYaml(cR)
+	return &yamlStr, nil
 }
 
 var modelServiceManifest string
