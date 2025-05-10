@@ -659,7 +659,39 @@ func (childResource *BaseConfig) setEPPRoleBinding(ctx context.Context, msvc *ms
 	if err := controllerutil.SetOwnerReference(msvc, childResource.EPPRoleBinding, scheme); err != nil {
 		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for epp rolebinding")
 	}
+}
 
+func genericCreateOrUpdate(ctx context.Context, r *ModelServiceReconciler, obj client.Object, emptyObject client.Object) error {
+	var err error
+
+	objectCopy := obj
+
+	// emptyObject is the object to look for in the cluster
+	log.FromContext(ctx).V(1).Info("obj: ", "obj object", obj)
+	log.FromContext(ctx).V(1).Info("empty object name" + objectCopy.GetName())
+
+	emptyObject.SetName(objectCopy.GetName())
+	emptyObject.SetNamespace(objectCopy.GetNamespace())
+
+	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, emptyObject, func() error {
+		// Mergo merge
+		mergeErr := mergo.Merge(emptyObject, obj, mergo.WithOverride)
+		if mergeErr != nil {
+			log.FromContext(ctx).V(1).Error(err, "attemping to merge inside createOrUpdate, but failed for object "+emptyObject.GetName())
+		} else {
+			log.FromContext(ctx).V(1).Info("successfully merged object in cluster" + emptyObject.GetName())
+		}
+
+		return mergeErr
+	})
+
+	log.FromContext(ctx).V(1).Info(fmt.Sprintf("performed createOrUpdate for object %s with operation %s", emptyObject.GetName(), op))
+
+	if err != nil {
+		log.FromContext(ctx).V(1).Error(err, "createOrUpdate failed for object "+emptyObject.GetName())
+	}
+
+	return err
 }
 
 // createOrUpdate all the child resources
@@ -668,11 +700,15 @@ func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelSer
 	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate configmaps")
 	childResource.createOrUpdateConfigMaps(ctx, r)
 
-	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate prefill deployment")
-	childResource.createOrUpdatePDDeployment(ctx, r, PREFILL_ROLE)
+	if childResource.PrefillDeployment != nil {
+		log.FromContext(ctx).V(1).Info("attempting to createOrUpdate prefill deployment")
+		childResource.createOrUpdatePDDeployment(ctx, r, PREFILL_ROLE)
+	}
 
-	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate decode deployment")
-	childResource.createOrUpdatePDDeployment(ctx, r, DECODE_ROLE)
+	if childResource.DecodeDeployment != nil {
+		log.FromContext(ctx).V(1).Info("attempting to createOrUpdate decode deployment")
+		childResource.createOrUpdatePDDeployment(ctx, r, DECODE_ROLE)
+	}
 
 	// Create or update services only if corresponding deployment exists in childResources
 	childResource.createOrUpdateServiceForDeployment(ctx, r, PREFILL_ROLE)
@@ -772,8 +808,9 @@ func (childResource *BaseConfig) createOrUpdateConfigMaps(ctx context.Context, r
 }
 
 func (childResource *BaseConfig) createOrUpdatePDDeployment(ctx context.Context, r *ModelServiceReconciler, role string) {
+	// var desiredDeployment appsv1.Deployment
 
-	var desiredDeployment *appsv1.Deployment
+	desiredDeployment := &appsv1.Deployment{}
 
 	if role == PREFILL_ROLE {
 		desiredDeployment = childResource.PrefillDeployment
@@ -781,26 +818,29 @@ func (childResource *BaseConfig) createOrUpdatePDDeployment(ctx context.Context,
 		desiredDeployment = childResource.DecodeDeployment
 	}
 
-	if desiredDeployment != nil {
-		deploymentInCluster := &appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      desiredDeployment.Name,
-				Namespace: desiredDeployment.Namespace,
-			}}
+	emptyDeployment := appsv1.Deployment{}
 
-		op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deploymentInCluster, func() error {
-			deploymentInCluster.OwnerReferences = desiredDeployment.OwnerReferences
-			deploymentInCluster.Labels = desiredDeployment.Labels
-			deploymentInCluster.Spec = desiredDeployment.Spec
-			return nil
-		})
-		log.FromContext(ctx).V(1).Info("from CreateOrUpdate", "op", op)
-		if err != nil {
-			if op != controllerutil.OperationResultNone {
-				log.FromContext(ctx).V(1).Error(err, "unable to create deployment for "+role, "operation", op)
-			}
-		}
+	log.FromContext(ctx).V(1).Info("calling genericCreateOrUpdate for " + role)
+
+	err := genericCreateOrUpdate(ctx, r, desiredDeployment, &emptyDeployment)
+	if err != nil {
+		log.FromContext(ctx).V(1).Error(err, "failed createOrUpdateForDeployment for "+role)
 	}
+
+	// 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deploymentInCluster, func() error {
+	// 		deploymentInCluster.OwnerReferences = desiredDeployment.OwnerReferences
+	// 		deploymentInCluster.Labels = desiredDeployment.Labels
+	// 		deploymentInCluster.Spec = desiredDeployment.Spec
+	// 		return nil
+	// 	})
+	// 	log.FromContext(ctx).V(1).Info("from CreateOrUpdate", "op", op)
+	// 	if err != nil {
+	// 		if op != controllerutil.OperationResultNone {
+	// 			log.FromContext(ctx).V(1).Error(err, "unable to create deployment for "+role, "operation", op)
+	// 		}
+	// 	}
+	// }
+
 }
 
 func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.Context, r *ModelServiceReconciler, role string) {

@@ -1,6 +1,8 @@
 apiVersion: llm-d.ai/v1alpha1
 kind: ModelService
 metadata:
+  annotations:
+    ok2: ok2
   name: busybox
 spec:
   decoupleScaling: false
@@ -19,8 +21,9 @@ spec:
     replicas: 1
     initContainers:
     - name: "proxy"
+      image: "busybox"
       args: 
-      - "{{ .ModelPath }}"
+      - "{{ .ModelPath }}-5"
     containers:
     - name: "llm"
       image: busybox
