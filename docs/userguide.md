@@ -35,6 +35,6 @@ Understand how `ModelService` fits into the Kubernetes ecosystem, what resources
 
 For more details, see:
 
-📄 [Install Guide](../install.md) — how to install the ModelService controller
+📄 [Install Guide](install.md) — how to install the ModelService controller
 
-📘 [API Reference](../apireference.md) — full CRD schema and field definitions
+📘 [API Reference](apireference.md) — full CRD schema and field definitions
