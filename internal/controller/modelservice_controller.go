@@ -184,12 +184,15 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	interpolatedBaseConfig = interpolatedBaseConfig.MergeChildResources(ctx, interpolatedModelService, r.Scheme, &r.RBACOptions)
 
 	// TODO: Post-process for decoupled Scaling
-	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate child resources")
-	err = interpolatedBaseConfig.createOrUpdate(ctx, r)
+	log.FromContext(ctx).V(1).Info("creating or updating child resources now")
+	errs := interpolatedBaseConfig.invokeCreateOrUpdate(ctx, r)
 
-	if err != nil {
-		log.FromContext(ctx).Error(err, "unable createorupdate from interpolatedBaseConfig")
-		return ctrl.Result{}, err
+	if len(errs) > 0 {
+		log.FromContext(ctx).Error(fmt.Errorf("problem creating %d child resources", len(errs)), "createOrUpdate failed")
+
+		// TODO: requeue here?
+		// Return the last error
+		return ctrl.Result{}, errs[len(errs)-1]
 	}
 
 	//update status
