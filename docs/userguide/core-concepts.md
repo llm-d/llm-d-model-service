@@ -51,7 +51,7 @@ spec:
     # if `uri` is prefixed with hf://, it will create an emptyDir volume in prefill/decode pods, that can be mounted by the model serving container in the pod.
     uri: hf://facebook/opt-125m
 
-  # `prefill` and `decode` sections enable disaggregated prefill architecture for model serving; these sections are optional.
+  # `prefill` and `decode` sections enable disaggregated prefill architecture for model serving; these sections are optional; include both to sections to enable diaggregation; omit prefill to disable disaggregation.
   decode:
     # number of decode pods
     replicas: 1
@@ -68,7 +68,5 @@ spec:
       mountModelVolume: true
 ```
 
-This minimal example demonstrates a model deployment using a Hugging Face model. For more on templating, merging, and advanced features, continue with the topics below.
-
-## Topics
+This minimal example demonstrates inference serving using a Hugging Face model. For more on routing, model sources, templating, merging, and advanced features, refer to the respective [topics](../userguide.md#topics).
 
