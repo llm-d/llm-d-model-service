@@ -639,16 +639,16 @@ func (childResource *BaseConfig) setEPPRoleBinding(ctx context.Context, msvc *ms
 }
 
 // createOrUpdate all the child resources
-func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelServiceReconciler) error {
+func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelServiceReconciler, decoupleScaling bool) error {
 	// create or update configmaps
 	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate configmaps")
 	childResource.createOrUpdateConfigMaps(ctx, r)
 
 	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate prefill deployment")
-	childResource.createOrUpdatePDDeployment(ctx, r, PREFILL_ROLE)
+	childResource.createOrUpdatePDDeployment(ctx, r, PREFILL_ROLE, decoupleScaling)
 
 	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate decode deployment")
-	childResource.createOrUpdatePDDeployment(ctx, r, DECODE_ROLE)
+	childResource.createOrUpdatePDDeployment(ctx, r, DECODE_ROLE, decoupleScaling)
 
 	// Create or update services only if corresponding deployment exists in childResources
 	childResource.createOrUpdateServiceForDeployment(ctx, r, PREFILL_ROLE)
@@ -747,7 +747,7 @@ func (childResource *BaseConfig) createOrUpdateConfigMaps(ctx context.Context, r
 	}
 }
 
-func (childResource *BaseConfig) createOrUpdatePDDeployment(ctx context.Context, r *ModelServiceReconciler, role string) {
+func (childResource *BaseConfig) createOrUpdatePDDeployment(ctx context.Context, r *ModelServiceReconciler, role string, decoupleScaling bool) {
 
 	var desiredDeployment *appsv1.Deployment
 
@@ -767,7 +767,12 @@ func (childResource *BaseConfig) createOrUpdatePDDeployment(ctx context.Context,
 		op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deploymentInCluster, func() error {
 			deploymentInCluster.OwnerReferences = desiredDeployment.OwnerReferences
 			deploymentInCluster.Labels = desiredDeployment.Labels
+			inClusterReplicas := deploymentInCluster.Spec.Replicas
 			deploymentInCluster.Spec = desiredDeployment.Spec
+			if !deploymentInCluster.CreationTimestamp.IsZero() && decoupleScaling {
+				log.FromContext(ctx).V(1).Info("scaling is decoupled, setting deployment replica value to incluster replica count")
+				deploymentInCluster.Spec.Replicas = inClusterReplicas
+			}
 			return nil
 		})
 		log.FromContext(ctx).V(1).Info("from CreateOrUpdate", "op", op)

@@ -574,13 +574,12 @@ var _ = Describe("ModelService Controller", func() {
 
 			secondModelServiceName := "decoupled-modelservice"
 			replicas := int32(10)
-			resetReplica := int32(1)
 			secondModelService := &msv1alpha1.ModelService{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: msv1alpha1.GroupVersion.String(),
 					Kind:       "ModelService",
 				}, ObjectMeta: metav1.ObjectMeta{
-					Name:      modelServiceName,
+					Name:      secondModelServiceName,
 					Namespace: namespace,
 				},
 				Spec: msv1alpha1.ModelServiceSpec{
@@ -637,19 +636,55 @@ var _ = Describe("ModelService Controller", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Verifying the Decode and Prefill deployments have replicas set to 1")
+			By("Verifying the Decode and Prefill deployments have replicas set to 10")
 			var decodeDeployment, prefillDeployment appsv1.Deployment
 
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, client.ObjectKey{Name: deploymentName(secondModelService, "decode"), Namespace: namespace}, &decodeDeployment)
 				return err == nil
 			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
-			Expect(decodeDeployment.Spec.Replicas).Should(Equal(&resetReplica))
+			Expect(decodeDeployment.Spec.Replicas).Should(Equal(&replicas))
+
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, client.ObjectKey{Name: deploymentName(secondModelService, "prefill"), Namespace: namespace}, &prefillDeployment)
 				return err == nil
 			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
-			Expect(prefillDeployment.Spec.Replicas).Should(Equal(&resetReplica))
+			Expect(prefillDeployment.Spec.Replicas).Should(Equal(&replicas))
+
+			By("Updating the second ModelService to use 3 replicas")
+			fetched := &msv1alpha1.ModelService{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{
+				Name:      secondModelServiceName,
+				Namespace: namespace,
+			}, fetched)).To(Succeed())
+
+			newReplicas := int32(3)
+			fetched.Spec.Decode.Replicas = &newReplicas
+			fetched.Spec.Prefill.Replicas = &newReplicas
+
+			Expect(k8sClient.Update(ctx, fetched)).To(Succeed())
+
+			By("Reconciling again after update")
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      secondModelServiceName,
+					Namespace: namespace,
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: deploymentName(secondModelService, "decode"), Namespace: namespace}, &decodeDeployment)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+			Expect(decodeDeployment.Spec.Replicas).Should(Equal(&replicas))
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: deploymentName(secondModelService, "prefill"), Namespace: namespace}, &prefillDeployment)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+			Expect(prefillDeployment.Spec.Replicas).Should(Equal(&replicas))
+
 		})
 
 	})
