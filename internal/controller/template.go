@@ -25,10 +25,11 @@ import (
 )
 
 // registerSprigFunctions to get a new template with sprig functions support
-func registerSprigFunctions(tmplStr string) (*template.Template, error) {
+func registerSprigFunctions(tmplStr string, functions *TemplateFuncs) (*template.Template, error) {
 	// Create a new template and register Sprig functions
 	tmpl, err := template.New("template").
 		Funcs(sprig.TxtFuncMap()).
+		Funcs(functions.funcMap).
 		Parse(tmplStr)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing template: %w", err)
@@ -37,8 +38,8 @@ func registerSprigFunctions(tmplStr string) (*template.Template, error) {
 }
 
 // renderTemplate using template vars
-func renderTemplate(tmplStr string, vars *TemplateVars) (string, error) {
-	tmpl, err := registerSprigFunctions(tmplStr)
+func renderTemplate(tmplStr string, vars *TemplateVars, functions *TemplateFuncs) (string, error) {
+	tmpl, err := registerSprigFunctions(tmplStr, functions)
 	if err != nil {
 		return "", err
 	}

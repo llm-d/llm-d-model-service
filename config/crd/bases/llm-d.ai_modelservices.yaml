@@ -133,7 +133,7 @@ spec:
                     type: object
                   containers:
                     description: Container holds vllm container container details
-                      that will be overriden from base config when present.
+                      that will be overridden from base config when present.
                     items:
                       description: ContainerSpec defines container-level configuration.
                       properties:
@@ -424,7 +424,7 @@ spec:
                     type: array
                   initContainers:
                     description: InitContainers holds vllm init container details
-                      that will be overriden from base config when present.
+                      that will be overridden from base config when present.
                     items:
                       description: ContainerSpec defines container-level configuration.
                       properties:
@@ -716,7 +716,7 @@ spec:
                   parallelism:
                     description: |-
                       vllm
-                      Parallelism specifies vllm parallelism that will be overriden from base config when present.
+                      Parallelism specifies vllm parallelism that will be overridden from base config when present.
                     properties:
                       tensor:
                         default: 1
@@ -800,7 +800,7 @@ spec:
                     type: object
                   containers:
                     description: Container holds vllm container container details
-                      that will be overriden from base config when present.
+                      that will be overridden from base config when present.
                     items:
                       description: ContainerSpec defines container-level configuration.
                       properties:
@@ -1091,7 +1091,7 @@ spec:
                     type: array
                   initContainers:
                     description: InitContainers holds vllm init container details
-                      that will be overriden from base config when present.
+                      that will be overridden from base config when present.
                     items:
                       description: ContainerSpec defines container-level configuration.
                       properties:
@@ -1383,7 +1383,7 @@ spec:
                   parallelism:
                     description: |-
                       vllm
-                      Parallelism specifies vllm parallelism that will be overriden from base config when present.
+                      Parallelism specifies vllm parallelism that will be overridden from base config when present.
                     properties:
                       tensor:
                         default: 1
@@ -1440,6 +1440,26 @@ spec:
                     x-kubernetes-validations:
                     - message: modelName is immutable
                       rule: self == oldSelf
+                  ports:
+                    description: |-
+                      Ports is a list of named ports
+                      These can be referenced by name in configuration of base configuration or model services
+                    items:
+                      properties:
+                        name:
+                          description: Name that can be used in place of port number
+                            in templates
+                          type: string
+                        port:
+                          description: Value of port
+                          format: int32
+                          minimum: 1
+                          type: integer
+                      required:
+                      - name
+                      - port
+                      type: object
+                    type: array
                 required:
                 - modelName
                 type: object

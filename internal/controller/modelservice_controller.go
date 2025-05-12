@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"text/template"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -128,6 +129,26 @@ func (t *TemplateVars) from(ctx context.Context, msvc *msv1alpha1.ModelService) 
 
 	return nil
 
+}
+
+type TemplateFuncs struct {
+	funcMap template.FuncMap
+}
+
+// from populates the field values for TemplateVars from the model service
+func (t *TemplateFuncs) from(ctx context.Context, msvc *msv1alpha1.ModelService) {
+
+	fn := func(name string) int32 {
+		for _, p := range msvc.Spec.Routing.Ports {
+			if p.Name == name {
+				return p.Port
+			}
+		}
+		log.FromContext(ctx).V(5).Info("unknown port", "name", name, "ports", msvc.Spec.Routing.Ports)
+		return -1
+	}
+
+	t.funcMap["getPort"] = fn
 }
 
 // +kubebuilder:rbac:groups=llm-d.ai,resources=modelservices,verbs=get;list;watch;create;update;patch;delete

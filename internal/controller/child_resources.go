@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"text/template"
 
 	"dario.cat/mergo"
 	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
@@ -66,12 +67,15 @@ func InterpolateBaseConfigMap(ctx context.Context, cm *corev1.ConfigMap, msvc *m
 		return nil, err
 	}
 
+	functions := &TemplateFuncs{funcMap: template.FuncMap{}}
+	functions.from(ctx, msvc)
+
 	// interpolate base config data
 	interpolated := cm.DeepCopy()
 	for key, tmplStr := range interpolated.Data {
 		// render first time with the user-exposed values;
 		// these values can be used to interpolate user-defined base config templates
-		rendering, err := renderTemplate(tmplStr, values)
+		rendering, err := renderTemplate(tmplStr, values, functions)
 		if err != nil {
 			log.FromContext(ctx).V(1).Error(err, "cannot construct child resource")
 			return nil, err
@@ -84,10 +88,10 @@ func InterpolateBaseConfigMap(ctx context.Context, cm *corev1.ConfigMap, msvc *m
 }
 
 // interpolateContainerArgs interpolates (init) container args
-func interpolateContainerArgs(ctx context.Context, containerSpec *msv1alpha1.ContainerSpec, values *TemplateVars) (*msv1alpha1.ContainerSpec, error) {
+func interpolateContainerArgs(ctx context.Context, containerSpec *msv1alpha1.ContainerSpec, values *TemplateVars, functions *TemplateFuncs) (*msv1alpha1.ContainerSpec, error) {
 	containerCopy := containerSpec.DeepCopy()
 	for j, argStr := range containerSpec.Args {
-		renderedArg, err := renderTemplate(argStr, values)
+		renderedArg, err := renderTemplate(argStr, values, functions)
 		if err != nil {
 			log.FromContext(ctx).V(1).Error(err, "error with template rendering, cannot render "+argStr)
 			return nil, err
@@ -98,7 +102,7 @@ func interpolateContainerArgs(ctx context.Context, containerSpec *msv1alpha1.Con
 }
 
 // interpolateContainerArgsForPDSpec interpolates container args using template variables
-func interpolateContainerArgsForPDSpec(ctx context.Context, msvc *msv1alpha1.ModelService, role string, values *TemplateVars) (*msv1alpha1.PDSpec, error) {
+func interpolateContainerArgsForPDSpec(ctx context.Context, msvc *msv1alpha1.ModelService, role string, values *TemplateVars, functions *TemplateFuncs) (*msv1alpha1.PDSpec, error) {
 	// Get the desired pdSpec
 	var pdSpec msv1alpha1.PDSpec
 	if role == PREFILL_ROLE {
@@ -110,7 +114,7 @@ func interpolateContainerArgsForPDSpec(ctx context.Context, msvc *msv1alpha1.Mod
 
 	// Interpolate args in pdSpec.initContainers
 	for i, initContainer := range pdSpec.InitContainers {
-		interpolatedInitContainer, err := interpolateContainerArgs(ctx, &initContainer, values)
+		interpolatedInitContainer, err := interpolateContainerArgs(ctx, &initContainer, values, functions)
 		if err != nil {
 			return nil, err
 		}
@@ -119,7 +123,7 @@ func interpolateContainerArgsForPDSpec(ctx context.Context, msvc *msv1alpha1.Mod
 
 	// Interpolate the args in pdSpec.Container
 	for i, container := range pdSpec.Containers {
-		interpolatedContainer, err := interpolateContainerArgs(ctx, &container, values)
+		interpolatedContainer, err := interpolateContainerArgs(ctx, &container, values, functions)
 		if err != nil {
 			return nil, err
 		}
@@ -138,12 +142,15 @@ func InterpolateModelService(ctx context.Context, msvc *msv1alpha1.ModelService)
 		return nil, err
 	}
 
+	functions := &TemplateFuncs{funcMap: template.FuncMap{}}
+	functions.from(ctx, msvc)
+
 	// interpolate container args
 	msvcCopy := msvc.DeepCopy()
 
 	// interpolate prefill section
 	if msvc.Spec.Prefill != nil {
-		interpolatedPrefill, err := interpolateContainerArgsForPDSpec(ctx, msvcCopy, PREFILL_ROLE, values)
+		interpolatedPrefill, err := interpolateContainerArgsForPDSpec(ctx, msvcCopy, PREFILL_ROLE, values, functions)
 		if err != nil {
 			return nil, err
 		}
@@ -152,7 +159,7 @@ func InterpolateModelService(ctx context.Context, msvc *msv1alpha1.ModelService)
 
 	// interpolate decode section
 	if msvc.Spec.Decode != nil {
-		interpolatedDecode, err := interpolateContainerArgsForPDSpec(ctx, msvcCopy, DECODE_ROLE, values)
+		interpolatedDecode, err := interpolateContainerArgsForPDSpec(ctx, msvcCopy, DECODE_ROLE, values, functions)
 		if err != nil {
 			return nil, err
 		}
