@@ -1,8 +1,6 @@
 apiVersion: llm-d.ai/v1alpha1
 kind: ModelService
 metadata:
-  annotations:
-    annotation1: annotation-value1
   name: busybox
 spec:
   decoupleScaling: false
