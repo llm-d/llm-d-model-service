@@ -144,7 +144,7 @@ func (t *TemplateFuncs) from(ctx context.Context, msvc *msv1alpha1.ModelService)
 				return p.Port
 			}
 		}
-		log.FromContext(ctx).V(5).Info("unknown port", "name", name, "ports", msvc.Spec.Routing.Ports)
+		log.FromContext(ctx).V(1).Info("unknown port", "name", name, "ports", msvc.Spec.Routing.Ports)
 		return -1
 	}
 
