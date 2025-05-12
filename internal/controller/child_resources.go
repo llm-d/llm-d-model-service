@@ -518,7 +518,7 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 
 	// Step 5: populate nodeaffinity
 	// AcceleratorTypes maybe nil... TODO: check
-	na, err := pdSpec.AcceleratorTypes.ToNodeAffinity()
+	na, err := AcceleratorTypesToNodeAffinity(pdSpec.AcceleratorTypes)
 	if err == nil {
 		depl.Spec.Template.Spec.Affinity = &corev1.Affinity{
 			NodeAffinity: na,
