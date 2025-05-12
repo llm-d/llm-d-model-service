@@ -2,7 +2,7 @@ apiVersion: llm-d.ai/v1alpha1
 kind: ModelService
 metadata:
   annotations:
-    ok2: ok2
+    annotation1: annotation-value1
   name: busybox
 spec:
   decoupleScaling: false
@@ -23,7 +23,7 @@ spec:
     - name: "proxy"
       image: "busybox"
       args: 
-      - "{{ .ModelPath }}-5"
+      - "{{ .ModelPath }}"
     containers:
     - name: "llm"
       image: busybox
