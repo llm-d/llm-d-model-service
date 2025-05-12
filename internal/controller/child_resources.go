@@ -54,7 +54,6 @@ type BaseConfig struct {
 	EPPServiceAccount *corev1.ServiceAccount      `json:"eppServiceAccount,omitempty"`
 	PDServiceAccount  *corev1.ServiceAccount      `json:"pdServiceAccount,omitempty"`
 	EPPRoleBinding    *rbacv1.RoleBinding         `json:"eppRoleBinding,omitempty"`
-	PDRoleBinding     *rbacv1.RoleBinding         `json:"pdRoleBinding,omitempty"`
 }
 
 // InterpolateBaseConfigMap data strings using msvc template variable values
