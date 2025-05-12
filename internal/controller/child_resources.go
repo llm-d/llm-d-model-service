@@ -721,6 +721,191 @@ func (childResource *BaseConfig) setEPPRoleBinding(ctx context.Context, msvc *ms
 	if err := controllerutil.SetOwnerReference(msvc, childResource.EPPRoleBinding, scheme); err != nil {
 		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for epp rolebinding")
 	}
+
+}
+
+// createOrUpdate all the child resources
+func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelServiceReconciler, decoupleScaling bool) error {
+	// create or update configmaps
+	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate configmaps")
+	childResource.createOrUpdateConfigMaps(ctx, r)
+
+	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate prefill deployment")
+	childResource.createOrUpdatePDDeployment(ctx, r, PREFILL_ROLE, decoupleScaling)
+
+	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate decode deployment")
+	childResource.createOrUpdatePDDeployment(ctx, r, DECODE_ROLE, decoupleScaling)
+
+	// Create or update services only if corresponding deployment exists in childResources
+	childResource.createOrUpdateServiceForDeployment(ctx, r, PREFILL_ROLE)
+	childResource.createOrUpdateServiceForDeployment(ctx, r, DECODE_ROLE)
+
+	// create of update inference pool
+	childResource.createOrUpdateInferencePool(ctx, r)
+
+	// create of update inference model
+	childResource.createOrUpdateInferenceModel(ctx, r)
+
+	if childResource.EPPDeployment != nil {
+		err := childResource.createEppDeployment(ctx, r.Client)
+		if err != nil {
+			log.FromContext(ctx).V(1).Error(err, "unable to create epp deployment")
+		}
+	}
+
+	if childResource.EPPService != nil {
+		err := childResource.createEppService(ctx, r.Client)
+		if err != nil {
+			log.FromContext(ctx).V(1).Error(err, "unable to create epp service")
+		}
+	}
+
+	if childResource.EPPServiceAccount != nil {
+		err := childResource.createEppServiceAccount(ctx, r.Client)
+		if err != nil {
+			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
+		}
+	}
+
+	if childResource.EPPRoleBinding != nil {
+		err := childResource.createEppRoleBinding(ctx, r.Client)
+		if err != nil {
+			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
+		}
+	}
+
+	if childResource.PDServiceAccount != nil {
+		err := childResource.createPDServiceAccount(ctx, r.Client)
+		if err != nil {
+			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
+		}
+	}
+
+	return nil
+}
+
+func (childResource *BaseConfig) createOrUpdateInferenceModel(ctx context.Context, r *ModelServiceReconciler) {
+	// nothing to do without inf model
+	if childResource == nil || childResource.InferenceModel == nil {
+		return
+	}
+
+	infModelInCluster := &giev1alpha2.InferenceModel{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      childResource.InferenceModel.Name,
+			Namespace: childResource.InferenceModel.Namespace,
+		},
+	}
+
+	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, infModelInCluster, func() error {
+		infModelInCluster.Labels = childResource.InferenceModel.Labels
+		infModelInCluster.OwnerReferences = childResource.InferenceModel.OwnerReferences
+		infModelInCluster.Spec = childResource.InferenceModel.Spec
+		return nil
+	})
+
+	if err != nil {
+		if op != controllerutil.OperationResultNone {
+			log.FromContext(ctx).V(1).Error(err, "unable to create inference model")
+		}
+	}
+}
+
+func (childResource *BaseConfig) createOrUpdateConfigMaps(ctx context.Context, r *ModelServiceReconciler) {
+	for i := range childResource.ConfigMaps {
+		cm := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      childResource.ConfigMaps[i].Name,
+				Namespace: childResource.ConfigMaps[i].Namespace,
+			}}
+
+		op, err := controllerutil.CreateOrUpdate(ctx, r.Client, cm, func() error {
+			cm.OwnerReferences = childResource.ConfigMaps[i].OwnerReferences
+			cm.Labels = childResource.ConfigMaps[i].Labels
+			cm.Data = childResource.ConfigMaps[i].Data
+			return nil
+		})
+		if err != nil {
+			if op != controllerutil.OperationResultNone {
+				log.FromContext(ctx).V(1).Error(err, "unable to create configmap")
+			}
+		}
+	}
+}
+
+func (childResource *BaseConfig) createOrUpdatePDDeployment(ctx context.Context, r *ModelServiceReconciler, role string, decoupleScaling bool) {
+
+	var desiredDeployment *appsv1.Deployment
+
+	if role == PREFILL_ROLE {
+		desiredDeployment = childResource.PrefillDeployment
+	} else {
+		desiredDeployment = childResource.DecodeDeployment
+	}
+
+	if desiredDeployment != nil {
+		deploymentInCluster := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      desiredDeployment.Name,
+				Namespace: desiredDeployment.Namespace,
+			}}
+
+		op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deploymentInCluster, func() error {
+			deploymentInCluster.OwnerReferences = desiredDeployment.OwnerReferences
+			deploymentInCluster.Labels = desiredDeployment.Labels
+			inClusterReplicas := deploymentInCluster.Spec.Replicas
+			deploymentInCluster.Spec = desiredDeployment.Spec
+			if !deploymentInCluster.CreationTimestamp.IsZero() && decoupleScaling {
+				log.FromContext(ctx).V(1).Info("scaling is decoupled, setting deployment replica value to incluster replica count")
+				deploymentInCluster.Spec.Replicas = inClusterReplicas
+			}
+			return nil
+		})
+		log.FromContext(ctx).V(1).Info("from CreateOrUpdate", "op", op)
+		if err != nil {
+			if op != controllerutil.OperationResultNone {
+				log.FromContext(ctx).V(1).Error(err, "unable to create deployment for "+role, "operation", op)
+			}
+		}
+	}
+}
+
+func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.Context, r *ModelServiceReconciler, role string) {
+
+	var service *corev1.Service
+	var deployment *appsv1.Deployment
+
+	if role == PREFILL_ROLE {
+		service = childResource.PrefillService
+		deployment = childResource.PrefillDeployment
+	} else {
+		service = childResource.DecodeService
+		deployment = childResource.DecodeDeployment
+	}
+
+	// Create service for the deployment iff deployment exists and service is defined in baseConfig
+	if deployment != nil && service != nil {
+		log.FromContext(ctx).V(1).Info("service for "+role, "service", service)
+
+		svcInCluster := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      service.Name,
+				Namespace: service.Namespace,
+			}}
+
+		op, err := controllerutil.CreateOrUpdate(ctx, r.Client, svcInCluster, func() error {
+			svcInCluster.Labels = service.Labels
+			svcInCluster.OwnerReferences = service.OwnerReferences
+			svcInCluster.Spec = service.Spec
+			return nil
+		})
+
+		if err != nil {
+			if op != controllerutil.OperationResultNone {
+				log.FromContext(ctx).V(1).Error(err, "unable to create service for "+role)
+			}
+		}
+	}
 }
 
 func getInferencePoolLabels(ctx context.Context, msvc *msv1alpha1.ModelService) map[giev1alpha2.LabelKey]giev1alpha2.LabelValue {
