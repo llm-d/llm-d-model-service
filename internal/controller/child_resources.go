@@ -71,7 +71,7 @@ func (childResource *BaseConfig) createPrefillDeployment() bool {
 
 // createPrefillService returns True if the prefill deployment needs to be created
 func (childResource *BaseConfig) createPrefillService() bool {
-	return childResource.createDecodeDeployment() && childResource.PrefillService != nil
+	return childResource.createPrefillDeployment() && childResource.PrefillService != nil
 }
 
 // createDecodeDeployment returns True if the decode deployment needs to be created
