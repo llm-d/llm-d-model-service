@@ -290,7 +290,6 @@ var _ = Describe("ModelService Controller", func() {
 				if err != nil {
 					return "", err
 				}
-				fmt.Printf("the ms object status is %v", ms.Status)
 				if ms.Status.DecodeDeploymentRef == nil {
 					return "", nil
 				}
@@ -560,6 +559,132 @@ var _ = Describe("ModelService Controller", func() {
 				err := k8sClient.Get(ctx, client.ObjectKey{Name: infModelName(modelService), Namespace: namespace}, &infModel)
 				return err == nil
 			}, 5*time.Second, 500*time.Millisecond).Should(BeTrue())
+		})
+
+		It("should reconcile a second ModelService with decoupled scaling", func() {
+			By("Deleting the first ModelService")
+			firstMS := &msv1alpha1.ModelService{}
+			err := k8sClient.Get(ctx, client.ObjectKey{Name: modelServiceName, Namespace: namespace}, firstMS)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = k8sClient.Delete(ctx, firstMS)
+			Expect(err).NotTo(HaveOccurred())
+
+			ctx := context.Background()
+
+			secondModelServiceName := "decoupled-modelservice"
+			replicas := int32(10)
+			secondModelService := &msv1alpha1.ModelService{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: msv1alpha1.GroupVersion.String(),
+					Kind:       "ModelService",
+				}, ObjectMeta: metav1.ObjectMeta{
+					Name:      secondModelServiceName,
+					Namespace: namespace,
+				},
+				Spec: msv1alpha1.ModelServiceSpec{
+					ModelArtifacts: msv1alpha1.ModelArtifacts{
+						URI: "pvc://llama-pvc/path/to/model",
+					},
+					Routing: msv1alpha1.Routing{
+						ModelName: modelServiceName,
+					},
+					DecoupleScaling: true,
+					Decode: &msv1alpha1.PDSpec{
+						Replicas: &replicas,
+						Containers: []msv1alpha1.ContainerSpec{
+							{
+								Name:  "llm",
+								Image: &imageName,
+							},
+						},
+					},
+					Prefill: &msv1alpha1.PDSpec{
+						Replicas: &replicas,
+						Containers: []msv1alpha1.ContainerSpec{
+							{
+								Name:  "llm",
+								Image: &imageName,
+							},
+						},
+					},
+					BaseConfigMapRef: &corev1.ObjectReference{
+						Name:      "basic-base-conf",
+						Namespace: "default",
+					},
+				},
+			}
+
+			By("Creating the second ModelService with decoupled scaling")
+			Expect(k8sClient.Create(ctx, secondModelService)).To(Succeed())
+
+			By("Reconciling the second ModelService")
+			reconciler := &ModelServiceReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+				RBACOptions: RBACOptions{
+					EPPPullSecrets: []string{"epp-pull-secret"},
+					PDPullSecrets:  []string{"secret1", "secret2"},
+					EPPClusterRole: "epp-cluster-role",
+				},
+			}
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      secondModelServiceName,
+					Namespace: namespace,
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying the Decode and Prefill deployments have replicas set to 10")
+			var decodeDeployment, prefillDeployment appsv1.Deployment
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: deploymentName(secondModelService, "decode"), Namespace: namespace}, &decodeDeployment)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+			Expect(decodeDeployment.Spec.Replicas).Should(Equal(&replicas))
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: deploymentName(secondModelService, "prefill"), Namespace: namespace}, &prefillDeployment)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+			Expect(prefillDeployment.Spec.Replicas).Should(Equal(&replicas))
+
+			By("Updating the second ModelService to use 3 replicas")
+			fetched := &msv1alpha1.ModelService{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{
+				Name:      secondModelServiceName,
+				Namespace: namespace,
+			}, fetched)).To(Succeed())
+
+			newReplicas := int32(3)
+			fetched.Spec.Decode.Replicas = &newReplicas
+			fetched.Spec.Prefill.Replicas = &newReplicas
+
+			Expect(k8sClient.Update(ctx, fetched)).To(Succeed())
+
+			By("Reconciling again after update")
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      secondModelServiceName,
+					Namespace: namespace,
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: deploymentName(secondModelService, "decode"), Namespace: namespace}, &decodeDeployment)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+			Expect(decodeDeployment.Spec.Replicas).Should(Equal(&replicas))
+
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: deploymentName(secondModelService, "prefill"), Namespace: namespace}, &prefillDeployment)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+			Expect(prefillDeployment.Spec.Replicas).Should(Equal(&replicas))
+
 		})
 
 	})
