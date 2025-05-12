@@ -186,7 +186,7 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// TODO: Post-process for decoupled Scaling
 	log.FromContext(ctx).V(1).Info("creating or updating child resources now")
 
-	errs := interpolatedBaseConfig.invokeCreateOrUpdate(ctx, r)
+	errs := interpolatedBaseConfig.invokeCreateOrUpdate(ctx, r, interpolatedModelService)
 
 	if len(errs) > 0 {
 		log.FromContext(ctx).Error(fmt.Errorf("problem creating %d child resources", len(errs)), "createOrUpdate failed")

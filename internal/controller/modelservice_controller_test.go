@@ -248,6 +248,7 @@ var _ = Describe("ModelService Controller", func() {
 			key := client.ObjectKey{Name: cm.Name, Namespace: cm.Namespace}
 			err = k8sClient.Get(ctx, key, &fetched)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(fetched.Data).To(HaveKey("configMaps"))
 			Expect(fetched.Data).To(HaveKey("decodeDeployment"))
 
 			By("Creating the ModelService CR")
