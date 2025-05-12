@@ -54,9 +54,6 @@ type BaseConfig struct {
 	EPPServiceAccount *corev1.ServiceAccount      `json:"eppServiceAccount,omitempty"`
 	PDServiceAccount  *corev1.ServiceAccount      `json:"pdServiceAccount,omitempty"`
 	EPPRoleBinding    *rbacv1.RoleBinding         `json:"eppRoleBinding,omitempty"`
-
-	// TODO: we should rm this, PDs don't need role bindings
-	PDRoleBinding *rbacv1.RoleBinding `json:"pdRoleBinding,omitempty"`
 }
 
 // shouldCreateConfigMaps returns True if there is at least one ConfigMap to be created
