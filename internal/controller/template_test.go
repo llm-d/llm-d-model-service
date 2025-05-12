@@ -61,19 +61,23 @@ func TestMSVCInterpolation(t *testing.T) {
 		{
 			name: "one interpolation required in args should pass",
 			originalMSVC: createMSVCWithDecode(&msv1alpha1.PDSpec{
-				Containers: []msv1alpha1.ContainerSpec{
-					{
-						Args: []string{
-							"{{ .ModelPath }}",
+				ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
+					Containers: []msv1alpha1.ContainerSpec{
+						{
+							Args: []string{
+								"{{ .ModelPath }}",
+							},
 						},
 					},
 				},
 			}),
 			expectedMSVC: createMSVCWithDecode(&msv1alpha1.PDSpec{
-				Containers: []msv1alpha1.ContainerSpec{
-					{
-						Args: []string{
-							"path/to/model",
+				ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
+					Containers: []msv1alpha1.ContainerSpec{
+						{
+							Args: []string{
+								"path/to/model",
+							},
 						},
 					},
 				},
@@ -83,23 +87,27 @@ func TestMSVCInterpolation(t *testing.T) {
 		{
 			name: "1+ interpolation required in args should pass",
 			originalMSVC: createMSVCWithDecode(&msv1alpha1.PDSpec{
-				Containers: []msv1alpha1.ContainerSpec{
-					{
-						Args: []string{
-							"{{ .ModelPath }}",
-							"--arg2",
-							"{{ .DecodeDeploymentName }}",
+				ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
+					Containers: []msv1alpha1.ContainerSpec{
+						{
+							Args: []string{
+								"{{ .ModelPath }}",
+								"--arg2",
+								"{{ .DecodeDeploymentName }}",
+							},
 						},
 					},
 				},
 			}),
 			expectedMSVC: createMSVCWithDecode(&msv1alpha1.PDSpec{
-				Containers: []msv1alpha1.ContainerSpec{
-					{
-						Args: []string{
-							"path/to/model",
-							"--arg2",
-							"decode", // this msvc has no name, so decode deployment name is just decode
+				ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
+					Containers: []msv1alpha1.ContainerSpec{
+						{
+							Args: []string{
+								"path/to/model",
+								"--arg2",
+								"decode", // this msvc has no name, so decode deployment name is just decode
+							},
 						},
 					},
 				},

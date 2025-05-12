@@ -203,8 +203,8 @@ type ModelArtifacts struct {
 	Size *res.Quantity `json:"size,omitempty"`
 }
 
-// PDSpec defines the specification for prefill and decode deployments created by ModelService.
-type PDSpec struct {
+// ModelServicePodSpec defines the specification for pod templates that will be created by ModelService.
+type ModelServicePodSpec struct {
 	// Replicas defines the desired number of replicas for this deployment.
 	//
 	// +optional
@@ -212,6 +212,20 @@ type PDSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
 	Replicas *int32 `json:"replicas,omitempty"`
+	// Container holds vllm container container details that will be overridden from base config when present.
+	//
+	// +optional
+	Containers []ContainerSpec `json:"containers,omitempty"`
+	// InitContainers holds vllm init container details that will be overridden from base config when present.
+	//
+	// +optional
+	InitContainers []ContainerSpec `json:"initContainers,omitempty"`
+}
+
+// PDSpec defines the specification for prefill and decode deployments created by ModelService.
+type PDSpec struct {
+	//
+	ModelServicePodSpec `json:",inline"`
 	// vllm
 	// Parallelism specifies vllm parallelism that will be overridden from base config when present.
 	//
@@ -224,15 +238,6 @@ type PDSpec struct {
 	//
 	// +optional
 	AcceleratorTypes *AcceleratorTypes `json:"acceleratorTypes,omitempty"`
-
-	// Container holds vllm container container details that will be overridden from base config when present.
-	//
-	// +optional
-	Containers []ContainerSpec `json:"containers,omitempty"`
-	// InitContainers holds vllm init container details that will be overridden from base config when present.
-	//
-	// +optional
-	InitContainers []ContainerSpec `json:"initContainers,omitempty"`
 }
 
 // ConvertToContainerSlice converts []Containers to []corev1.Container
