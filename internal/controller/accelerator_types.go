@@ -1,8 +1,9 @@
-package v1alpha1
+package controller
 
 import (
 	"fmt"
 
+	"github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -10,7 +11,7 @@ import (
 // the specified accelerator label key and one of the allowed values.
 //
 // Returns an error if LabelKey is empty or LabelValues is empty.
-func (a *AcceleratorTypes) ToNodeAffinity() (*corev1.NodeAffinity, error) {
+func AcceleratorTypesToNodeAffinity(a *v1alpha1.AcceleratorTypes) (*corev1.NodeAffinity, error) {
 	if a == nil {
 		return nil, nil
 	}
