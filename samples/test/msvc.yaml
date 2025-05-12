@@ -10,6 +10,11 @@ spec:
 
   routing: 
     modelName: llama-2075
+    ports:
+    - name: inport
+      port: 80
+    - name: outport
+      port: 9376
 
   modelArtifacts:
     uri: pvc://llama-of-the-future/path/to/llama-2075

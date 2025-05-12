@@ -10,6 +10,9 @@ spec:
 
   routing: 
     modelName: ibm-granite/granite-3.3-2b-base
+    ports:
+    - name: app_port
+      port: 8000
 
   modelArtifacts:
     uri: hf://ibm-granite/granite-3.3-2b-base

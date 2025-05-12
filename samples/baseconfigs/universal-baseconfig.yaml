@@ -1,4 +1,9 @@
-# Source: https://github.com/neuralmagic/llm-d-routing-sidecar/tree/dev/test/config/nixl
+# Based on: https://github.com/neuralmagic/llm-d-routing-sidecar/tree/dev/test/config/nixl
+#
+# Requirements:
+# Any consuming ModelService should define ports labeled:
+#    - app_port - the external port number for the prefill and decode pods
+#    - internal_port - the port number used by the sidecar to communicate with a vllm container
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -19,11 +24,11 @@ data:
                 runAsNonRoot: true
               args:
                 # Note: this port has to match the prefill port
-                - "--port=8000"
-                - "--vllm-port=8200"
+                - "--port={{ "app_port" | getPort }}"
+                - "--vllm-port={{ "internal_port" | getPort }}"
                 - "--connector=nixl"
               ports:
-                - containerPort: 8000
+                - containerPort: {{ "app_port" | getPort }}
                   protocol: TCP
               restartPolicy: Always
           containers:
@@ -36,7 +41,7 @@ data:
                 allowPrivilegeEscalation: false
               args:
                 - "--port"
-                - "8200"
+                - "{{ "internal_port" | getPort }}"
                 - "--enforce-eager"
                 - "--kv-transfer-config"
                 - '{"kv_connector":"NixlConnector","kv_role":"kv_both"}'
@@ -84,7 +89,7 @@ data:
               args:
                 # Note: this port has to match the proxy --port arg
                 - "--port"
-                - "8000"
+                - "{{ "app_port" | getPort }}"
                 - "--enforce-eager"
                 - "--kv-transfer-config"
                 - '{"kv_connector":"NixlConnector","kv_role":"kv_both"}'
@@ -104,7 +109,7 @@ data:
                 - name: HF_HUB_CACHE
                   value: /vllm-workspace/models
               ports:
-                - containerPort: 8000
+                - containerPort: {{ "app_port" | getPort }}
                   protocol: TCP
                 - containerPort: 5557
                   protocol: TCP
@@ -191,7 +196,7 @@ data:
     apiVersion: inference.networking.x-k8s.io/v1alpha2
     kind: InferencePool
     spec:
-      targetPortNumber: 8000
+      targetPortNumber: {{ "app_port" | getPort }}
   
   inferenceModel: |
     apiVersion: inference.networking.x-k8s.io/v1alpha2
