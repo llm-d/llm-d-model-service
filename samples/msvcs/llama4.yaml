@@ -10,6 +10,11 @@ spec:
 
   routing: 
     modelName: meta-llama/Llama-4-Scout-17B-16E
+    ports:
+    - name: app_port
+      port: 8000
+    - name: internal_port
+      port: 8200
 
   modelArtifacts:
     # When specfying the URI with `pvc` prefix, the string after the pvc name (llama-pvc)

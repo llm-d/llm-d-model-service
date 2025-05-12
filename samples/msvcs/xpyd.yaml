@@ -10,6 +10,11 @@ spec:
 
   routing: 
     modelName: facebook/opt-125m
+    ports:
+    - name: app_port
+      port: 8000
+    - name: internal_port
+      port: 8200
 
   modelArtifacts:
     uri: pvc://facebook-pvc/path/to/opt-125m
