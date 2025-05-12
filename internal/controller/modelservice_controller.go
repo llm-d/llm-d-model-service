@@ -76,6 +76,7 @@ type TemplateVars struct {
 	HFModelName           string `json:"hfModelName,omitempty"`
 	SanitizedModelName    string `json:"sanitizedModelName,omitempty"`
 	ModelPath             string `json:"modelPath,omitempty"`
+	AuthSecretName        string `json:"authSecretName,omitempty"`
 	EPPServiceName        string `json:"eppServiceName,omitempty"`
 	EPPDeploymentName     string `json:"eppDeploymentName,omitempty"`
 	PrefillDeploymentName string `json:"prefillDeploymentName,omitempty"`
@@ -111,6 +112,10 @@ func (t *TemplateVars) from(ctx context.Context, msvc *msv1alpha1.ModelService) 
 	t.InferenceModelName = infModelName(msvc)
 	t.ModelName = msvc.Spec.Routing.ModelName
 	t.SanitizedModelName = sanitizeModelName(msvc)
+
+	if msvc.Spec.ModelArtifacts.AuthSecretName != nil {
+		t.AuthSecretName = *msvc.Spec.ModelArtifacts.AuthSecretName
+	}
 
 	uri := msvc.Spec.ModelArtifacts.URI
 	if strings.HasPrefix(uri, HF_PREFIX) {
