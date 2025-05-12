@@ -26,9 +26,6 @@ spec:
     - name: "proxy"
       args: 
       - "{{ .ModelPath }}"
-      env:
-      - name: FOO
-        value: BAR
     containers:
     - name: "llm"
       image: busybox
