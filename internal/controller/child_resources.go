@@ -519,8 +519,8 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 	}
 
 	// Step 4: populate containers
-	depl.Spec.Template.Spec.Containers = msv1alpha1.ConvertToContainerSlice(pdSpec.Containers)
-	depl.Spec.Template.Spec.InitContainers = msv1alpha1.ConvertToContainerSlice(pdSpec.InitContainers)
+	depl.Spec.Template.Spec.Containers = ConvertToContainerSlice(pdSpec.Containers)
+	depl.Spec.Template.Spec.InitContainers = ConvertToContainerSlice(pdSpec.InitContainers)
 
 	// Step 5: populate nodeaffinity
 	// AcceleratorTypes maybe nil... TODO: check

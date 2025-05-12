@@ -23,14 +23,37 @@ import (
 
 	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+const msvcName = "msvc-test"
+const msvcNamespace = "default"
+const modelName = "modelName"
+const sanitizedModelName = "modelname"
+const pvcName = "pvc-name"
+const modelPath = "path/to/" + modelName
+const pvcURI = "pvc://" + pvcName + "/" + modelPath
+const hfModelName = pvcName + "/" + modelName
+const hfURI = "hf://" + hfModelName
+const authSecretName = "hf-secret"
+
+var authSecretNameCopy = authSecretName
+var authSecretNamePtr = &authSecretNameCopy // ugly workaround ModelArtifacts.AuthSecretName is *strings
 
 // returns a minimal valid msvc
 func minimalMSVC() *msv1alpha1.ModelService {
 	return &msv1alpha1.ModelService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      msvcName,
+			Namespace: msvcNamespace,
+		},
 		Spec: msv1alpha1.ModelServiceSpec{
+			Routing: msv1alpha1.Routing{
+				ModelName: modelName,
+			},
 			ModelArtifacts: msv1alpha1.ModelArtifacts{
-				URI: "pvc://pvc-name/path/to/model",
+				URI:            pvcURI,
+				AuthSecretName: authSecretNamePtr,
 			},
 		},
 	}
@@ -42,6 +65,91 @@ func createMSVCWithDecode(decodeSpec *msv1alpha1.PDSpec) *msv1alpha1.ModelServic
 	minimalMSVC := minimalMSVC()
 	minimalMSVC.Spec.Decode = decodeSpec
 	return minimalMSVC
+}
+
+func TestTemplateVars(t *testing.T) {
+	// Test that each template var can be interpolated in MSVC
+
+	tests := map[string]struct {
+		expectedValue string
+		uri           string
+	}{
+		"ModelServiceName": {
+			expectedValue: msvcName,
+		},
+		"ModelServiceNamespace": {
+			expectedValue: msvcNamespace,
+		},
+		"ModelName": {
+			expectedValue: modelName,
+		},
+		"HFModelName": {
+			expectedValue: hfModelName,
+			uri:           hfURI,
+		},
+		"SanitizedModelName": {
+			expectedValue: sanitizedModelName,
+		},
+		"ModelPath": {
+			expectedValue: modelPath,
+		},
+		"AuthSecretName": {
+			expectedValue: authSecretName,
+		},
+		"EPPServiceName": {
+			expectedValue: msvcName + "-epp-service",
+		},
+		"EPPDeploymentName": {
+			expectedValue: msvcName + "-epp",
+		},
+		"PrefillDeploymentName": {
+			expectedValue: msvcName + "-prefill",
+		},
+		"DecodeDeploymentName": {
+			expectedValue: msvcName + "-decode",
+		},
+		"PrefillServiceName": {
+			expectedValue: msvcName + "-service-prefill",
+		},
+		"DecodeServiceName": {
+			expectedValue: msvcName + "-service-decode",
+		},
+		"InferencePoolName": {
+			expectedValue: msvcName + "-inference-pool",
+		},
+		"InferenceModelName": {
+			expectedValue: msvcName,
+		},
+	}
+
+	for templateVar, testCase := range tests {
+		ctx := context.Background()
+
+		minimalMSVC := createMSVCWithDecode(&msv1alpha1.PDSpec{
+			ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
+				Containers: []msv1alpha1.ContainerSpec{
+					{
+						Args: []string{
+							// This becomes, for example, {{ .ModelService }}
+							fmt.Sprintf("{{ .%s }}", templateVar),
+						},
+					},
+				},
+			},
+		})
+
+		if testCase.uri != "" {
+			minimalMSVC.Spec.ModelArtifacts.URI = testCase.uri
+		}
+
+		interpolatedMSVC, err := InterpolateModelService(ctx, minimalMSVC)
+		assert.NoError(t, err, "got error but expected none")
+
+		// Assert that the template var is interpolated and the expected values match
+		// Check that Args[0] matches
+		actualValue := interpolatedMSVC.Spec.Decode.Containers[0].Args[0]
+		assert.Equal(t, testCase.expectedValue, actualValue, fmt.Sprintf("%s should be interpolated", templateVar))
+	}
 }
 
 func TestMSVCInterpolation(t *testing.T) {
@@ -76,7 +184,7 @@ func TestMSVCInterpolation(t *testing.T) {
 					Containers: []msv1alpha1.ContainerSpec{
 						{
 							Args: []string{
-								"path/to/model",
+								modelPath,
 							},
 						},
 					},
@@ -104,9 +212,9 @@ func TestMSVCInterpolation(t *testing.T) {
 					Containers: []msv1alpha1.ContainerSpec{
 						{
 							Args: []string{
-								"path/to/model",
+								modelPath,
 								"--arg2",
-								"decode", // this msvc has no name, so decode deployment name is just decode
+								msvcName + "-decode",
 							},
 						},
 					},

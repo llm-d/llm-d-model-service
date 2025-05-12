@@ -240,29 +240,6 @@ type PDSpec struct {
 	AcceleratorTypes *AcceleratorTypes `json:"acceleratorTypes,omitempty"`
 }
 
-// ConvertToContainerSlice converts []Containers to []corev1.Container
-func ConvertToContainerSlice(c []ContainerSpec) []corev1.Container {
-
-	containerSlice := make([]corev1.Container, len(c))
-
-	for i, containerSpec := range c {
-		containerSlice[i] = corev1.Container{
-			Name:      containerSpec.Name,
-			Command:   containerSpec.Command,
-			Args:      containerSpec.Args,
-			Env:       containerSpec.Env,
-			EnvFrom:   containerSpec.EnvFrom,
-			Resources: containerSpec.Resources,
-		}
-
-		if c[i].Image != nil {
-			containerSlice[i].Image = *c[i].Image
-		}
-	}
-
-	return containerSlice
-}
-
 // Parallelism defines parallelism behavior for vllm.
 type Parallelism struct {
 	// // NodeParallelism is the number of required nodes
