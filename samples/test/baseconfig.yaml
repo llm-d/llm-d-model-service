@@ -20,8 +20,8 @@ data:
         app.kubernetes.io/name: decodeServiceLabelInBaseConfig
       ports:
         - protocol: TCP
-          port: 80
-          targetPort: 9376
+          port: {{ "inport" | getPort }}
+          targetPort: {{ "outport" | getPort }}
   
   # This service should not be created bc prefill doesn't exist in basemsvc.yaml
   prefillService: |
@@ -30,8 +30,8 @@ data:
         app.kubernetes.io/name: prefillServiceLabelInBaseConfig
       ports:
         - protocol: TCP
-          port: 80
-          targetPort: 9376
+          port: {{ "inport" | getPort }}
+          targetPort: {{ "outport" | getPort }}
 
   inferenceModel: |
     spec:
@@ -39,7 +39,7 @@ data:
   
   inferencePool: |
     spec:
-      targetPortNumber: 9376
+      targetPortNumber: {{ "outport" | getPort }}
   eppDeployment: |
     apiVersion: apps/v1
     kind: Deployment

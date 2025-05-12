@@ -176,6 +176,11 @@ type Routing struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="modelName is immutable"
 	ModelName string `json:"modelName"`
+
+	// Ports is a list of named ports
+	// These can be referenced by name in configuration of base configuration or model services
+	// +optional
+	Ports []Port `json:"ports,omitempty"`
 }
 
 // ModelArtifacts describes the source of the model
@@ -208,7 +213,7 @@ type PDSpec struct {
 	// +kubebuilder:default=1
 	Replicas *int32 `json:"replicas,omitempty"`
 	// vllm
-	// Parallelism specifies vllm parallelism that will be overriden from base config when present.
+	// Parallelism specifies vllm parallelism that will be overridden from base config when present.
 	//
 	// +optional
 	Parallelism *Parallelism `json:"parallelism,omitempty"`
@@ -220,11 +225,11 @@ type PDSpec struct {
 	// +optional
 	AcceleratorTypes *AcceleratorTypes `json:"acceleratorTypes,omitempty"`
 
-	// Container holds vllm container container details that will be overriden from base config when present.
+	// Container holds vllm container container details that will be overridden from base config when present.
 	//
 	// +optional
 	Containers []ContainerSpec `json:"containers,omitempty"`
-	// InitContainers holds vllm init container details that will be overriden from base config when present.
+	// InitContainers holds vllm init container details that will be overridden from base config when present.
 	//
 	// +optional
 	InitContainers []ContainerSpec `json:"initContainers,omitempty"`
@@ -333,6 +338,16 @@ type ModelServiceStatus struct {
 	// Condition types should be prefixed to indicate their origin
 	// Example types: "PrefillAvailable", "DecodeProgressing", etc.
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
+type Port struct {
+	// Name that can be used in place of port number in templates
+	// +required
+	Name string `json:"name"`
+	// Value of port
+	// +kubebuilder:validation:Minimum=1
+	// +required
+	Port int32 `json:"port"`
 }
 
 func init() {

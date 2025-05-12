@@ -1,5 +1,10 @@
 # A simple baseconfig to serve a model downloaded from Hugging Face without a token on a pod
 # Make sure that the model can fit on the sizeLimit specified
+#
+# Requirements:
+# Any consuming ModelService should define ports labeled:
+#    - app_port - the external port number for the prefill and decode pods
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -22,7 +27,7 @@ data:
                 allowPrivilegeEscalation: false
               args:
                 - "--port"
-                - "8000"
+                - "{{ "app_port" | getPort }"
               env:
                 - name: CUDA_VISIBLE_DEVICES
                   value: "0"
@@ -53,6 +58,6 @@ data:
       clusterIP: None
       ports:
       - name: vllm
-        port: 8000
+        port: {{ "app_port" | getPort }
         protocol: TCP
   
