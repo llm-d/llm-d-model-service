@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
 	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -218,4 +219,27 @@ func sanitizeName(s string) (string, error) {
 	}
 
 	return s, nil
+}
+
+// ConvertToContainerSlice converts []Containers to []corev1.Container
+func ConvertToContainerSlice(c []v1alpha1.ContainerSpec) []corev1.Container {
+
+	containerSlice := make([]corev1.Container, len(c))
+
+	for i, containerSpec := range c {
+		containerSlice[i] = corev1.Container{
+			Name:      containerSpec.Name,
+			Command:   containerSpec.Command,
+			Args:      containerSpec.Args,
+			Env:       containerSpec.Env,
+			EnvFrom:   containerSpec.EnvFrom,
+			Resources: containerSpec.Resources,
+		}
+
+		if c[i].Image != nil {
+			containerSlice[i].Image = *c[i].Image
+		}
+	}
+
+	return containerSlice
 }
