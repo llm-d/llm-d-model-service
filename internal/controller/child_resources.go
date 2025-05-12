@@ -724,65 +724,65 @@ func (childResource *BaseConfig) setEPPRoleBinding(ctx context.Context, msvc *ms
 
 }
 
-// createOrUpdate all the child resources
-func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelServiceReconciler, decoupleScaling bool) error {
-	// create or update configmaps
-	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate configmaps")
-	childResource.createOrUpdateConfigMaps(ctx, r)
+// // createOrUpdate all the child resources
+// func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelServiceReconciler, decoupleScaling bool) error {
+// 	// create or update configmaps
+// 	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate configmaps")
+// 	childResource.createOrUpdateConfigMaps(ctx, r)
 
-	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate prefill deployment")
-	childResource.createOrUpdatePDDeployment(ctx, r, PREFILL_ROLE, decoupleScaling)
+// 	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate prefill deployment")
+// 	childResource.createOrUpdatePDDeployment(ctx, r, PREFILL_ROLE, decoupleScaling)
 
-	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate decode deployment")
-	childResource.createOrUpdatePDDeployment(ctx, r, DECODE_ROLE, decoupleScaling)
+// 	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate decode deployment")
+// 	childResource.createOrUpdatePDDeployment(ctx, r, DECODE_ROLE, decoupleScaling)
 
-	// Create or update services only if corresponding deployment exists in childResources
-	childResource.createOrUpdateServiceForDeployment(ctx, r, PREFILL_ROLE)
-	childResource.createOrUpdateServiceForDeployment(ctx, r, DECODE_ROLE)
+// 	// Create or update services only if corresponding deployment exists in childResources
+// 	childResource.createOrUpdateServiceForDeployment(ctx, r, PREFILL_ROLE)
+// 	childResource.createOrUpdateServiceForDeployment(ctx, r, DECODE_ROLE)
 
-	// create of update inference pool
-	childResource.createOrUpdateInferencePool(ctx, r)
+// 	// create of update inference pool
+// 	childResource.createOrUpdateInferencePool(ctx, r)
 
-	// create of update inference model
-	childResource.createOrUpdateInferenceModel(ctx, r)
+// 	// create of update inference model
+// 	childResource.createOrUpdateInferenceModel(ctx, r)
 
-	if childResource.EPPDeployment != nil {
-		err := childResource.createEppDeployment(ctx, r.Client)
-		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "unable to create epp deployment")
-		}
-	}
+// 	if childResource.EPPDeployment != nil {
+// 		err := childResource.createEppDeployment(ctx, r.Client)
+// 		if err != nil {
+// 			log.FromContext(ctx).V(1).Error(err, "unable to create epp deployment")
+// 		}
+// 	}
 
-	if childResource.EPPService != nil {
-		err := childResource.createEppService(ctx, r.Client)
-		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "unable to create epp service")
-		}
-	}
+// 	if childResource.EPPService != nil {
+// 		err := childResource.createEppService(ctx, r.Client)
+// 		if err != nil {
+// 			log.FromContext(ctx).V(1).Error(err, "unable to create epp service")
+// 		}
+// 	}
 
-	if childResource.EPPServiceAccount != nil {
-		err := childResource.createEppServiceAccount(ctx, r.Client)
-		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
-		}
-	}
+// 	if childResource.EPPServiceAccount != nil {
+// 		err := childResource.createEppServiceAccount(ctx, r.Client)
+// 		if err != nil {
+// 			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
+// 		}
+// 	}
 
-	if childResource.EPPRoleBinding != nil {
-		err := childResource.createEppRoleBinding(ctx, r.Client)
-		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
-		}
-	}
+// 	if childResource.EPPRoleBinding != nil {
+// 		err := childResource.createEppRoleBinding(ctx, r.Client)
+// 		if err != nil {
+// 			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
+// 		}
+// 	}
 
-	if childResource.PDServiceAccount != nil {
-		err := childResource.createPDServiceAccount(ctx, r.Client)
-		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
-		}
-	}
+// 	if childResource.PDServiceAccount != nil {
+// 		err := childResource.createPDServiceAccount(ctx, r.Client)
+// 		if err != nil {
+// 			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 func (childResource *BaseConfig) createOrUpdateInferenceModel(ctx context.Context, r *ModelServiceReconciler) {
 	// nothing to do without inf model
