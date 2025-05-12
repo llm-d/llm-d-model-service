@@ -866,6 +866,7 @@ func (childResources *BaseConfig) mergeEppDeployment(ctx context.Context, msvc *
 	if childResources == nil || childResources.EPPDeployment == nil {
 		return childResources
 	}
+
 	eppLabels := map[string]string{
 		"llm-d.ai/epp": eppDeploymentName(msvc),
 	}
@@ -891,6 +892,14 @@ func (childResources *BaseConfig) mergeEppDeployment(ctx context.Context, msvc *
 	src.Spec.Template.ObjectMeta = metav1.ObjectMeta{
 		Labels: eppLabels,
 	}
+
+	modelSrvPodSpec := &msv1alpha1.ModelServicePodSpec{}
+	if msvc.Spec.EndpointPicker != nil {
+		modelSrvPodSpec = msvc.Spec.EndpointPicker
+	}
+	src.Spec.Replicas = modelSrvPodSpec.Replicas
+	src.Spec.Template.Spec.Containers = ConvertToContainerSlice(modelSrvPodSpec.Containers)
+	src.Spec.Template.Spec.InitContainers = ConvertToContainerSlice(modelSrvPodSpec.InitContainers)
 
 	// set epp service account name
 	src.Spec.Template.Spec.ServiceAccountName = eppServiceAccountName(msvc)

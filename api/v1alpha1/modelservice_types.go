@@ -71,6 +71,10 @@ type ModelServiceSpec struct {
 	//
 	// +optional
 	Prefill *PDSpec `json:"prefill,omitempty"`
+	// EndpointPicker is the endpoint picker (epp) portion of the spec
+	//
+	// +optional
+	EndpointPicker *ModelServicePodSpec `json:"endpointPicker,omitempty"`
 }
 
 // ModelServiceList contains a list of ModelService

@@ -12,6 +12,9 @@ data:
           - name: llm
             command:
             - sleep
+            env:
+            - name: TEST
+              value: TRIAL
 
   # Note that this label is preserved and our labels are added
   decodeService: |
