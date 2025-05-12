@@ -1,7 +1,7 @@
 apiVersion: llm-d.ai/v1alpha1
 kind: ModelService
 metadata:
-  name: facebook-opt-125m
+  name: facebook-opt-125m-xpyd
 spec:
   decoupleScaling: false
 
@@ -12,18 +12,17 @@ spec:
     modelName: facebook/opt-125m
 
   modelArtifacts:
-    uri: hf://facebook/opt-125m
+    uri: pvc://facebook-pvc/path/to/opt-125m
 
   # describe decode pods
   decode:
-    replicas: 1
+    # Note a different replica count from spec.prefill.replicas
+    replicas: 2
     containers:
-    - name: "vllm" 
-      args: 
-        - '{{ .HFModelName }}'
-    
-    # TODO: override or append for node affinity?
-    # should be requiredDuringSchedulingIgnoredDuringExecution
+    - name: "vllm"
+      args:
+      # Comes from baseconfig's volume mounts path
+      - '/stored/models/{{ .ModelPath }}'
     acceleratorTypes:
       labelKey: nvidia.com/gpu.product
       labelValues:
@@ -33,9 +32,10 @@ spec:
   prefill:
     replicas: 1
     containers:
-    - name: "vllm" 
-      args: 
-        - '{{ .HFModelName }}'
+    - name: "vllm"
+      args:
+      # Comes from baseconfig's volume mounts path
+      - '/stored/models/{{ .ModelPath }}'
     acceleratorTypes:
       labelKey: nvidia.com/gpu.product
       labelValues:

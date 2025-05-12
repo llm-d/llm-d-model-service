@@ -228,10 +228,6 @@ type PDSpec struct {
 	//
 	// +optional
 	InitContainers []ContainerSpec `json:"initContainers,omitempty"`
-	// EmphemeralContainers holds vllm ephemeral container details that will be overriden from base config when present.
-	//
-	// +optional
-	EphemeralContainers []ContainerSpec `json:"ephemeralContainers,omitempty"`
 }
 
 // ConvertToContainerSlice converts []Containers to []corev1.Container
@@ -345,15 +341,15 @@ type ModelServiceStatus struct {
 	ConfigMapNames []string `json:"configMapNames,omitempty"`
 
 	// READY and AVAILABLE for prefill
-	PrefillReady     string `json:"prefillReady,omitempty"` // e.g. "1/1"
+	PrefillReady     string `json:"prefillReady"` // e.g. "1/1"
 	PrefillAvailable int32  `json:"prefillAvailable"`
 
 	// READY and AVAILABLE for decode
-	DecodeReady     string `json:"decodeReady,omitempty"`
+	DecodeReady     string `json:"decodeReady"`
 	DecodeAvailable int32  `json:"decodeAvailable"`
 
 	// READY and AVAILABLE for Epp
-	EppReady     string `json:"eppReady,omitempty"`
+	EppReady     string `json:"eppReady"`
 	EppAvailable int32  `json:"eppAvailable"`
 
 	// Combined deployment conditions from prefill and decode deployments

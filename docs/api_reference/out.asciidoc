@@ -1,0 +1,381 @@
+// Generated documentation. Please do not edit.
+:anchor_prefix: k8s-api
+
+[id="{p}-api-reference"]
+== API Reference
+
+.Packages
+- xref:{anchor_prefix}-llm-d-ai-v1alpha1[$$llm-d.ai/v1alpha1$$]
+
+
+[id="{anchor_prefix}-llm-d-ai-v1alpha1"]
+=== llm-d.ai/v1alpha1
+
+Package v1alpha1 contains API Schema definitions for the llmd v1alpha1 API group.
+
+.Resource Types
+- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservice[$$ModelService$$]
+- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicelist[$$ModelServiceList$$]
+
+
+
+[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-acceleratortypes"]
+==== AcceleratorTypes
+
+
+
+AcceleratorTypes specifies set of accelerators for scheduling.
+
+
+
+.Appears In:
+****
+- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-pdspec[$$PDSpec$$]
+****
+
+[cols="20a,50a,15a,15a", options="header"]
+|===
+| Field | Description | Default | Validation
+| *`labelKey`* __string__ | node label key that identifies the accelerator type for the node +
+e.g., nvidia.com/gpu.product + |  | 
+| *`labelValues`* __string array__ | node label values that will be matched against for pod scheduling. +
+e.g., [A100, H100] + |  | MinItems: 1 +
+
+|===
+
+
+[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-containerspec"]
+==== ContainerSpec
+
+
+
+ContainerSpec defines container-level configuration.
+
+
+
+.Appears In:
+****
+- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-pdspec[$$PDSpec$$]
+****
+
+[cols="20a,50a,15a,15a", options="header"]
+|===
+| Field | Description | Default | Validation
+| *`name`* __string__ | Name of the container specified as a DNS_LABEL. +
+Each container in a pod must have a unique name (DNS_LABEL). +
+Cannot be updated. + |  | 
+| *`image`* __string__ | Image that is used to spawn container if present will override base config + |  | 
+| *`command`* __string array__ | Entrypoint array. Not executed within a shell. +
+The container image's ENTRYPOINT is used if this is not provided. +
+Variable references $(VAR_NAME) are expanded using the container's environment. If a variable +
+cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced +
+to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will +
+produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless +
+of whether the variable exists or not. Cannot be updated. +
+More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell + |  | 
+| *`args`* __string array__ | Arguments to the entrypoint. +
+The container image's CMD is used if this is not provided. +
+Variable references $(VAR_NAME) are expanded using the container's environment. If a variable +
+cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced +
+to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will +
+produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless +
+of whether the variable exists or not. Cannot be updated. +
+More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell + |  | 
+| *`env`* __link:https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#envvar-v1-core[$$EnvVar$$] array__ | List of environment variables to set in the container. +
+Cannot be updated. + |  | 
+| *`envFrom`* __link:https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#envfromsource-v1-core[$$EnvFromSource$$] array__ | List of sources to populate environment variables in the container. +
+The keys defined within a source must be a C_IDENTIFIER. All invalid keys +
+will be reported as an event when the container is starting. When a key exists in multiple +
+sources, the value associated with the last source will take precedence. +
+Values defined by an Env with a duplicate key will take precedence. +
+Cannot be updated. + |  | 
+| *`resources`* __link:https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#resourcerequirements-v1-core[$$ResourceRequirements$$]__ | Compute Resources required by this container. +
+Cannot be updated. +
+More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ + |  | 
+|===
+
+
+[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelartifacts"]
+==== ModelArtifacts
+
+
+
+ModelArtifacts describes the source of the model
+
+
+
+.Appears In:
+****
+- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicespec[$$ModelServiceSpec$$]
+****
+
+[cols="20a,50a,15a,15a", options="header"]
+|===
+| Field | Description | Default | Validation
+| *`uri`* __string__ | URI is the model URI +
+Three types of URIs are support to enable models packaged as images (oci://<image-repo>/<image-name><:image-tag>), +
+models downloaded from HuggingFace (hf://<model-repo>/<model-name>) +
+and pre-existing models loaded from a volume-mounted PVC (pvc://model-path) + |  | 
+| *`authSecretName`* __string__ | Name of the authentication secret. Contains HF_TOKEN + |  | 
+| *`size`* __xref:{anchor_prefix}-k8s-io-apimachinery-pkg-api-resource-quantity[$$Quantity$$]__ | Size of the model artifacts on disk +
+ensure Size is large enough when providing hf://... URI + |  | 
+|===
+
+
+[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservice"]
+==== ModelService
+
+
+
+ModelService is the Schema for the modelservices API.
+
+
+
+.Appears In:
+****
+- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicelist[$$ModelServiceList$$]
+****
+
+[cols="20a,50a,15a,15a", options="header"]
+|===
+| Field | Description | Default | Validation
+| *`apiVersion`* __string__ | `llm-d.ai/v1alpha1` | |
+| *`kind`* __string__ | `ModelService` | |
+| *`kind`* __string__ | Kind is a string value representing the REST resource this object represents. +
+Servers may infer this from the endpoint the client submits requests to. +
+Cannot be updated. +
+In CamelCase. +
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds + |  | 
+| *`apiVersion`* __string__ | APIVersion defines the versioned schema of this representation of an object. +
+Servers should convert recognized schemas to the latest internal value, and +
+may reject unrecognized values. +
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources + |  | 
+| *`metadata`* __link:https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#objectmeta-v1-meta[$$ObjectMeta$$]__ | Refer to Kubernetes API documentation for fields of `metadata`.
+ |  | 
+| *`spec`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicespec[$$ModelServiceSpec$$]__ |  |  | 
+| *`status`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicestatus[$$ModelServiceStatus$$]__ |  |  | 
+|===
+
+
+[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicelist"]
+==== ModelServiceList
+
+
+
+ModelServiceList contains a list of ModelService
+
+
+
+
+
+[cols="20a,50a,15a,15a", options="header"]
+|===
+| Field | Description | Default | Validation
+| *`apiVersion`* __string__ | `llm-d.ai/v1alpha1` | |
+| *`kind`* __string__ | `ModelServiceList` | |
+| *`kind`* __string__ | Kind is a string value representing the REST resource this object represents. +
+Servers may infer this from the endpoint the client submits requests to. +
+Cannot be updated. +
+In CamelCase. +
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds + |  | 
+| *`apiVersion`* __string__ | APIVersion defines the versioned schema of this representation of an object. +
+Servers should convert recognized schemas to the latest internal value, and +
+may reject unrecognized values. +
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources + |  | 
+| *`metadata`* __link:https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#listmeta-v1-meta[$$ListMeta$$]__ | Refer to Kubernetes API documentation for fields of `metadata`.
+ |  | 
+| *`items`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservice[$$ModelService$$] array__ |  |  | 
+|===
+
+
+[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicespec"]
+==== ModelServiceSpec
+
+
+
+ModelServiceSpec defines the desired state of ModelService
+
+
+
+.Appears In:
+****
+- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservice[$$ModelService$$]
+****
+
+[cols="20a,50a,15a,15a", options="header"]
+|===
+| Field | Description | Default | Validation
+| *`baseConfigMapRef`* __link:https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#objectreference-v1-core[$$ObjectReference$$]__ | BaseConfigMapRef provides configuration needed to spawn objects owned by modelservice + |  | 
+| *`routing`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-routing[$$Routing$$]__ | Routing provides information needed to create configuration for routing + |  | 
+| *`modelArtifacts`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelartifacts[$$ModelArtifacts$$]__ | modelArtifacts provides information needed to download artifacts +
+needed to serve a model + |  | 
+| *`decoupleScaling`* __boolean__ | DecoupleScaling determines who owns the replica fields is the deployment objects +
+Set this to true if the intent is to autoscale with HPA, other autoscalers +
+Setting this to false will force the controller to manage deployment replicas based on +
+replica fields in this model service + |  | 
+| *`decode`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-pdspec[$$PDSpec$$]__ | Decode is the decode portion of the spec + |  | 
+| *`prefill`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-pdspec[$$PDSpec$$]__ | Prefill is the prefill portion of the spec + |  | 
+|===
+
+
+[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicestatus"]
+==== ModelServiceStatus
+
+
+
+ModelServiceStatus defines the observed state of ModelService
+
+
+
+.Appears In:
+****
+- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservice[$$ModelService$$]
+****
+
+[cols="20a,50a,15a,15a", options="header"]
+|===
+| Field | Description | Default | Validation
+| *`prefillDeploymentRef`* __string__ | PrefillDeploymentRef identifies the prefill deployment +
+if prefill stanza is omitted, or if prefill deployment is yet to be created, +
+this reference will be nil + |  | 
+| *`decodeDeploymentRef`* __string__ | DecodeDeploymentRef identifies the decode deployment +
+if decode deployment is yet to be created, +
+this reference will be nil + |  | 
+| *`eppDeploymentRef`* __string__ | EppDeploymentRef identifies the epp deployment +
+if epp deployment is yet to be created, +
+this reference will be nil + |  | 
+| *`inferenceModelRef`* __string__ | InferenceModelRef identifies the inference model resource +
+if inference model is yet to be created, +
+this reference will be nil + |  | 
+| *`inferencePoolRef`* __string__ | InferencePoolRef identifies the inference pool resource +
+if inference pool is yet to be created, +
+this reference will be nil + |  | 
+| *`prefillServiceAccountRef`* __string__ | PDServiceAccountRef identifies the service account for PD +
+if PDServiceAccountRef is yet to be created, +
+this reference will be nil + |  | 
+| *`decodeServiceAccountRef`* __string__ | DecodeServiceAccountRef identifies the service account for decode +
+if DecodeServiceAccountRef is yet to be created, +
+this reference will be nil + |  | 
+| *`eppRoleBinding`* __string__ | EppRoleBinding identifies the rolebinding for Epp +
+if EppRoleBinding is yet to be created, +
+this reference will be nil + |  | 
+| *`configMapNames`* __string array__ | ConfigMapNames identifies the configmap used for prefill and decode +
+if ConfigMapNames is yet to be created, +
+this reference will be an empty list + |  | 
+| *`prefillReady`* __string__ | READY and AVAILABLE for prefill + |  | 
+| *`prefillAvailable`* __integer__ |  |  | 
+| *`decodeReady`* __string__ | READY and AVAILABLE for decode + |  | 
+| *`decodeAvailable`* __integer__ |  |  | 
+| *`eppReady`* __string__ | READY and AVAILABLE for Epp + |  | 
+| *`eppAvailable`* __integer__ |  |  | 
+| *`conditions`* __link:https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#condition-v1-meta[$$Condition$$] array__ | Combined deployment conditions from prefill and decode deployments +
+Condition types should be prefixed to indicate their origin +
+Example types: "PrefillAvailable", "DecodeProgressing", etc. + |  | 
+|===
+
+
+[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-pdspec"]
+==== PDSpec
+
+
+
+PDSpec defines the specification for prefill and decode deployments created by ModelService.
+
+
+
+.Appears In:
+****
+- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicespec[$$ModelServiceSpec$$]
+****
+
+[cols="20a,50a,15a,15a", options="header"]
+|===
+| Field | Description | Default | Validation
+| *`replicas`* __integer__ | Replicas defines the desired number of replicas for this deployment. + | 1 | Minimum: 0 +
+
+| *`parallelism`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-parallelism[$$Parallelism$$]__ | vllm +
+Parallelism specifies vllm parallelism that will be overriden from base config when present. + |  | 
+| *`acceleratorTypes`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-acceleratortypes[$$AcceleratorTypes$$]__ | pod +
+AcceleratorTypes determines the set of accelerators on which +
+this pod will be run. Any matching accelerator type can be used +
+to place the model pods.This will override base config when present + |  | 
+| *`containers`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-containerspec[$$ContainerSpec$$] array__ | Container holds vllm container container details that will be overriden from base config when present. + |  | 
+| *`initContainers`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-containerspec[$$ContainerSpec$$] array__ | InitContainers holds vllm init container details that will be overriden from base config when present. + |  | 
+|===
+
+
+[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-parallelism"]
+==== Parallelism
+
+
+
+Parallelism defines parallelism behavior for vllm.
+
+
+
+.Appears In:
+****
+- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-pdspec[$$PDSpec$$]
+****
+
+[cols="20a,50a,15a,15a", options="header"]
+|===
+| Field | Description | Default | Validation
+| *`tensor`* __integer__ | TensorParallelism corresponds to the same argument in vllm +
+This also corresponds to number of GPUs + | 1 | Minimum: 0 +
+
+|===
+
+
+[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-routing"]
+==== Routing
+
+
+
+Routing provides the information needed to configure routing
+for a base model. This include creation of InferenceModel.
+
+
+
+.Appears In:
+****
+- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicespec[$$ModelServiceSpec$$]
+****
+
+[cols="20a,50a,15a,15a", options="header"]
+|===
+| Field | Description | Default | Validation
+| *`modelName`* __string__ | // CreateInferencePool indicates if inference pool resource will be created +
+CreateInferencePool bool `json:"createInferencePool"` +
+
+
+ModelName is the model field within inference request +
+This should be unique across ModelService objects. +
+
+
+If the name is reused, an error will be +
+shown on the status of a ModelService that attempted to reuse. +
+The oldest ModelService, based on creation timestamp, will be selected +
+to remain valid. In the event of a race condition, one will be selected +
+arbitrarily. +
+
+
+refer to https://gateway-api-inference-extension.sigs.k8s.io +
+for relationship between model name, inference pool, and inference model +
+
+
+From GIE: +
+ModelName is the name of the model as it will be set in the "model" parameter for an incoming request. +
+ModelNames must be unique for a referencing InferencePool +
+(names can be reused for a different pool in the same cluster). +
+The modelName with the oldest creation timestamp is retained, and the incoming +
+InferenceModel is sets the Ready status to false with a corresponding reason. +
+In the rare case of a race condition, one Model will be selected randomly to be considered valid, and the other rejected. +
+Names can be reserved without an underlying model configured in the pool. +
+This can be done by specifying a target model and setting the weight to zero, +
+an error will be returned specifying that no valid target model is found. + |  | MaxLength: 256 +
+Required: {} +
+
+|===
+
+
