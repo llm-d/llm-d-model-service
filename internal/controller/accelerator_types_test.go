@@ -1,8 +1,9 @@
-package v1alpha1
+package controller
 
 import (
 	"testing"
 
+	"github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
@@ -11,13 +12,13 @@ import (
 func TestToNodeAffinity(t *testing.T) {
 	tests := []struct {
 		name        string
-		accelerator AcceleratorTypes
+		accelerator v1alpha1.AcceleratorTypes
 		expectError bool
 	}{
 		// valid label key and values
 		{
 			name: "valid accelerator",
-			accelerator: AcceleratorTypes{
+			accelerator: v1alpha1.AcceleratorTypes{
 				LabelKey:    "nvidia.com/gpu.product",
 				LabelValues: []string{"A100", "H100"},
 			},
@@ -26,7 +27,7 @@ func TestToNodeAffinity(t *testing.T) {
 		// missing LabelKey
 		{
 			name: "missing label key",
-			accelerator: AcceleratorTypes{
+			accelerator: v1alpha1.AcceleratorTypes{
 				LabelKey:    "",
 				LabelValues: []string{"A100"},
 			},
@@ -35,7 +36,7 @@ func TestToNodeAffinity(t *testing.T) {
 		// empty LabelValues slice
 		{
 			name: "empty label values",
-			accelerator: AcceleratorTypes{
+			accelerator: v1alpha1.AcceleratorTypes{
 				LabelKey:    "nvidia.com/gpu.product",
 				LabelValues: []string{},
 			},
@@ -45,7 +46,7 @@ func TestToNodeAffinity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			nodeAffinity, err := tt.accelerator.ToNodeAffinity()
+			nodeAffinity, err := AcceleratorTypesToNodeAffinity(&tt.accelerator)
 
 			if tt.expectError {
 				assert.Error(t, err, "expected error but got none")
