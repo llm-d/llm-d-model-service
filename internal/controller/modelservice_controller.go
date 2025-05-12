@@ -190,7 +190,8 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// TODO: Post-process for decoupled Scaling
 	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate child resources")
-	err = interpolatedBaseConfig.createOrUpdate(ctx, r)
+
+	err = interpolatedBaseConfig.createOrUpdate(ctx, r, modelService.Spec.DecoupleScaling)
 
 	if err != nil {
 		log.FromContext(ctx).Error(err, "unable createorupdate from interpolatedBaseConfig")
