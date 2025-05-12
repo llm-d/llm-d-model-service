@@ -329,6 +329,34 @@ var _ = Describe("ModelService Controller", func() {
 			err = k8sClient.Status().Update(ctx, updated)
 			Expect(err).NotTo(HaveOccurred())
 
+			By("Adding a custom annotation to the decode deployment, expect annotations to stay there")
+			annotationKey := "random"
+			annotationValue := "value"
+			Expect(decode.Annotations[annotationKey]).To(Equal("")) // annotation with the key isn't there
+			if decode.Annotations == nil {
+				decode.Annotations = map[string]string{}
+			}
+			decode.Annotations[annotationKey] = annotationValue
+			Expect(k8sClient.Update(ctx, &decode)).Error().NotTo(HaveOccurred())
+			// trigger reconcilation
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: client.ObjectKey{
+					Name:      modelServiceName,
+					Namespace: namespace,
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			// fetch the decode again
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{
+					Name:      decodeWorkloadName,
+					Namespace: namespace},
+					&decode)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+			// annotation with the key is now there after reconcilation
+			Expect(decode.Annotations[annotationKey]).To(Equal(annotationValue))
+
 			By("Eventually expecting the status to be populated with decode deployment name")
 			Eventually(func() (string, error) {
 				ms := &msv1alpha1.ModelService{}
