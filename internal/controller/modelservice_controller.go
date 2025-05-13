@@ -406,6 +406,10 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 
 	latest := &msv1alpha1.ModelService{}
 	if err := r.Client.Get(ctx, types.NamespacedName{Name: msvc.Name, Namespace: msvc.Namespace}, latest); err != nil {
+		if errors.IsNotFound(err) {
+			log.FromContext(ctx).Info("ModelService no longer exists, skipping status update")
+			return nil
+		}
 		return err
 	}
 	latest.Status = msvc.Status
