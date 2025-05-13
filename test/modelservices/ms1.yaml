@@ -12,8 +12,8 @@ spec:
   decode:
     containers:
     - name: llm-proxy
-      image: "quay.io/llm-d/llm-d-routingsidecar-dev:0.0.5"
+      image: "ghcr.io/llm-d/llm-d-routingsidecar-dev:0.0.5"
       imagePullPolicy: "Always"
     - name: llm-container
-      image: "quay.io/llm-d/llm-d-dev:0.0.2"
+      image: "ghcr.io/llm-d/llm-d-dev:0.0.2"
 
