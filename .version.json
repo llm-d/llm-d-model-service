@@ -1,6 +1,6 @@
 {
-  "dev-version": "0.0.11",
+  "dev-version": "0.0.12",
   "dev-registry": "ghcr.io/llm-d/llm-d-model-service-dev",
-  "prod-version": "0.0.10",
+  "prod-version": "0.0.11",
   "prod-registry": "ghcr.io/llm-d/llm-d-model-service"
 }
