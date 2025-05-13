@@ -222,7 +222,8 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	//update status
 	err = r.populateStatus(ctx, interpolatedModelService)
 	if err != nil {
-		log.FromContext(ctx).Error(err, "unable populate status")
+		// modelservice could be deleted before populating status
+		// next reconcile cycle should ignore this request
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
@@ -403,7 +404,6 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 
 	latest := &msv1alpha1.ModelService{}
 	if err := r.Client.Get(ctx, types.NamespacedName{Name: msvc.Name, Namespace: msvc.Namespace}, latest); err != nil {
-		log.FromContext(ctx).Error(err, "unable to re-fetch ModelService before status update")
 		return err
 	}
 	latest.Status = msvc.Status
