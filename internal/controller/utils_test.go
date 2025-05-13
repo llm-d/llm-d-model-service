@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strings"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	ginkgo "github.com/onsi/ginkgo/v2"
+	gomega "github.com/onsi/gomega"
 
 	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
 )
@@ -29,60 +29,60 @@ import (
 const PVC_NAME = "my-pvc"
 const MODEL_PATH = "path/to/model"
 
-var _ = Describe("Model Artifacts", func() {
-	Context("Given a model artifact with an invalid URI prefix", func() {
+var _ = ginkgo.Describe("Model Artifacts", func() {
+	ginkgo.Context("Given a model artifact with an invalid URI prefix", func() {
 		modelArtifact := msv1alpha1.ModelArtifacts{
 			URI: fmt.Sprintf("nothing://%s/%s", PVC_NAME, MODEL_PATH),
 		}
-		It("should parse correctly", func() {
-			By("checking type of uri")
-			Expect(isPVCURI(modelArtifact.URI)).To(BeFalse())
-			Expect(isHFURI(modelArtifact.URI)).To(BeFalse())
+		ginkgo.It("should parse correctly", func() {
+			ginkgo.By("checking type of uri")
+			gomega.Expect(isPVCURI(modelArtifact.URI)).To(gomega.BeFalse())
+			gomega.Expect(isHFURI(modelArtifact.URI)).To(gomega.BeFalse())
 
-			By("Parsing uri should fail")
+			ginkgo.By("Parsing uri should fail")
 			_, err := parsePVCURI(&modelArtifact)
-			Expect(err).NotTo(BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
 		})
 	})
-	Context("Given a model artifact with a valid PVC URI", func() {
+	ginkgo.Context("Given a model artifact with a valid PVC URI", func() {
 		modelArtifact := msv1alpha1.ModelArtifacts{
 			URI: fmt.Sprintf("pvc://%s/%s", PVC_NAME, MODEL_PATH),
 		}
-		It("should parse correctly", func() {
-			By("checking type of uri")
-			Expect(isPVCURI(modelArtifact.URI)).To(BeTrue())
-			Expect(isHFURI(modelArtifact.URI)).To(BeFalse())
+		ginkgo.It("should parse correctly", func() {
+			ginkgo.By("checking type of uri")
+			gomega.Expect(isPVCURI(modelArtifact.URI)).To(gomega.BeTrue())
+			gomega.Expect(isHFURI(modelArtifact.URI)).To(gomega.BeFalse())
 
-			By("Parsing uri should be successful")
+			ginkgo.By("Parsing uri should be successful")
 			parts, err := parsePVCURI(&modelArtifact)
-			Expect(err).To(BeNil())
-			Expect(len(parts) > 1).To(BeTrue())
-			Expect(parts[0]).To(Equal(PVC_NAME))
-			Expect(strings.Join(parts[1:], "/")).To(Equal(MODEL_PATH))
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(len(parts) > 1).To(gomega.BeTrue())
+			gomega.Expect(parts[0]).To(gomega.Equal(PVC_NAME))
+			gomega.Expect(strings.Join(parts[1:], "/")).To(gomega.Equal(MODEL_PATH))
 		})
-		It("should produce a valid volumeMount", func() {
+		ginkgo.It("should produce a valid volumeMount", func() {
 			volumeMount, err := getVolumeMountFromModelArtifacts(&modelArtifact)
-			Expect(err).To(BeNil())
-			Expect(volumeMount.Name).To(Equal(modelStorageVolumeName))
-			Expect(volumeMount.MountPath).To(Equal(modelStorageRoot))
-			Expect(volumeMount.ReadOnly).To(BeTrue())
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(volumeMount.Name).To(gomega.Equal(modelStorageVolumeName))
+			gomega.Expect(volumeMount.MountPath).To(gomega.Equal(modelStorageRoot))
+			gomega.Expect(volumeMount.ReadOnly).To(gomega.BeTrue())
 		})
-		It("should produce a valid volume", func() {
+		ginkgo.It("should produce a valid volume", func() {
 			volume, err := getVolumeFromModelArtifacts(&modelArtifact)
-			Expect(err).To(BeNil())
-			Expect(volume.Name).To(Equal(modelStorageVolumeName))
-			Expect(volume.PersistentVolumeClaim.ClaimName).To(Equal(PVC_NAME))
-			Expect(volume.PersistentVolumeClaim.ReadOnly).To(BeTrue())
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(volume.Name).To(gomega.Equal(modelStorageVolumeName))
+			gomega.Expect(volume.PersistentVolumeClaim.ClaimName).To(gomega.Equal(PVC_NAME))
+			gomega.Expect(volume.PersistentVolumeClaim.ReadOnly).To(gomega.BeTrue())
 		})
 	})
-	Context("Given a model artifact with a valid HF URI", func() {
+	ginkgo.Context("Given a model artifact with a valid HF URI", func() {
 		modelArtifact := msv1alpha1.ModelArtifacts{
 			URI: fmt.Sprintf("hf://%s/%s", "repo", "model"),
 		}
-		It("should parse correctly", func() {
-			By("checking type of uri")
-			Expect(isPVCURI(modelArtifact.URI)).To(BeFalse())
-			Expect(isHFURI(modelArtifact.URI)).To(BeTrue())
+		ginkgo.It("should parse correctly", func() {
+			ginkgo.By("checking type of uri")
+			gomega.Expect(isPVCURI(modelArtifact.URI)).To(gomega.BeFalse())
+			gomega.Expect(isHFURI(modelArtifact.URI)).To(gomega.BeTrue())
 		})
 	})
 })

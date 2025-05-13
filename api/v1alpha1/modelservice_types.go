@@ -176,6 +176,11 @@ type Routing struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="modelName is immutable"
 	ModelName string `json:"modelName"`
+
+	// Ports is a list of named ports
+	// These can be referenced by name in configuration of base configuration or model services
+	// +optional
+	Ports []Port `json:"ports,omitempty"`
 }
 
 // ModelArtifacts describes the source of the model
@@ -208,7 +213,7 @@ type PDSpec struct {
 	// +kubebuilder:default=1
 	Replicas *int32 `json:"replicas,omitempty"`
 	// vllm
-	// Parallelism specifies vllm parallelism that will be overriden from base config when present.
+	// Parallelism specifies vllm parallelism that will be overridden from base config when present.
 	//
 	// +optional
 	Parallelism *Parallelism `json:"parallelism,omitempty"`
@@ -220,41 +225,14 @@ type PDSpec struct {
 	// +optional
 	AcceleratorTypes *AcceleratorTypes `json:"acceleratorTypes,omitempty"`
 
-	// Container holds vllm container container details that will be overriden from base config when present.
+	// Container holds vllm container container details that will be overridden from base config when present.
 	//
 	// +optional
 	Containers []ContainerSpec `json:"containers,omitempty"`
-	// InitContainers holds vllm init container details that will be overriden from base config when present.
+	// InitContainers holds vllm init container details that will be overridden from base config when present.
 	//
 	// +optional
 	InitContainers []ContainerSpec `json:"initContainers,omitempty"`
-	// EmphemeralContainers holds vllm ephemeral container details that will be overriden from base config when present.
-	//
-	// +optional
-	EphemeralContainers []ContainerSpec `json:"ephemeralContainers,omitempty"`
-}
-
-// ConvertToContainerSlice converts []Containers to []corev1.Container
-func ConvertToContainerSlice(c []ContainerSpec) []corev1.Container {
-
-	containerSlice := make([]corev1.Container, len(c))
-
-	for i, containerSpec := range c {
-		containerSlice[i] = corev1.Container{
-			Name:      containerSpec.Name,
-			Command:   containerSpec.Command,
-			Args:      containerSpec.Args,
-			Env:       containerSpec.Env,
-			EnvFrom:   containerSpec.EnvFrom,
-			Resources: containerSpec.Resources,
-		}
-
-		if c[i].Image != nil {
-			containerSlice[i].Image = *c[i].Image
-		}
-	}
-
-	return containerSlice
 }
 
 // Parallelism defines parallelism behavior for vllm.
@@ -360,6 +338,16 @@ type ModelServiceStatus struct {
 	// Condition types should be prefixed to indicate their origin
 	// Example types: "PrefillAvailable", "DecodeProgressing", etc.
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
+type Port struct {
+	// Name that can be used in place of port number in templates
+	// +required
+	Name string `json:"name"`
+	// Value of port
+	// +kubebuilder:validation:Minimum=1
+	// +required
+	Port int32 `json:"port"`
 }
 
 func init() {

@@ -11,6 +11,11 @@ spec:
   routing: 
     # This is the model name for the OpenAI request
     modelName: facebook/opt-125m
+    ports:
+    - name: app_port
+      port: 8000
+    - name: internal_port
+      port: 8200
 
   modelArtifacts:
     # When specfying the URI with `hf` prefix, the <repo-id>/<model-id> string

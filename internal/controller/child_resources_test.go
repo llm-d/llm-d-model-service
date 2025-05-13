@@ -158,24 +158,22 @@ var _ = Describe("BaseConfig reader", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 
-		// Create test deployment YAML
-		deployment := appsv1.Deployment{
-			Spec: appsv1.DeploymentSpec{
-				Template: corev1.PodTemplateSpec{
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
-							{
-								Name:    "vllm",
-								Command: []string{"vllm", "serve"},
-								Args:    []string{"{{ .HFModelName }}"},
-							},
-						},
-					},
-				},
-			},
-		}
-		deployYaml, err := yaml.Marshal(deployment)
-		Expect(err).To(BeNil())
+		// Be careful that there are no TAB characters in the string
+		deployYamlStr := `metadata:
+  name: mvsc-prefill
+spec:
+  template:
+    spec:
+      containers:
+      - name: vllm
+        command:
+        - vllm
+        - serve
+        args:
+        - '{{ .HFModelName }}'
+        ports:
+        - containerPort: {{ "portName" | getPort }}
+`
 
 		// Create ConfigMap with a deployment inside
 		cm = &corev1.ConfigMap{
@@ -184,7 +182,7 @@ var _ = Describe("BaseConfig reader", func() {
 				Namespace: "default",
 			},
 			Data: map[string]string{
-				"prefillDeployment": string(deployYaml),
+				"prefillDeployment": string(deployYamlStr),
 			},
 		}
 
@@ -200,6 +198,14 @@ var _ = Describe("BaseConfig reader", func() {
 				},
 				ModelArtifacts: msv1alpha1.ModelArtifacts{
 					URI: "hf://facebook/opt-125m",
+				},
+				Routing: msv1alpha1.Routing{
+					Ports: []msv1alpha1.Port{
+						{
+							Name: "portName",
+							Port: 9999,
+						},
+					},
 				},
 			},
 		}
@@ -225,6 +231,17 @@ var _ = Describe("BaseConfig reader", func() {
 		c := bc.PrefillDeployment.Spec.Template.Spec.Containers[0]
 		Expect(c.Args).ToNot(BeNil())
 		Expect(c.Args[0]).To(Equal("facebook/opt-125m"))
+	})
+
+	It("should correctly interpolate containerPort", func() {
+		bc, err := reconciler.getChildResourcesFromConfigMap(ctx, msvc)
+		Expect(err).To(BeNil())
+		Expect(bc).ToNot(BeNil())
+		Expect(bc.PrefillDeployment).ToNot(BeNil())
+		Expect(bc.PrefillDeployment.Spec.Template.Spec.Containers).ToNot(BeNil())
+		c := bc.PrefillDeployment.Spec.Template.Spec.Containers[0]
+		Expect(c.Ports).ToNot(BeEmpty())
+		Expect(c.Ports[0].ContainerPort).To(Equal(int32(9999)))
 	})
 
 	AfterEach(func() {

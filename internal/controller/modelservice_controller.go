@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"text/template"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -76,6 +77,7 @@ type TemplateVars struct {
 	HFModelName           string `json:"hfModelName,omitempty"`
 	SanitizedModelName    string `json:"sanitizedModelName,omitempty"`
 	ModelPath             string `json:"modelPath,omitempty"`
+	AuthSecretName        string `json:"authSecretName,omitempty"`
 	EPPServiceName        string `json:"eppServiceName,omitempty"`
 	EPPDeploymentName     string `json:"eppDeploymentName,omitempty"`
 	PrefillDeploymentName string `json:"prefillDeploymentName,omitempty"`
@@ -112,6 +114,10 @@ func (t *TemplateVars) from(ctx context.Context, msvc *msv1alpha1.ModelService) 
 	t.ModelName = msvc.Spec.Routing.ModelName
 	t.SanitizedModelName = sanitizeModelName(msvc)
 
+	if msvc.Spec.ModelArtifacts.AuthSecretName != nil {
+		t.AuthSecretName = *msvc.Spec.ModelArtifacts.AuthSecretName
+	}
+
 	uri := msvc.Spec.ModelArtifacts.URI
 	if strings.HasPrefix(uri, HF_PREFIX) {
 		t.HFModelName = strings.TrimPrefix(uri, HF_PREFIX)
@@ -128,6 +134,26 @@ func (t *TemplateVars) from(ctx context.Context, msvc *msv1alpha1.ModelService) 
 
 	return nil
 
+}
+
+type TemplateFuncs struct {
+	funcMap template.FuncMap
+}
+
+// from populates the field values for TemplateVars from the model service
+func (t *TemplateFuncs) from(ctx context.Context, msvc *msv1alpha1.ModelService) {
+
+	fn := func(name string) int32 {
+		for _, p := range msvc.Spec.Routing.Ports {
+			if p.Name == name {
+				return p.Port
+			}
+		}
+		log.FromContext(ctx).V(1).Info("unknown port", "name", name, "ports", msvc.Spec.Routing.Ports)
+		return -1
+	}
+
+	t.funcMap["getPort"] = fn
 }
 
 // +kubebuilder:rbac:groups=llm-d.ai,resources=modelservices,verbs=get;list;watch;create;update;patch;delete
@@ -185,7 +211,8 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// TODO: Post-process for decoupled Scaling
 	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate child resources")
-	err = interpolatedBaseConfig.createOrUpdate(ctx, r)
+
+	err = interpolatedBaseConfig.createOrUpdate(ctx, r, modelService.Spec.DecoupleScaling)
 
 	if err != nil {
 		log.FromContext(ctx).Error(err, "unable createorupdate from interpolatedBaseConfig")
