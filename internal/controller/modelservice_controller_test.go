@@ -205,18 +205,22 @@ var _ = Describe("ModelService Controller", func() {
 					},
 					DecoupleScaling: false,
 					Decode: &msv1alpha1.PDSpec{
-						Containers: []msv1alpha1.ContainerSpec{
-							{
-								Name:  "llm",
-								Image: &imageName,
+						ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
+							Containers: []msv1alpha1.ContainerSpec{
+								{
+									Name:  "llm",
+									Image: &imageName,
+								},
 							},
 						},
 					},
 					Prefill: &msv1alpha1.PDSpec{
-						Containers: []msv1alpha1.ContainerSpec{
-							{
-								Name:  "llm",
-								Image: &imageName,
+						ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
+							Containers: []msv1alpha1.ContainerSpec{
+								{
+									Name:  "llm",
+									Image: &imageName,
+								},
 							},
 						},
 					},
@@ -591,20 +595,24 @@ var _ = Describe("ModelService Controller", func() {
 					},
 					DecoupleScaling: true,
 					Decode: &msv1alpha1.PDSpec{
-						Replicas: &replicas,
-						Containers: []msv1alpha1.ContainerSpec{
-							{
-								Name:  "llm",
-								Image: &imageName,
+						ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
+							Replicas: &replicas,
+							Containers: []msv1alpha1.ContainerSpec{
+								{
+									Name:  "llm",
+									Image: &imageName,
+								},
 							},
 						},
 					},
 					Prefill: &msv1alpha1.PDSpec{
-						Replicas: &replicas,
-						Containers: []msv1alpha1.ContainerSpec{
-							{
-								Name:  "llm",
-								Image: &imageName,
+						ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
+							Replicas: &replicas,
+							Containers: []msv1alpha1.ContainerSpec{
+								{
+									Name:  "llm",
+									Image: &imageName,
+								},
 							},
 						},
 					},

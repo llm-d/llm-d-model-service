@@ -31,3 +31,12 @@ spec:
       image: busybox
       args:
       - "{{ .ModelName }}"
+
+  endpointPicker:
+    containers:
+    - name: "epp"
+      env:
+      - name: HF_TOKEN
+        value: hello
+      - name: USE_STREAMING
+        value: "false"
