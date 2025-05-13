@@ -904,7 +904,8 @@ func (childResources *BaseConfig) mergeEppDeployment(ctx context.Context, msvc *
 	// set epp service account name
 	src.Spec.Template.Spec.ServiceAccountName = eppServiceAccountName(msvc)
 
-	if err := mergo.Merge(&dest, src, mergo.WithOverride); err != nil {
+	err := mergo.Merge(&dest, src, mergo.WithOverride, mergo.WithAppendSlice, mergo.WithTransformers(containerSliceTransformer{}))
+	if err != nil {
 		log.FromContext(ctx).V(1).Error(err, "problem with epp deployment merge")
 		return childResources
 	}
