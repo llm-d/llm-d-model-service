@@ -74,7 +74,7 @@ The result is a fully managed inference stack for the base model.
 
 ## Roadmap
 
-What's in store for `Modelservice` in the near future, in no specific order.
+`Modelservice` roadmap features in no specific order.
 
 - [ ] Multiple base models: Create HTTPRoute and related routing configuration
 - [ ] LoRA adapters: Create LoRA controller that integrates with `ModelService`
