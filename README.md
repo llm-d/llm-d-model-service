@@ -71,3 +71,17 @@ The result is a fully managed inference stack for the base model.
 ### [API Reference](docs/apireference.md)
 
 ### [Developer](docs/developer.md)
+
+## Roadmap
+
+What's in store for `Modelservice` in the near future, in no specific order.
+
+- [ ] Multiple base models: Create HTTPRoute and related routing configuration needed to support multiple base models effectively
+- [ ] LoRA adapters: Create LoRA controller that integrates well with `ModelService`
+- [ ] Routing weights: Allow a single logical model to expose multiple related model versions behind the same endpoint via routing weights
+- [ ] In-cluster model caching: download model artifacts once into cluster and reuse
+- [ ] Node-level model caching: pre-load model artifacts onto nodes for fast model loading
+- [ ] BaseConfig CRD: migrate from the use of configmaps to CRD for `baseconfig` resources
+- [ ] Model Warm-Start Mechanisms: Enable pre-initialization hooks or lifecycle events to preload models or weights ahead of serving readiness.
+- [ ] Prometheus metrics exporter: Emit controller metrics
+- [ ] Enable multi-node inferencing
