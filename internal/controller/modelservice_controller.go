@@ -225,7 +225,8 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	//update status
 	err = r.populateStatus(ctx, interpolatedModelService)
 	if err != nil {
-		log.FromContext(ctx).Error(err, "unable populate status")
+		// modelservice could be deleted before populating status
+		// next reconcile cycle should ignore this request
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
@@ -275,6 +276,7 @@ func (r *ModelServiceReconciler) deploymentMapFunc(ctx context.Context, obj clie
 
 func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1alpha1.ModelService) error {
 	var conditions []metav1.Condition
+	totalReady, expected := int32(0), int32(0)
 	original := msvc.DeepCopy()
 	baseConfig, err := r.getChildResourcesFromConfigMap(ctx, msvc)
 	if err != nil {
@@ -316,22 +318,22 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 				Message:            fmt.Sprintf("Failed to fetch Prefill Deployment: %v", err),
 				LastTransitionTime: metav1.Now(),
 			})
-		}
-		totalReady, expected := int32(0), int32(0)
-		totalReady = prefillDeploymentFromCluster.Status.ReadyReplicas
-		totalAvailable := prefillDeploymentFromCluster.Status.AvailableReplicas
-		expected = *prefillDeploymentFromCluster.Spec.Replicas
-		msvc.Status.PrefillReady = fmt.Sprintf("%d/%d", totalReady, expected)
-		msvc.Status.PrefillAvailable = totalAvailable
+		} else {
+			totalReady = prefillDeploymentFromCluster.Status.ReadyReplicas
+			totalAvailable := prefillDeploymentFromCluster.Status.AvailableReplicas
+			expected = *prefillDeploymentFromCluster.Spec.Replicas
+			msvc.Status.PrefillReady = fmt.Sprintf("%d/%d", totalReady, expected)
+			msvc.Status.PrefillAvailable = totalAvailable
 
-		for _, c := range prefillDeploymentFromCluster.Status.Conditions {
-			conditions = append(conditions, metav1.Condition{
-				Type:               "Prefill" + string(c.Type),
-				Status:             metav1.ConditionStatus(c.Status),
-				Reason:             c.Reason,
-				Message:            c.Message,
-				LastTransitionTime: c.LastUpdateTime,
-			})
+			for _, c := range prefillDeploymentFromCluster.Status.Conditions {
+				conditions = append(conditions, metav1.Condition{
+					Type:               "Prefill" + string(c.Type),
+					Status:             metav1.ConditionStatus(c.Status),
+					Reason:             c.Reason,
+					Message:            c.Message,
+					LastTransitionTime: c.LastUpdateTime,
+				})
+			}
 		}
 	}
 
@@ -349,22 +351,23 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 				Message:            fmt.Sprintf("Failed to fetch Decode Deployment: %v", err),
 				LastTransitionTime: metav1.Now(),
 			})
-		}
-		totalReady := decodeDeploymentFromCluster.Status.ReadyReplicas
-		totalAvailable := decodeDeploymentFromCluster.Status.AvailableReplicas
-		expected := *decodeDeploymentFromCluster.Spec.Replicas
-		msvc.Status.DecodeReady = fmt.Sprintf("%d/%d", totalReady, expected)
-		msvc.Status.DecodeAvailable = totalAvailable
+		} else {
+			totalReady := decodeDeploymentFromCluster.Status.ReadyReplicas
+			totalAvailable := decodeDeploymentFromCluster.Status.AvailableReplicas
+			expected := *decodeDeploymentFromCluster.Spec.Replicas
+			msvc.Status.DecodeReady = fmt.Sprintf("%d/%d", totalReady, expected)
+			msvc.Status.DecodeAvailable = totalAvailable
 
-		// Mirror conditions with "Decode" prefix
-		for _, c := range decodeDeploymentFromCluster.Status.Conditions {
-			conditions = append(conditions, metav1.Condition{
-				Type:               "Decode" + string(c.Type),
-				Status:             metav1.ConditionStatus(c.Status),
-				Reason:             c.Reason,
-				Message:            c.Message,
-				LastTransitionTime: c.LastUpdateTime,
-			})
+			// Mirror conditions with "Decode" prefix
+			for _, c := range decodeDeploymentFromCluster.Status.Conditions {
+				conditions = append(conditions, metav1.Condition{
+					Type:               "Decode" + string(c.Type),
+					Status:             metav1.ConditionStatus(c.Status),
+					Reason:             c.Reason,
+					Message:            c.Message,
+					LastTransitionTime: c.LastUpdateTime,
+				})
+			}
 		}
 	}
 
@@ -382,23 +385,23 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 				Message:            fmt.Sprintf("Failed to fetch Epp Deployment: %v", err),
 				LastTransitionTime: metav1.Now(),
 			})
-		}
+		} else {
+			totalReady := eppDeploymentFromCluster.Status.ReadyReplicas
+			totalAvailable := eppDeploymentFromCluster.Status.AvailableReplicas
+			expected := *eppDeploymentFromCluster.Spec.Replicas
+			msvc.Status.EppReady = fmt.Sprintf("%d/%d", totalReady, expected)
+			msvc.Status.EppAvailable = totalAvailable
 
-		totalReady := eppDeploymentFromCluster.Status.ReadyReplicas
-		totalAvailable := eppDeploymentFromCluster.Status.AvailableReplicas
-		expected := *eppDeploymentFromCluster.Spec.Replicas
-		msvc.Status.EppReady = fmt.Sprintf("%d/%d", totalReady, expected)
-		msvc.Status.EppAvailable = totalAvailable
-
-		// Mirror conditions with "Epp" prefix
-		for _, c := range eppDeploymentFromCluster.Status.Conditions {
-			conditions = append(conditions, metav1.Condition{
-				Type:               "Epp" + string(c.Type),
-				Status:             metav1.ConditionStatus(c.Status),
-				Reason:             c.Reason,
-				Message:            c.Message,
-				LastTransitionTime: c.LastUpdateTime,
-			})
+			// Mirror conditions with "Epp" prefix
+			for _, c := range eppDeploymentFromCluster.Status.Conditions {
+				conditions = append(conditions, metav1.Condition{
+					Type:               "Epp" + string(c.Type),
+					Status:             metav1.ConditionStatus(c.Status),
+					Reason:             c.Reason,
+					Message:            c.Message,
+					LastTransitionTime: c.LastUpdateTime,
+				})
+			}
 		}
 	}
 
@@ -406,13 +409,19 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 
 	latest := &msv1alpha1.ModelService{}
 	if err := r.Client.Get(ctx, types.NamespacedName{Name: msvc.Name, Namespace: msvc.Namespace}, latest); err != nil {
-		log.FromContext(ctx).Error(err, "unable to re-fetch ModelService before status update")
+		if errors.IsNotFound(err) {
+			log.FromContext(ctx).Info("ModelService no longer exists, skipping status update")
+			return nil
+		}
 		return err
 	}
 	latest.Status = msvc.Status
 	if !equality.Semantic.DeepEqual(&original.Status, &latest.Status) {
 		if err := r.Status().Update(ctx, latest); err != nil {
-			log.FromContext(ctx).Error(err, "unable to update ModelService status")
+			if errors.IsNotFound(err) {
+				log.FromContext(ctx).Info("ModelService no longer exists, skipping status update")
+				return nil
+			}
 			return err
 		}
 	}

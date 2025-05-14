@@ -126,11 +126,13 @@ func TestTemplateVars(t *testing.T) {
 		ctx := context.Background()
 
 		minimalMSVC := createMSVCWithDecode(&msv1alpha1.PDSpec{
-			Containers: []msv1alpha1.ContainerSpec{
-				{
-					Args: []string{
-						// This becomes, for example, {{ .ModelService }}
-						fmt.Sprintf("{{ .%s }}", templateVar),
+			ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
+				Containers: []msv1alpha1.ContainerSpec{
+					{
+						Args: []string{
+							// This becomes, for example, {{ .ModelService }}
+							fmt.Sprintf("{{ .%s }}", templateVar),
+						},
 					},
 				},
 			},
@@ -167,19 +169,23 @@ func TestMSVCInterpolation(t *testing.T) {
 		{
 			name: "one interpolation required in args should pass",
 			originalMSVC: createMSVCWithDecode(&msv1alpha1.PDSpec{
-				Containers: []msv1alpha1.ContainerSpec{
-					{
-						Args: []string{
-							"{{ .ModelPath }}",
+				ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
+					Containers: []msv1alpha1.ContainerSpec{
+						{
+							Args: []string{
+								"{{ .ModelPath }}",
+							},
 						},
 					},
 				},
 			}),
 			expectedMSVC: createMSVCWithDecode(&msv1alpha1.PDSpec{
-				Containers: []msv1alpha1.ContainerSpec{
-					{
-						Args: []string{
-							modelPath,
+				ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
+					Containers: []msv1alpha1.ContainerSpec{
+						{
+							Args: []string{
+								modelPath,
+							},
 						},
 					},
 				},
@@ -189,23 +195,27 @@ func TestMSVCInterpolation(t *testing.T) {
 		{
 			name: "1+ interpolation required in args should pass",
 			originalMSVC: createMSVCWithDecode(&msv1alpha1.PDSpec{
-				Containers: []msv1alpha1.ContainerSpec{
-					{
-						Args: []string{
-							"{{ .ModelPath }}",
-							"--arg2",
-							"{{ .DecodeDeploymentName }}",
+				ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
+					Containers: []msv1alpha1.ContainerSpec{
+						{
+							Args: []string{
+								"{{ .ModelPath }}",
+								"--arg2",
+								"{{ .DecodeDeploymentName }}",
+							},
 						},
 					},
 				},
 			}),
 			expectedMSVC: createMSVCWithDecode(&msv1alpha1.PDSpec{
-				Containers: []msv1alpha1.ContainerSpec{
-					{
-						Args: []string{
-							modelPath,
-							"--arg2",
-							msvcName + "-decode",
+				ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
+					Containers: []msv1alpha1.ContainerSpec{
+						{
+							Args: []string{
+								modelPath,
+								"--arg2",
+								msvcName + "-decode",
+							},
 						},
 					},
 				},
