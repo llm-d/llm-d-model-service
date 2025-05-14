@@ -76,11 +76,18 @@ The result is a fully managed inference stack for the base model.
 
 `Modelservice` roadmap features in no specific order.
 
-- [ ] Multiple base models: Create HTTPRoute and related routing configuration
-- [ ] LoRA adapters: Create LoRA controller that integrates with `ModelService`
-- [ ] Routing weights: Allow a logical model to expose multiple model versions via routing weights
-- [ ] In-cluster model caching: download model artifacts once into cluster and reuse
-- [ ] Node-level model caching: pre-load model artifacts onto nodes for fast model loading
-- [ ] BaseConfig CRD: migrate from the use of configmaps to CRD for `baseconfig` resources
-- [ ] Prometheus metrics exporter: Emit controller metrics
-- [ ] Enable multi-node inferencing: for instance, using LWS integration
+1. Multiple base models: Create HTTPRoute and related routing configuration
+
+2. LoRA adapters: Create LoRA controller that integrates with `ModelService`
+
+3. Routing weights: Allow a logical model to expose multiple model versions via routing weights
+
+4. In-cluster model caching: download model artifacts once into cluster and reuse
+
+5. Node-level model caching: pre-load model artifacts onto nodes for fast model loading
+
+6. BaseConfig CRD: migrate from the use of configmaps to CRD for `baseconfig` resources
+
+7. Prometheus metrics exporter: Emit controller metrics
+
+8. Enable multi-node inferencing: for instance, using LWS integration
