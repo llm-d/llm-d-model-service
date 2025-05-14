@@ -60,6 +60,7 @@ spec:
       containers:
       - command:
         - /manager
+        - run
         args:
           - --leader-elect=false
           - --health-probe-bind-address=:8081
