@@ -99,12 +99,12 @@ func (childResource *BaseConfig) shouldCreateEPPService() bool {
 
 // shouldCreateEPPServiceAccount returns True if EPP deployment needs to be created
 func (childResource *BaseConfig) shouldCreateEPPServiceAccount() bool {
-	return childResource.shouldCreateEPPDeployment()
+	return childResource.shouldCreateEPPDeployment() && childResource.EPPServiceAccount != nil
 }
 
 // createEPPServiceAccount returns True if EPP deployment needs to be created
 func (childResource *BaseConfig) shouldCreateEPPRoleBinding() bool {
-	return childResource.shouldCreateEPPDeployment()
+	return childResource.shouldCreateEPPDeployment() && childResource.EPPRoleBinding != nil
 }
 
 // shouldCreateInferencePool returns True if InferencePool needs to be created
