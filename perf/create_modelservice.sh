@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Base name for the ModelService
-BASE_NAME="facebook-opt-125m-nixl"
+BASE_NAME="perf-facebook-opt-125m-nixl"
 
 echo "Please make sure universal base config is applied to the cluster"
 
@@ -53,3 +53,10 @@ spec:
         - "{{ .HFModelName }}"
 EOF
 done
+
+echo "Done submitting"
+
+echo ""
+
+echo "use kubectl delete msvc --all to delete all created resources"
+
