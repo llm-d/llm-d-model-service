@@ -538,105 +538,127 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 
 	var err error
 
-	// Step 1: Create an empty deployment
-	depl := &appsv1.Deployment{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Deployment",
-			APIVersion: "apps/v1",
-		},
-	}
+	// Compute fields needed
+	podLabels := getPodLabels(ctx, msvc, role)
+	var nodeAffinity *corev1.Affinity
 
-	// Step 3: Define object meta
-	// Sanitize modelName into a valid label
-	// TODO: this is not a good approach. Confirm with routing team on what label they need
-
-	labels := map[string]string{
-		"llm-d.ai/inferenceServing": "true",
-		"llm-d.ai/model":            sanitizeModelName(msvc),
-		"llm-d.ai/role":             role,
-	}
-
-	log.FromContext(ctx).V(1).Info("model service", "type meta", msvc.TypeMeta)
-
-	depl.ObjectMeta = metav1.ObjectMeta{
-		Name:      deploymentName(msvc, role),
-		Namespace: msvc.Namespace,
-		Labels:    labels,
-	}
-	err = controllerutil.SetOwnerReference(msvc, depl, scheme)
-	if err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to set owner reference")
-	}
-
-	// Step 4b. Define selectors for pods
-	depl.Spec.Selector = &metav1.LabelSelector{
-		MatchLabels: labels,
-	}
-
-	// Step 4c. Define pod templates with our templates
-	depl.Spec.Template.ObjectMeta = metav1.ObjectMeta{
-		Labels: labels,
-	}
-
-	// Step 4: populate containers
-	depl.Spec.Template.Spec.Containers = ConvertToContainerSlice(pdSpec.Containers)
-	depl.Spec.Template.Spec.InitContainers = ConvertToContainerSlice(pdSpec.InitContainers)
-
-	// Step 5: populate nodeaffinity
 	// AcceleratorTypes maybe nil... TODO: check
 	na, err := AcceleratorTypesToNodeAffinity(pdSpec.AcceleratorTypes)
 	if err == nil {
-		depl.Spec.Template.Spec.Affinity = &corev1.Affinity{
+		nodeAffinity = &corev1.Affinity{
 			NodeAffinity: na,
 		}
 	} else {
 		log.FromContext(ctx).V(1).Error(err, "unable to get node affinity")
 	}
 
-	// Step 6: populate replicas
-	// ToDo: handle decouple scaling as part of apply logic
-	// ToDo: decouple scaling
-	depl.Spec.Replicas = pdSpec.Replicas
+	// Step 1: Create an empty deployment
+	desiredDeployment := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
 
-	// Step 8: TODO: change volume, volume mounts based on modelArtifacts
-	if isPVCURI(msvc.Spec.ModelArtifacts.URI) {
-		// Set volumes according to ModelArtifacts specs
-		volume, err := getVolumeFromModelArtifacts(&msvc.Spec.ModelArtifacts)
-		if err != nil {
-			// The modelArtifact is invalid
-			log.FromContext(ctx).V(1).Error(err, "unable to get volume")
-		}
-		if volume != nil {
-			depl.Spec.Template.Spec.Volumes = append(depl.Spec.Template.Spec.Volumes, *volume)
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deploymentName(msvc, role),
+			Namespace: msvc.Namespace,
+
+			// Define the labels for this deployment
+			Labels: podLabels,
+		},
+		Spec: appsv1.DeploymentSpec{
+			// Define template selector labels
+			Selector: &metav1.LabelSelector{
+				MatchLabels: podLabels,
+			},
+
+			// Define replicas
+			// Decouple scaling will be handled in the merge
+			Replicas: pdSpec.Replicas,
+
+			// Define pod templates with our templates
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: podLabels,
+				},
+				Spec: corev1.PodSpec{
+					// populate containers
+					InitContainers: ConvertToContainerSlice(pdSpec.InitContainers),
+					Containers:     ConvertToContainerSlice(pdSpec.Containers),
+
+					// populate node affinity
+					Affinity: nodeAffinity,
+
+					// populate service account for PD pods
+					ServiceAccountName: pdServiceAccountName(msvc),
+
+					// populate volumes based on URI
+					Volumes: getVolumeForPDDeployment(ctx, msvc),
+				},
+			},
+		},
+	}
+
+	// Post processing for containers where mountModelVolume is true
+	// InitContainers first
+	for i := range desiredDeployment.Spec.Template.Spec.InitContainers {
+		// Get MountModelVolume boolean from pdSpec
+		if ifMount := pdSpec.InitContainers[i].MountModelVolume; ifMount {
+			desiredDeployment.Spec.Template.Spec.InitContainers[i].VolumeMounts = getVolumeMountsForContainer(ctx, msvc)
 		}
 	}
 
-	// set service account for pd pods
-	depl.Spec.Template.Spec.ServiceAccountName = pdServiceAccountName(msvc)
+	// Then, Containers
+	for i := range desiredDeployment.Spec.Template.Spec.Containers {
+		// Get MountModelVolume boolean from pdSpec
+		if ifMount := pdSpec.Containers[i].MountModelVolume; ifMount {
+			desiredDeployment.Spec.Template.Spec.Containers[i].VolumeMounts = getVolumeMountsForContainer(ctx, msvc)
+		}
+	}
 
-	// Step 9: We need to figure out the volume mount story in
-	// addition to the volume story above ...
+	// Finally, set owner references
+	err = controllerutil.SetOwnerReference(msvc, desiredDeployment, scheme)
+	if err != nil {
+		log.FromContext(ctx).V(1).Error(err, "unable to set owner reference")
+	}
 
-	// In Mergo merge...
+	// Finally, in Mergo merge...
 	// We create a destination deployment object from baseconfig
 	// We create a source deployment object from model service
 	// We merge source into destination
 	// We apply the merged destination
+
+	var originalDeployment *appsv1.Deployment
+
+	log.FromContext(ctx).V(1).Info("merging PD deployment", "role", role, "desiredDeployment (src)", desiredDeployment)
 	if role == PREFILL_ROLE {
-		log.FromContext(ctx).V(1).Info("mergo info", "role", role, "dst", childResource.PrefillDeployment, "src", depl)
-		err = mergo.Merge(childResource.PrefillDeployment, depl, mergo.WithOverride, mergo.WithAppendSlice, mergo.WithTransformers(containerSliceTransformer{}))
-		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "mergo error")
-		}
+		originalDeployment = childResource.PrefillDeployment
 	}
 	if role == DECODE_ROLE {
-		log.FromContext(ctx).V(1).Info("mergo info", "role", role, "dst", childResource.DecodeDeployment, "src", depl)
-		log.FromContext(ctx).V(1).Info("before mergo info -- details", "role", role, "dst.spec", childResource.DecodeDeployment.Spec, "src.spec", depl.Spec)
-		err = mergo.Merge(childResource.DecodeDeployment, depl, mergo.WithOverride, mergo.WithAppendSlice, mergo.WithTransformers(containerSliceTransformer{}))
-		log.FromContext(ctx).V(1).Info("after mergo info -- details", "role", role, "dst.spec", childResource.DecodeDeployment.Spec)
-		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "mergo error")
+		originalDeployment = childResource.DecodeDeployment
+	}
+
+	// Mergo merge
+	log.FromContext(ctx).V(1).Info("merging PD deployment", "originalDeployment (dst)", originalDeployment)
+	if err = mergo.Merge(
+		originalDeployment,
+		desiredDeployment,
+		mergo.WithOverride,
+		mergo.WithAppendSlice,
+		mergo.WithTransformers(containerSliceTransformer{})); err != nil {
+		log.FromContext(ctx).V(1).Error(err, "mergo error")
+	} else {
+
+		// Log errors
+		// technically we can log using originalDeployment here, but be safe
+		// and log what's directly stored in childResources.<ROLE>Deployment
+		var mergedDeployment *appsv1.Deployment
+		if role == DECODE_ROLE {
+			mergedDeployment = childResource.PrefillDeployment
+		} else {
+			mergedDeployment = childResource.DecodeDeployment
 		}
+		log.FromContext(ctx).V(1).Info("merging was succesful", "merged deployment", mergedDeployment)
 	}
 
 	return childResource

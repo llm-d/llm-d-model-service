@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const modelStorageVolumeName = "model-storage"
@@ -34,9 +36,20 @@ const DECODE_ROLE = "decode"
 const PREFILL_ROLE = "prefill"
 const MODEL_ARTIFACT_URI_PVC = "pvc"
 const MODEL_ARTIFACT_URI_HF = "hf"
+const MODEL_ARTIFACT_URI_OCI = "oci"
 const MODEL_ARTIFACT_URI_PVC_PREFIX = MODEL_ARTIFACT_URI_PVC + "://"
 const MODEL_ARTIFACT_URI_HF_PREFIX = MODEL_ARTIFACT_URI_HF + "://"
+const MODEL_ARTIFACT_URI_OCI_PREFIX = MODEL_ARTIFACT_URI_OCI + "://"
 const ENV_HF_TOKEN = "HF_TOKEN"
+
+type URIType string
+
+const (
+	PVC        URIType = "pvc"
+	HF         URIType = "hf"
+	OCI        URIType = "oci"
+	UnknownURI URIType = "unknown"
+)
 
 // deploymentName returns the name that should be used for a deployment object
 func deploymentName(modelService *msv1alpha1.ModelService, role string) string {
@@ -118,6 +131,27 @@ func isPVCURI(uri string) bool {
 	return strings.HasPrefix(uri, MODEL_ARTIFACT_URI_PVC_PREFIX)
 }
 
+func isOCIURI(uri string) bool {
+	return strings.HasPrefix(uri, MODEL_ARTIFACT_URI_PVC_PREFIX)
+}
+
+// UriType returns the type of URI
+func UriType(uri string) URIType {
+	if isHFURI(uri) {
+		return PVC
+	}
+
+	if isPVCURI(uri) {
+		return HF
+	}
+
+	if isOCIURI(uri) {
+		return OCI
+	}
+
+	return UnknownURI
+}
+
 // parsePVCURI returns parts from a valid pvc URI, or
 // returns an error if the PVC URI is invalid
 func parsePVCURI(modelArtifact *msv1alpha1.ModelArtifacts) ([]string, error) {
@@ -138,63 +172,76 @@ func parsePVCURI(modelArtifact *msv1alpha1.ModelArtifacts) ([]string, error) {
 	return parts, nil
 }
 
-// getVolumeMountFromModelArtifacts returns a VolumeMount for a URI of the form pvc://...
-func getVolumeMountFromModelArtifacts(modelArtifact *msv1alpha1.ModelArtifacts) (*corev1.VolumeMount, error) {
-	_, err := parsePVCURI(modelArtifact)
-	if err != nil {
-		return nil, err
-	}
+// getVolumeMountForContainer returns a VolumeMount for a container where MountModelVolume: true
+func getVolumeMountsForContainer(ctx context.Context, msvc *msv1alpha1.ModelService) []corev1.VolumeMount {
 
-	return &corev1.VolumeMount{
-		Name:      modelStorageVolumeName,
-		MountPath: modelStorageRoot,
-		ReadOnly:  true,
-	}, nil
-}
+	volumeMounts := []corev1.VolumeMount{}
+	var desiredVolumeMount *corev1.VolumeMount
+	uriType := UriType(msvc.Spec.ModelArtifacts.URI)
 
-// getVolumeFromModelArtifacts returns a Volume for a URI of the form pvc://...
-func getVolumeFromModelArtifacts(modelArtifact *msv1alpha1.ModelArtifacts) (*corev1.Volume, error) {
-	parts, err := parsePVCURI(modelArtifact)
-	if err != nil {
-		return nil, err
-	}
-
-	pvcName := parts[0]
-
-	return &corev1.Volume{
-		Name: modelStorageVolumeName,
-		VolumeSource: corev1.VolumeSource{
-			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-				ClaimName: pvcName,
-				ReadOnly:  true,
-			},
-		},
-	}, nil
-}
-
-/*
-// getVLLMContainer returns the vllmContainer with volumeMount populated
-func getVLLMContainer(modelArtifact *msv1alpha1.ModelArtifacts, pdSpec *msv1alpha1.PDSpec) (*corev1.Container, error) {
-	vllmContainer := &corev1.Container{}
-
-	// TODO handle modelService.Spec.Decode.Parallelism
-
-	// If ModelArtifcat.URI is hf:// add an environment variable and a secret
-	if isHFURI(modelArtifact.URI) {
-		configureContainerForHF(modelArtifact, vllmContainer)
-	}
-
-	if isPVCURI(modelArtifact.URI) {
-		// add volume from modelService.Spec.ModelArtifact
-		volumeMount, err := getVolumeMountFromModelArtifacts(modelArtifact)
-		if err != nil {
-			return nil, err
+	switch uriType {
+	case PVC:
+		// don't need the parts
+		if _, err := parsePVCURI(&msvc.Spec.ModelArtifacts); err == nil {
+			desiredVolumeMount = &corev1.VolumeMount{
+				Name:      modelStorageVolumeName,
+				MountPath: modelStorageRoot,
+			}
+		} else {
+			log.FromContext(ctx).V(1).Error(err, "uri type: "+msvc.Spec.ModelArtifacts.URI)
 		}
-		vllmContainer.VolumeMounts = append(vllmContainer.VolumeMounts, *volumeMount)
+	// TODO for these
+	// case HF:
+	// case OCI:
+	case UnknownURI:
+		// do nothing
+		log.FromContext(ctx).V(1).Error(fmt.Errorf("uri type is unknown, cannot populate volume mounts"), "uri type: "+msvc.Spec.ModelArtifacts.URI)
 	}
-	return vllmContainer, nil
+
+	if desiredVolumeMount != nil {
+		volumeMounts = append(volumeMounts, *desiredVolumeMount)
+	}
+
+	return volumeMounts
 }
-*/
+
+// getVolumeForPDDeployment returns a Volume for ModelArtifacts.URI
+func getVolumeForPDDeployment(ctx context.Context, msvc *msv1alpha1.ModelService) []corev1.Volume {
+
+	volumes := []corev1.Volume{}
+	var desiredVolume *corev1.Volume
+	uriType := UriType(msvc.Spec.ModelArtifacts.URI)
+
+	switch uriType {
+	case PVC:
+		if parts, err := parsePVCURI(&msvc.Spec.ModelArtifacts); err == nil {
+			pvcName := parts[0]
+			desiredVolume = &corev1.Volume{
+				Name: modelStorageVolumeName,
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: pvcName,
+						ReadOnly:  true,
+					},
+				},
+			}
+		} else {
+			log.FromContext(ctx).V(1).Error(err, "uri type: "+msvc.Spec.ModelArtifacts.URI)
+		}
+	// TODO for these
+	// case HF:
+	// case OCI:
+	case UnknownURI:
+		// do nothing
+		log.FromContext(ctx).V(1).Error(fmt.Errorf("uri type is unknown, cannot populate volumes"), "uri type: "+msvc.Spec.ModelArtifacts.URI)
+	}
+
+	if desiredVolume != nil {
+		volumes = append(volumes, *desiredVolume)
+	}
+
+	return volumes
+}
 
 // sanitizeName converts an routing.ModelNAme into a valid Kubernetes label value
 func sanitizeName(s string) (string, error) {
@@ -222,6 +269,7 @@ func sanitizeName(s string) (string, error) {
 }
 
 // ConvertToContainerSlice converts []Containers to []corev1.Container
+// Note we lose information about MountModelVolume
 func ConvertToContainerSlice(c []v1alpha1.ContainerSpec) []corev1.Container {
 
 	containerSlice := make([]corev1.Container, len(c))
@@ -236,8 +284,8 @@ func ConvertToContainerSlice(c []v1alpha1.ContainerSpec) []corev1.Container {
 			Resources: containerSpec.Resources,
 		}
 
-		if c[i].Image != nil {
-			containerSlice[i].Image = *c[i].Image
+		if containerSpec.Image != nil {
+			containerSlice[i].Image = *containerSpec.Image
 		}
 	}
 

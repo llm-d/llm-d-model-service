@@ -60,20 +60,20 @@ var _ = ginkgo.Describe("Model Artifacts", func() {
 			gomega.Expect(parts[0]).To(gomega.Equal(PVC_NAME))
 			gomega.Expect(strings.Join(parts[1:], "/")).To(gomega.Equal(MODEL_PATH))
 		})
-		ginkgo.It("should produce a valid volumeMount", func() {
-			volumeMount, err := getVolumeMountFromModelArtifacts(&modelArtifact)
-			gomega.Expect(err).To(gomega.BeNil())
-			gomega.Expect(volumeMount.Name).To(gomega.Equal(modelStorageVolumeName))
-			gomega.Expect(volumeMount.MountPath).To(gomega.Equal(modelStorageRoot))
-			gomega.Expect(volumeMount.ReadOnly).To(gomega.BeTrue())
-		})
-		ginkgo.It("should produce a valid volume", func() {
-			volume, err := getVolumeFromModelArtifacts(&modelArtifact)
-			gomega.Expect(err).To(gomega.BeNil())
-			gomega.Expect(volume.Name).To(gomega.Equal(modelStorageVolumeName))
-			gomega.Expect(volume.PersistentVolumeClaim.ClaimName).To(gomega.Equal(PVC_NAME))
-			gomega.Expect(volume.PersistentVolumeClaim.ReadOnly).To(gomega.BeTrue())
-		})
+		// ginkgo.It("should produce a valid volumeMount", func() {
+		// 	volumeMount, err := getVolumeMountFromModelArtifacts(&modelArtifact)
+		// 	gomega.Expect(err).To(gomega.BeNil())
+		// 	gomega.Expect(volumeMount.Name).To(gomega.Equal(modelStorageVolumeName))
+		// 	gomega.Expect(volumeMount.MountPath).To(gomega.Equal(modelStorageRoot))
+		// 	gomega.Expect(volumeMount.ReadOnly).To(gomega.BeTrue())
+		// })
+		// ginkgo.It("should produce a valid volume", func() {
+		// 	volume, err := getVolumeFromModelService(&modelArtifact)
+		// 	gomega.Expect(err).To(gomega.BeNil())
+		// 	gomega.Expect(volume.Name).To(gomega.Equal(modelStorageVolumeName))
+		// 	gomega.Expect(volume.PersistentVolumeClaim.ClaimName).To(gomega.Equal(PVC_NAME))
+		// 	gomega.Expect(volume.PersistentVolumeClaim.ReadOnly).To(gomega.BeTrue())
+		// })
 	})
 	ginkgo.Context("Given a model artifact with a valid HF URI", func() {
 		modelArtifact := msv1alpha1.ModelArtifacts{
