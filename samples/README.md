@@ -19,7 +19,7 @@ Before you get started, ensure that you have the following install and running.
 If you need more guidance, refer to the [developer docs](../docs/developer.md) on how to properly install the ModelService controller and other components on your system.
 
 ## Scenarios 
-
+*Note: we have set `acceleratorTypes` to A100-80GB, please reset as per resurces available in your cluster*
 ### Scenario 1: serving a base model on vLLM on one pod
 A simple use case is online serving a model on vLLM using one deployment. We will serve [`ibm-granite/granite-3.3-2b-base`](https://huggingface.co/ibm-granite/granite-3.3-2b-base) which can be downloaded from Hugging Face without the need for a token.
 
