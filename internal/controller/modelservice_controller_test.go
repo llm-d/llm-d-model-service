@@ -154,8 +154,7 @@ data:
     type: ClusterIP
 `
 
-// TODO: change image
-var imageName = "quay.io/redhattraining/hello-world-nginx"
+var imageName = "ghcr.io/linuxserver/nginx:1.26.3-r0-ls318"
 
 var _ = Describe("ModelService Controller", func() {
 	var rbacOptions *RBACOptions
