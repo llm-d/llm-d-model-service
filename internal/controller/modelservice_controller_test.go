@@ -40,6 +40,8 @@ import (
 
 const namespace = "default"
 const modelServiceName = "llama-3-1-8b-instruct"
+const cm1Name = "cm1"
+const cm2Name = "cm2"
 const decodeWorkloadName = "llama-3-1-8b-instruct-decode"
 const prefillWorkloadName = "llama-3-1-8b-instruct-prefill"
 
@@ -49,6 +51,17 @@ kind: ConfigMap
 metadata:
   name: basic-base-conf
 data:
+  configMaps: |
+    - metadata:
+        name: cm1
+      data: 
+        key1: value1
+        key2: value2
+    - metadata:
+        name: cm2
+      data:
+        key3: value3
+        key4: value4
   decodeDeployment: |
     spec:
       replicas: 2
@@ -102,24 +115,7 @@ data:
           terminationGracePeriodSeconds: 130
           containers:
           - name: epp
-            image: us-central1-docker.pkg.dev/k8s-staging-images/gateway-api-inference-extension/epp:main
-            imagePullPolicy: Always
-            args:
-            - -poolName
-            - my-pool-name
-            - -poolNamespace
-            - my-pool-namespace
-            - -v
-            - "4"
-            - --zap-encoder
-            - "json"
-            - -grpcPort
-            - "9002"
-            - -grpcHealthPort
-            - "9003"
-            env:
-            - name: USE_STREAMING
-              value: "true"
+            image: busybox
             ports:
             - containerPort: 9002
             - containerPort: 9003
@@ -154,20 +150,33 @@ data:
     type: ClusterIP
 `
 
-var imageName = "ghcr.io/linuxserver/nginx:1.26.3-r0-ls318"
+// Name is required for configMap creation by MSVC
+const badBaseConfigYAML = `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bad-base-config
+data:
+  configMaps: |
+    - data: 
+       key1: value1
+       key2: value2
+`
+
+// TODO: change image
+var imageName = "quay.io/redhattraining/hello-world-nginx"
 
 var _ = Describe("ModelService Controller", func() {
 	var rbacOptions *RBACOptions
 
 	Context("When reconciling a resource", func() {
-		//ctx := context.Background()
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      modelServiceName,
 			Namespace: namespace,
 		}
 
-		It("should spawn decode and prefill deployments with status", func() {
+		It("should spawn child resources with status", func() {
 			ctx := context.Background()
 
 			// Set RBAC options with EPPPullSecrets and PDPullSecrets
@@ -243,6 +252,7 @@ var _ = Describe("ModelService Controller", func() {
 			key := client.ObjectKey{Name: cm.Name, Namespace: cm.Namespace}
 			err = k8sClient.Get(ctx, key, &fetched)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(fetched.Data).To(HaveKey("configMaps"))
 			Expect(fetched.Data).To(HaveKey("decodeDeployment"))
 
 			By("Creating the ModelService CR")
@@ -266,6 +276,43 @@ var _ = Describe("ModelService Controller", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
+			By("Checking if ConfigMaps have been created")
+			var cm1 corev1.ConfigMap
+			var cm2 corev1.ConfigMap
+
+			Eventually(func() bool {
+				err := k8sClient.Get(
+					ctx, client.ObjectKey{
+						Name:      cm1Name,
+						Namespace: namespace,
+					},
+					&cm1)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+			Expect(cm1.Data).ToNot(BeEmpty())
+
+			Eventually(func() bool {
+				err := k8sClient.Get(
+					ctx, client.ObjectKey{
+						Name:      cm2Name,
+						Namespace: namespace,
+					},
+					&cm2)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+			Expect(cm2.Data).ToNot(BeEmpty())
+
+			By("Checking if ConfigMaps has correct owner reference")
+			Expect(cm1.OwnerReferences).ToNot(BeEmpty())
+			ownerRef := cm1.OwnerReferences[0]
+			Expect(ownerRef.Kind).To(Equal("ModelService"))
+			Expect(ownerRef.Name).To(Equal(modelService.Name))
+
+			Expect(cm2.OwnerReferences).ToNot(BeEmpty())
+			ownerRef = cm2.OwnerReferences[0]
+			Expect(ownerRef.Kind).To(Equal("ModelService"))
+			Expect(ownerRef.Name).To(Equal(modelService.Name))
+
 			By("Checking if Decode deployment was created")
 			var decode appsv1.Deployment
 			var prefill appsv1.Deployment
@@ -276,7 +323,7 @@ var _ = Describe("ModelService Controller", func() {
 
 			By("Checking if Decode deployment has correct owner reference")
 			Expect(decode.OwnerReferences).ToNot(BeEmpty())
-			ownerRef := decode.OwnerReferences[0]
+			ownerRef = decode.OwnerReferences[0]
 			Expect(ownerRef.Kind).To(Equal("ModelService"))
 			Expect(ownerRef.Name).To(Equal(modelService.Name))
 			Expect(ownerRef.APIVersion).To(Equal("llm-d.ai/v1alpha1"))
@@ -285,6 +332,34 @@ var _ = Describe("ModelService Controller", func() {
 			updated.Status.DecodeDeploymentRef = ptr.To(decode.Name)
 			err = k8sClient.Status().Update(ctx, updated)
 			Expect(err).NotTo(HaveOccurred())
+
+			By("Adding a custom annotation to the decode deployment, expect annotations to stay there")
+			annotationKey := "random"
+			annotationValue := "value"
+			Expect(decode.Annotations[annotationKey]).To(Equal("")) // annotation with the key isn't there
+			if decode.Annotations == nil {
+				decode.Annotations = map[string]string{}
+			}
+			decode.Annotations[annotationKey] = annotationValue
+			Expect(k8sClient.Update(ctx, &decode)).Error().NotTo(HaveOccurred())
+			// trigger reconcilation
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: client.ObjectKey{
+					Name:      modelServiceName,
+					Namespace: namespace,
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			// fetch the decode again
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{
+					Name:      decodeWorkloadName,
+					Namespace: namespace},
+					&decode)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+			// annotation with the key is now there after reconcilation
+			Expect(decode.Annotations[annotationKey]).To(Equal(annotationValue))
 
 			By("Eventually expecting the status to be populated with decode deployment name")
 			Eventually(func() (string, error) {
@@ -694,5 +769,74 @@ var _ = Describe("ModelService Controller", func() {
 
 		})
 
+	})
+
+	Context("When reconciling a MSVC with errorneous BaseConfig", func() {
+		When("BaseConfig's ConfigMap field is malformatted", func() {
+			It("should raise an error when reconciling", func() {
+				ctx := context.Background()
+
+				// Set RBAC options with EPPPullSecrets and PDPullSecrets
+				rbacOptions = &RBACOptions{
+					EPPPullSecrets: []string{"epp-pull-secret"},
+					PDPullSecrets:  []string{"secret1", "secret2"},
+					EPPClusterRole: "epp-cluster-role",
+				}
+
+				badModelServiceName := "bad-msvc"
+
+				modelService := &msv1alpha1.ModelService{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: msv1alpha1.GroupVersion.String(),
+						Kind:       "ModelService",
+					}, ObjectMeta: metav1.ObjectMeta{
+						Name:      badModelServiceName,
+						Namespace: namespace,
+					},
+					Spec: msv1alpha1.ModelServiceSpec{
+						ModelArtifacts: msv1alpha1.ModelArtifacts{
+							URI: "pvc://llama-pvc/path/to/model",
+						},
+						Routing: msv1alpha1.Routing{
+							ModelName: badModelServiceName,
+						},
+						BaseConfigMapRef: &corev1.ObjectReference{
+							Name:      "bad-base-config",
+							Namespace: "default",
+						},
+					},
+				}
+				By("Creating the basic base configmap")
+				var badBaseConfigMap corev1.ConfigMap
+				err := yaml.Unmarshal([]byte(badBaseConfigYAML), &badBaseConfigMap)
+				Expect(err).NotTo(HaveOccurred())
+				badBaseConfigMap.Namespace = "default"
+
+				err = k8sClient.Create(ctx, &badBaseConfigMap)
+				Expect(err).NotTo(HaveOccurred())
+
+				var fetched corev1.ConfigMap
+				key := client.ObjectKey{Name: badBaseConfigMap.Name, Namespace: badBaseConfigMap.Namespace}
+				err = k8sClient.Get(ctx, key, &fetched)
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Creating the ModelService CR")
+				Expect(k8sClient.Create(ctx, modelService)).To(Succeed())
+
+				By("Reconciling the ModelService, expect an error")
+				reconciler := &ModelServiceReconciler{
+					Client:      k8sClient,
+					Scheme:      k8sClient.Scheme(),
+					RBACOptions: *rbacOptions,
+				}
+				_, err = reconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      modelService.Name,
+						Namespace: modelService.Namespace,
+					},
+				})
+				Expect(err).To(HaveOccurred())
+			})
+		})
 	})
 })
