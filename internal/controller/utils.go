@@ -21,8 +21,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
-	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
+	"github.com/llm-d/llm-d-model-service/api/v1alpha1"
+	msv1alpha1 "github.com/llm-d/llm-d-model-service/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
