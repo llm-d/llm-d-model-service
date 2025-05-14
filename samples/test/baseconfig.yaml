@@ -72,6 +72,8 @@ data:
             env:
             - name: USE_STREAMING
               value: "true"
+            - name: UNTOUCHED
+              value: untouched
             ports:
             - containerPort: 9002
             - containerPort: 9003

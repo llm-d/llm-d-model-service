@@ -78,6 +78,7 @@ func getBaseChildResources(filename string, msvc *msv1alpha1.ModelService, logge
 
 func generateManifests(ctx context.Context, manifestFile string, configFile string) (*string, error) {
 	logger := log.FromContext(ctx)
+	logger.V(1).Info("generateManifests", "manifestFile", manifestFile, "configFile", configFile)
 
 	// get msvc from file and interpolate it
 	msvc, err := readModelService(ctx, manifestFile, logger)

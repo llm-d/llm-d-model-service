@@ -276,6 +276,9 @@ func runController() {
 	}
 }
 
+// testStartHook is used for testing
+var testStartedHook func()
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "modelservice",
@@ -289,6 +292,11 @@ var rootCmd = &cobra.Command{
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
+		// for testing the CLI; the controller does not return
+		if testStartedHook != nil {
+			testStartedHook()
+			return
+		}
 		runController()
 	},
 }
