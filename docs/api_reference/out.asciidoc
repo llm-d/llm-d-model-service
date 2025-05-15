@@ -93,6 +93,13 @@ Cannot be updated. + |  |
 | *`resources`* __link:https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#resourcerequirements-v1-core[$$ResourceRequirements$$]__ | Compute Resources required by this container. +
 Cannot be updated. +
 More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ + |  | 
+| *`mountModelVolume`* __boolean__ | Boolean to indicate mounting the model artifacts to this container +
+For URIs with pvc:// prefix, a model-storage volume is created and mounted with the mountPath: /cache +
+For URIs with hf:// prefix, modelArtifact.authSecretName is used as the secret key reference, +
+and the value is mounted to an environment variable called HF_TOKEN +
+For URIs with oci:// prefix, an OCI volume with image reference (https://kubernetes.io/blog/2024/08/16/kubernetes-1-31-image-volume-source/) +
+is created and mounted with the mountPath oci-dir +
+default:false + |  | 
 |===
 
 
@@ -118,7 +125,7 @@ Three types of URIs are support to enable models packaged as images (oci://<imag
 models downloaded from HuggingFace (hf://<model-repo>/<model-name>) +
 and pre-existing models loaded from a volume-mounted PVC (pvc://model-path) + |  | 
 | *`authSecretName`* __string__ | Name of the authentication secret. Contains HF_TOKEN + |  | 
-| *`size`* __link:https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#quantity-resource-api[$$Quantity$$]__ | Size of the model artifacts on disk +
+| *`size`* __xref:{anchor_prefix}-k8s-io-apimachinery-pkg-api-resource-quantity[$$Quantity$$]__ | Size of the model artifacts on disk +
 ensure Size is large enough when providing hf://... URI + |  | 
 |===
 
