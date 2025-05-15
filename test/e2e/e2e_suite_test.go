@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -23,7 +24,7 @@ var (
 
 	// projectImage is the name of the image which will be build and loaded
 	// with the code source changes to be tested.
-	projectImage = "example.com/modelservice:v0.0.1"
+	projectImage = "llm-d.ai/modelservice:v0.0.1"
 )
 
 // TestE2E runs the end-to-end (e2e) test suite for the project. These tests execute in an isolated,
@@ -37,9 +38,19 @@ func TestE2E(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+	By("creating Kind cluster if not exists")
+	cmd := exec.Command("kind", "get", "clusters")
+	out, err := cmd.CombinedOutput()
+	Expect(err).ToNot(HaveOccurred())
+	if strings.Contains(string(out), "No") {
+		cmd = exec.Command("kind", "create", "cluster", "--image",
+			"kindest/node:v1.32.0@sha256:c48c62eac5da28cdadcf560d1d8616cfa6783b58f0d94cf63ad1bf49600cb027")
+		_, err := utils.Run(cmd)
+		ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to create Kind cluster")
+	}
 	By("building the manager(Operator) image")
-	cmd := exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectImage))
-	_, err := utils.Run(cmd)
+	cmd = exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectImage))
+	_, err = utils.Run(cmd)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to build the manager(Operator) image")
 
 	// TODO(user): If you want to change the e2e test vendor from Kind, ensure the image is

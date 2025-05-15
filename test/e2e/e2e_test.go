@@ -49,8 +49,22 @@ var _ = Describe("Manager", Ordered, func() {
 		_, err = utils.Run(cmd)
 		Expect(err).NotTo(HaveOccurred(), "Failed to install CRDs")
 
+		By("installing external CRDs")
+
+		cmd = exec.Command("kubectl", "apply", "-f",
+			"https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/v0.3.0/manifests.yaml")
+		_, err = utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to install CRDs")
+
+		By("installing rolebinding for Epp")
+
+		cmd = exec.Command("kubectl", "apply", "-f",
+			"https://raw.githubusercontent.com/llm-d/gateway-api-inference-extension/refs/heads/dev/config/manifests/inferencepool-resources.yaml")
+		_, err = utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to install rolebinding for Epp")
+
 		By("deploying the controller-manager")
-		cmd = exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectImage))
+		cmd = exec.Command("make", "dev-deploy", fmt.Sprintf("IMG=%s", projectImage), fmt.Sprintf("EPP_CLUSTERROLE=%s", "pod-read"), fmt.Sprintf("IMAGE_PULL_POLICY=%s", "Never"))
 		_, err = utils.Run(cmd)
 		Expect(err).NotTo(HaveOccurred(), "Failed to deploy the controller-manager")
 	})
