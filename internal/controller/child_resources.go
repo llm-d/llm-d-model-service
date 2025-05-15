@@ -563,7 +563,8 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 			Name:      deploymentName(msvc, role),
 			Namespace: msvc.Namespace,
 
-			// Define the labels for this deployment
+			// Define the labels for this PD deployment
+			// Same as pod labels
 			Labels: podLabels,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -579,12 +580,13 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 			// Define pod templates with our templates
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
+					// Define pod labels, must match selector labels
 					Labels: podLabels,
 				},
 				Spec: corev1.PodSpec{
 					// populate containers
-					InitContainers: ConvertToContainerSlice(pdSpec.InitContainers),
-					Containers:     ConvertToContainerSlice(pdSpec.Containers),
+					InitContainers: ConvertToContainerSliceWithVolumeMount(ctx, pdSpec.InitContainers, msvc),
+					Containers:     ConvertToContainerSliceWithVolumeMount(ctx, pdSpec.Containers, msvc),
 
 					// populate node affinity
 					Affinity: nodeAffinity,
@@ -599,22 +601,22 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 		},
 	}
 
-	// Post processing for containers where mountModelVolume is true
-	// InitContainers first
-	for i := range desiredDeployment.Spec.Template.Spec.InitContainers {
-		// Get MountModelVolume boolean from pdSpec
-		if ifMount := pdSpec.InitContainers[i].MountModelVolume; ifMount {
-			desiredDeployment.Spec.Template.Spec.InitContainers[i].VolumeMounts = getVolumeMountsForContainer(ctx, msvc)
-		}
-	}
+	// // Post processing for containers where mountModelVolume is true
+	// // InitContainers first
+	// for i := range desiredDeployment.Spec.Template.Spec.InitContainers {
+	// 	// Get MountModelVolume boolean from pdSpec
+	// 	if ifMount := pdSpec.InitContainers[i].MountModelVolume; ifMount {
+	// 		desiredDeployment.Spec.Template.Spec.InitContainers[i].VolumeMounts = getVolumeMountsForContainer(ctx, msvc)
+	// 	}
+	// }
 
-	// Then, Containers
-	for i := range desiredDeployment.Spec.Template.Spec.Containers {
-		// Get MountModelVolume boolean from pdSpec
-		if ifMount := pdSpec.Containers[i].MountModelVolume; ifMount {
-			desiredDeployment.Spec.Template.Spec.Containers[i].VolumeMounts = getVolumeMountsForContainer(ctx, msvc)
-		}
-	}
+	// // Then, Containers
+	// for i := range desiredDeployment.Spec.Template.Spec.Containers {
+	// 	// Get MountModelVolume boolean from pdSpec
+	// 	if ifMount := pdSpec.Containers[i].MountModelVolume; ifMount {
+	// 		desiredDeployment.Spec.Template.Spec.Containers[i].VolumeMounts = getVolumeMountsForContainer(ctx, msvc)
+	// 	}
+	// }
 
 	// Finally, set owner references
 	err = controllerutil.SetOwnerReference(msvc, desiredDeployment, scheme)

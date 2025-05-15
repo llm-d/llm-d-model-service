@@ -132,17 +132,17 @@ func isPVCURI(uri string) bool {
 }
 
 func isOCIURI(uri string) bool {
-	return strings.HasPrefix(uri, MODEL_ARTIFACT_URI_PVC_PREFIX)
+	return strings.HasPrefix(uri, MODEL_ARTIFACT_URI_OCI_PREFIX)
 }
 
 // UriType returns the type of URI
 func UriType(uri string) URIType {
 	if isHFURI(uri) {
-		return PVC
+		return HF
 	}
 
 	if isPVCURI(uri) {
-		return HF
+		return PVC
 	}
 
 	if isOCIURI(uri) {
@@ -186,6 +186,7 @@ func getVolumeMountsForContainer(ctx context.Context, msvc *msv1alpha1.ModelServ
 			desiredVolumeMount = &corev1.VolumeMount{
 				Name:      modelStorageVolumeName,
 				MountPath: modelStorageRoot,
+				ReadOnly:  true,
 			}
 		} else {
 			log.FromContext(ctx).V(1).Error(err, "uri type: "+msvc.Spec.ModelArtifacts.URI)
@@ -269,7 +270,8 @@ func sanitizeName(s string) (string, error) {
 }
 
 // ConvertToContainerSlice converts []Containers to []corev1.Container
-// Note we lose information about MountModelVolume
+// Note we lose information about MountModelVolume, ok for EndpointPicker container
+// but not ok for PDSpec containers
 func ConvertToContainerSlice(c []v1alpha1.ContainerSpec) []corev1.Container {
 
 	containerSlice := make([]corev1.Container, len(c))
@@ -286,6 +288,22 @@ func ConvertToContainerSlice(c []v1alpha1.ContainerSpec) []corev1.Container {
 
 		if containerSpec.Image != nil {
 			containerSlice[i].Image = *containerSpec.Image
+		}
+	}
+
+	return containerSlice
+}
+
+// ConvertToContainerSlice converts []Containers to []corev1.Container
+// Note we lose information about MountModelVolume
+// c is the targeted container slice (can be initContainer or Container)
+// msvc is the msvc so we can get the URI and populate the relevant volumeMount
+func ConvertToContainerSliceWithVolumeMount(ctx context.Context, c []v1alpha1.ContainerSpec, msvc *msv1alpha1.ModelService) []corev1.Container {
+
+	containerSlice := ConvertToContainerSlice(c)
+	for i := range c {
+		if c[i].MountModelVolume {
+			containerSlice[i].VolumeMounts = getVolumeMountsForContainer(ctx, msvc)
 		}
 	}
 
