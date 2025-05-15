@@ -48,20 +48,6 @@ var _ = Describe("Model Artifacts", func() {
 	})
 
 	Context("Given an URI string", func() {
-		// tests := map[string]URIType{
-		// 	"pvc://pvc-name/path/to/model":       PVC,
-		// 	"oci://repo-with-tag::path/to/model": OCI,
-		// 	"hf://repo-id/model-id":              HF,
-		// 	"pvc://pvc-name":                     PVC,
-		// 	"oci://":                             OCI,
-		// 	"hf://wrong":                         HF,
-		// 	"random://":                          UnknownURI,
-		// 	"":                                   UnknownURI,
-		// 	"PVC://":                             UnknownURI,
-		// 	"HF://":                              UnknownURI,
-		// 	"OCI://":                             UnknownURI,
-		// }
-
 		tests := map[string]struct {
 			expectedURIType        URIType
 			expectedModelMountPath string

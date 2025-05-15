@@ -318,8 +318,7 @@ func ConvertToContainerSlice(c []v1alpha1.ContainerSpec) []corev1.Container {
 	return containerSlice
 }
 
-// ConvertToContainerSlice converts []Containers to []corev1.Container
-// Note we lose information about MountModelVolume
+// ConvertToContainerSliceWithVolumeMount converts []Containers to []corev1.Container
 // c is the targeted container slice (can be initContainer or Container)
 // msvc is the msvc so we can get the URI and populate the relevant volumeMount
 func ConvertToContainerSliceWithVolumeMount(ctx context.Context, c []v1alpha1.ContainerSpec, msvc *msv1alpha1.ModelService) []corev1.Container {
