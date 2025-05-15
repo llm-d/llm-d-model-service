@@ -48,26 +48,99 @@ var _ = Describe("Model Artifacts", func() {
 	})
 
 	Context("Given an URI string", func() {
-		It("should determine the type of the URI correctly", func() {
-			tests := map[string]URIType{
-				"pvc://pvc-name/path/to/model":       PVC,
-				"oci://repo-with-tag::path/to/model": OCI,
-				"hf://repo-id/model-id":              HF,
-				"pvc://pvc-name":                     PVC,
-				"oci://":                             OCI,
-				"hf://wrong":                         HF,
-				"random://":                          UnknownURI,
-				"":                                   UnknownURI,
-				"PVC://":                             UnknownURI,
-				"HF://":                              UnknownURI,
-				"OCI://":                             UnknownURI,
-			}
+		// tests := map[string]URIType{
+		// 	"pvc://pvc-name/path/to/model":       PVC,
+		// 	"oci://repo-with-tag::path/to/model": OCI,
+		// 	"hf://repo-id/model-id":              HF,
+		// 	"pvc://pvc-name":                     PVC,
+		// 	"oci://":                             OCI,
+		// 	"hf://wrong":                         HF,
+		// 	"random://":                          UnknownURI,
+		// 	"":                                   UnknownURI,
+		// 	"PVC://":                             UnknownURI,
+		// 	"HF://":                              UnknownURI,
+		// 	"OCI://":                             UnknownURI,
+		// }
 
-			for uri, expectedURIType := range tests {
+		tests := map[string]struct {
+			expectedURIType        URIType
+			expectedModelMountPath string
+		}{
+			"pvc://pvc-name/path/to/model": {
+				expectedURIType:        PVC,
+				expectedModelMountPath: modelStorageRoot + pathSep + "path/to/model",
+			},
+			"oci://repo-with-tag::path/to/model": {
+				expectedURIType:        OCI,
+				expectedModelMountPath: "", // TODO
+			},
+			"hf://repo-id/model-id": {
+				expectedURIType:        HF,
+				expectedModelMountPath: "", // TODO
+			},
+			"pvc://pvc-name": {
+				expectedURIType:        PVC,
+				expectedModelMountPath: "",
+			},
+			"oci://": {
+				expectedURIType:        OCI,
+				expectedModelMountPath: "", // TODO
+			},
+			"hf://wrong": {
+				expectedURIType:        HF,
+				expectedModelMountPath: "", // TODO
+			},
+			"random://": {
+				expectedURIType:        UnknownURI,
+				expectedModelMountPath: "",
+			},
+			"": {
+				expectedURIType:        UnknownURI,
+				expectedModelMountPath: "",
+			},
+			"PVC://": {
+				expectedURIType:        UnknownURI,
+				expectedModelMountPath: "",
+			},
+			"HF://": {
+				expectedURIType:        UnknownURI,
+				expectedModelMountPath: "",
+			},
+			"OCI://": {
+				expectedURIType:        UnknownURI,
+				expectedModelMountPath: "",
+			},
+		}
+
+		It("should determine the type of the URI correctly", func() {
+			for uri, answer := range tests {
+				expectedURIType := answer.expectedURIType
 				actualURIType := UriType(uri)
 				Expect(actualURIType).To(Equal(expectedURIType))
 			}
+		})
 
+		It("should compute the mounted model path correctly", func() {
+			for uri, answer := range tests {
+				expectedModelMountPath := answer.expectedModelMountPath
+
+				actualModelMountPath, err := mountedModelPath(&msv1alpha1.ModelService{
+					Spec: msv1alpha1.ModelServiceSpec{
+						ModelArtifacts: msv1alpha1.ModelArtifacts{
+							URI: uri,
+						},
+					},
+				})
+
+				// Expect error if uri type is unknown
+				if answer.expectedURIType == UnknownURI {
+					Expect(err).To(HaveOccurred())
+				} else {
+					Expect(err).ToNot(HaveOccurred())
+					Expect(actualModelMountPath).To(Equal(expectedModelMountPath))
+				}
+
+			}
 		})
 	})
 

@@ -123,6 +123,30 @@ func infModelName(modelService *msv1alpha1.ModelService) string {
 	return modelService.Name
 }
 
+// mountedModelPath returns the mounted model path for the specific URI type
+func mountedModelPath(modelService *msv1alpha1.ModelService) (string, error) {
+	var err error
+	mountedModelPath := ""
+	uri := modelService.Spec.ModelArtifacts.URI
+	switch UriType(uri) {
+	case PVC:
+		if parts, err := parsePVCURI(&modelService.Spec.ModelArtifacts); err == nil {
+			modelPath := strings.Join(parts[1:], pathSep)
+			// if uri is pvc://pvc-name/path/to/model
+			// output is /cache/path/to/model
+			mountedModelPath = modelStorageRoot + pathSep + modelPath
+		}
+	// TODOs for HF and OIC
+	// case HF:
+	// case OCI:
+
+	case UnknownURI:
+		err = fmt.Errorf("unknown uri type, cannot compute the mountedModelPath")
+	}
+
+	return mountedModelPath, err
+}
+
 func isHFURI(uri string) bool {
 	return strings.HasPrefix(uri, MODEL_ARTIFACT_URI_HF_PREFIX)
 }

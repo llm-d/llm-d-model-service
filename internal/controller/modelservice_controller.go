@@ -77,6 +77,7 @@ type TemplateVars struct {
 	HFModelName           string `json:"hfModelName,omitempty"`
 	SanitizedModelName    string `json:"sanitizedModelName,omitempty"`
 	ModelPath             string `json:"modelPath,omitempty"`
+	MountedModelPath      string `json:"mountedModelPath,omitempty"`
 	AuthSecretName        string `json:"authSecretName,omitempty"`
 	EPPServiceName        string `json:"eppServiceName,omitempty"`
 	EPPDeploymentName     string `json:"eppDeploymentName,omitempty"`
@@ -131,6 +132,12 @@ func (t *TemplateVars) from(ctx context.Context, msvc *msv1alpha1.ModelService) 
 		log.FromContext(ctx).V(1).Error(err, "cannot get template vars", "uri", uri)
 		return err
 	}
+
+	mountedModelPath, err := mountedModelPath(msvc)
+	if err != nil {
+		return err
+	}
+	t.MountedModelPath = mountedModelPath
 
 	return nil
 
