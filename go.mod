@@ -1,4 +1,4 @@
-module github.com/neuralmagic/llm-d-model-service
+module github.com/llm-d/llm-d-model-service
 
 go 1.24.0
 

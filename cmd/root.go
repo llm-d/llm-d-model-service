@@ -19,7 +19,7 @@ package cmd
 import (
 	"os"
 
-	"github.com/neuralmagic/llm-d-model-service/internal/controller"
+	"github.com/llm-d/llm-d-model-service/internal/controller"
 	"github.com/spf13/cobra"
 )
 

@@ -15,8 +15,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/yaml"
 
-	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
-	"github.com/neuralmagic/llm-d-model-service/internal/controller"
+	msv1alpha1 "github.com/llm-d/llm-d-model-service/api/v1alpha1"
+	"github.com/llm-d/llm-d-model-service/internal/controller"
 	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 )
 

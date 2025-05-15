@@ -14,12 +14,12 @@
 Package v1alpha1 contains API Schema definitions for the llmd v1alpha1 API group.
 
 .Resource Types
-- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservice[$$ModelService$$]
-- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicelist[$$ModelServiceList$$]
+- xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservice[$$ModelService$$]
+- xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicelist[$$ModelServiceList$$]
 
 
 
-[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-acceleratortypes"]
+[id="{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-acceleratortypes"]
 ==== AcceleratorTypes
 
 
@@ -30,7 +30,7 @@ AcceleratorTypes specifies set of accelerators for scheduling.
 
 .Appears In:
 ****
-- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-pdspec[$$PDSpec$$]
+- xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-pdspec[$$PDSpec$$]
 ****
 
 [cols="20a,50a,15a,15a", options="header"]
@@ -44,7 +44,7 @@ e.g., [A100, H100] + |  | MinItems: 1 +
 |===
 
 
-[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-containerspec"]
+[id="{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-containerspec"]
 ==== ContainerSpec
 
 
@@ -55,7 +55,8 @@ ContainerSpec defines container-level configuration.
 
 .Appears In:
 ****
-- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-pdspec[$$PDSpec$$]
+- xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicepodspec[$$ModelServicePodSpec$$]
+- xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-pdspec[$$PDSpec$$]
 ****
 
 [cols="20a,50a,15a,15a", options="header"]
@@ -95,7 +96,7 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 |===
 
 
-[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelartifacts"]
+[id="{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelartifacts"]
 ==== ModelArtifacts
 
 
@@ -106,7 +107,7 @@ ModelArtifacts describes the source of the model
 
 .Appears In:
 ****
-- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicespec[$$ModelServiceSpec$$]
+- xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicespec[$$ModelServiceSpec$$]
 ****
 
 [cols="20a,50a,15a,15a", options="header"]
@@ -117,12 +118,12 @@ Three types of URIs are support to enable models packaged as images (oci://<imag
 models downloaded from HuggingFace (hf://<model-repo>/<model-name>) +
 and pre-existing models loaded from a volume-mounted PVC (pvc://model-path) + |  | 
 | *`authSecretName`* __string__ | Name of the authentication secret. Contains HF_TOKEN + |  | 
-| *`size`* __xref:{anchor_prefix}-k8s-io-apimachinery-pkg-api-resource-quantity[$$Quantity$$]__ | Size of the model artifacts on disk +
+| *`size`* __link:https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#quantity-resource-api[$$Quantity$$]__ | Size of the model artifacts on disk +
 ensure Size is large enough when providing hf://... URI + |  | 
 |===
 
 
-[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservice"]
+[id="{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservice"]
 ==== ModelService
 
 
@@ -133,7 +134,7 @@ ModelService is the Schema for the modelservices API.
 
 .Appears In:
 ****
-- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicelist[$$ModelServiceList$$]
+- xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicelist[$$ModelServiceList$$]
 ****
 
 [cols="20a,50a,15a,15a", options="header"]
@@ -152,12 +153,12 @@ may reject unrecognized values. +
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources + |  | 
 | *`metadata`* __link:https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#objectmeta-v1-meta[$$ObjectMeta$$]__ | Refer to Kubernetes API documentation for fields of `metadata`.
  |  | 
-| *`spec`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicespec[$$ModelServiceSpec$$]__ |  |  | 
-| *`status`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicestatus[$$ModelServiceStatus$$]__ |  |  | 
+| *`spec`* __xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicespec[$$ModelServiceSpec$$]__ |  |  | 
+| *`status`* __xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicestatus[$$ModelServiceStatus$$]__ |  |  | 
 |===
 
 
-[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicelist"]
+[id="{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicelist"]
 ==== ModelServiceList
 
 
@@ -184,11 +185,36 @@ may reject unrecognized values. +
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources + |  | 
 | *`metadata`* __link:https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#listmeta-v1-meta[$$ListMeta$$]__ | Refer to Kubernetes API documentation for fields of `metadata`.
  |  | 
-| *`items`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservice[$$ModelService$$] array__ |  |  | 
+| *`items`* __xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservice[$$ModelService$$] array__ |  |  | 
 |===
 
 
-[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicespec"]
+[id="{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicepodspec"]
+==== ModelServicePodSpec
+
+
+
+ModelServicePodSpec defines the specification for pod templates that will be created by ModelService.
+
+
+
+.Appears In:
+****
+- xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicespec[$$ModelServiceSpec$$]
+- xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-pdspec[$$PDSpec$$]
+****
+
+[cols="20a,50a,15a,15a", options="header"]
+|===
+| Field | Description | Default | Validation
+| *`replicas`* __integer__ | Replicas defines the desired number of replicas for this deployment. + | 1 | Minimum: 0 +
+
+| *`containers`* __xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-containerspec[$$ContainerSpec$$] array__ | Container holds vllm container container details that will be overridden from base config when present. + |  | 
+| *`initContainers`* __xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-containerspec[$$ContainerSpec$$] array__ | InitContainers holds vllm init container details that will be overridden from base config when present. + |  | 
+|===
+
+
+[id="{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicespec"]
 ==== ModelServiceSpec
 
 
@@ -199,26 +225,27 @@ ModelServiceSpec defines the desired state of ModelService
 
 .Appears In:
 ****
-- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservice[$$ModelService$$]
+- xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservice[$$ModelService$$]
 ****
 
 [cols="20a,50a,15a,15a", options="header"]
 |===
 | Field | Description | Default | Validation
 | *`baseConfigMapRef`* __link:https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#objectreference-v1-core[$$ObjectReference$$]__ | BaseConfigMapRef provides configuration needed to spawn objects owned by modelservice + |  | 
-| *`routing`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-routing[$$Routing$$]__ | Routing provides information needed to create configuration for routing + |  | 
-| *`modelArtifacts`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelartifacts[$$ModelArtifacts$$]__ | modelArtifacts provides information needed to download artifacts +
+| *`routing`* __xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-routing[$$Routing$$]__ | Routing provides information needed to create configuration for routing + |  | 
+| *`modelArtifacts`* __xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelartifacts[$$ModelArtifacts$$]__ | modelArtifacts provides information needed to download artifacts +
 needed to serve a model + |  | 
 | *`decoupleScaling`* __boolean__ | DecoupleScaling determines who owns the replica fields is the deployment objects +
 Set this to true if the intent is to autoscale with HPA, other autoscalers +
 Setting this to false will force the controller to manage deployment replicas based on +
 replica fields in this model service + |  | 
-| *`decode`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-pdspec[$$PDSpec$$]__ | Decode is the decode portion of the spec + |  | 
-| *`prefill`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-pdspec[$$PDSpec$$]__ | Prefill is the prefill portion of the spec + |  | 
+| *`decode`* __xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-pdspec[$$PDSpec$$]__ | Decode is the decode portion of the spec + |  | 
+| *`prefill`* __xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-pdspec[$$PDSpec$$]__ | Prefill is the prefill portion of the spec + |  | 
+| *`endpointPicker`* __xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicepodspec[$$ModelServicePodSpec$$]__ | EndpointPicker is the endpoint picker (epp) portion of the spec + |  | 
 |===
 
 
-[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicestatus"]
+[id="{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicestatus"]
 ==== ModelServiceStatus
 
 
@@ -229,7 +256,7 @@ ModelServiceStatus defines the observed state of ModelService
 
 .Appears In:
 ****
-- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservice[$$ModelService$$]
+- xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservice[$$ModelService$$]
 ****
 
 [cols="20a,50a,15a,15a", options="header"]
@@ -274,7 +301,7 @@ Example types: "PrefillAvailable", "DecodeProgressing", etc. + |  |
 |===
 
 
-[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-pdspec"]
+[id="{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-pdspec"]
 ==== PDSpec
 
 
@@ -285,7 +312,7 @@ PDSpec defines the specification for prefill and decode deployments created by M
 
 .Appears In:
 ****
-- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicespec[$$ModelServiceSpec$$]
+- xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicespec[$$ModelServiceSpec$$]
 ****
 
 [cols="20a,50a,15a,15a", options="header"]
@@ -293,18 +320,18 @@ PDSpec defines the specification for prefill and decode deployments created by M
 | Field | Description | Default | Validation
 | *`replicas`* __integer__ | Replicas defines the desired number of replicas for this deployment. + | 1 | Minimum: 0 +
 
-| *`parallelism`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-parallelism[$$Parallelism$$]__ | vllm +
-Parallelism specifies vllm parallelism that will be overriden from base config when present. + |  | 
-| *`acceleratorTypes`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-acceleratortypes[$$AcceleratorTypes$$]__ | pod +
+| *`containers`* __xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-containerspec[$$ContainerSpec$$] array__ | Container holds vllm container container details that will be overridden from base config when present. + |  | 
+| *`initContainers`* __xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-containerspec[$$ContainerSpec$$] array__ | InitContainers holds vllm init container details that will be overridden from base config when present. + |  | 
+| *`parallelism`* __xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-parallelism[$$Parallelism$$]__ | vllm +
+Parallelism specifies vllm parallelism that will be overridden from base config when present. + |  | 
+| *`acceleratorTypes`* __xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-acceleratortypes[$$AcceleratorTypes$$]__ | pod +
 AcceleratorTypes determines the set of accelerators on which +
 this pod will be run. Any matching accelerator type can be used +
 to place the model pods.This will override base config when present + |  | 
-| *`containers`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-containerspec[$$ContainerSpec$$] array__ | Container holds vllm container container details that will be overriden from base config when present. + |  | 
-| *`initContainers`* __xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-containerspec[$$ContainerSpec$$] array__ | InitContainers holds vllm init container details that will be overriden from base config when present. + |  | 
 |===
 
 
-[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-parallelism"]
+[id="{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-parallelism"]
 ==== Parallelism
 
 
@@ -315,7 +342,7 @@ Parallelism defines parallelism behavior for vllm.
 
 .Appears In:
 ****
-- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-pdspec[$$PDSpec$$]
+- xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-pdspec[$$PDSpec$$]
 ****
 
 [cols="20a,50a,15a,15a", options="header"]
@@ -327,7 +354,30 @@ This also corresponds to number of GPUs + | 1 | Minimum: 0 +
 |===
 
 
-[id="{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-routing"]
+[id="{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-port"]
+==== Port
+
+
+
+
+
+
+
+.Appears In:
+****
+- xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-routing[$$Routing$$]
+****
+
+[cols="20a,50a,15a,15a", options="header"]
+|===
+| Field | Description | Default | Validation
+| *`name`* __string__ | Name that can be used in place of port number in templates + |  | 
+| *`port`* __integer__ | Value of port + |  | Minimum: 1 +
+
+|===
+
+
+[id="{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-routing"]
 ==== Routing
 
 
@@ -339,7 +389,7 @@ for a base model. This include creation of InferenceModel.
 
 .Appears In:
 ****
-- xref:{anchor_prefix}-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicespec[$$ModelServiceSpec$$]
+- xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicespec[$$ModelServiceSpec$$]
 ****
 
 [cols="20a,50a,15a,15a", options="header"]
@@ -376,6 +426,8 @@ This can be done by specifying a target model and setting the weight to zero, +
 an error will be returned specifying that no valid target model is found. + |  | MaxLength: 256 +
 Required: {} +
 
+| *`ports`* __xref:{anchor_prefix}-github-com-llm-d-llm-d-model-service-api-v1alpha1-port[$$Port$$] array__ | Ports is a list of named ports +
+These can be referenced by name in configuration of base configuration or model services + |  | 
 |===
 
 

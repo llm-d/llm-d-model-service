@@ -458,15 +458,15 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <div class="title">Resource Types</div>
 <ul>
 <li>
-<p><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservice">ModelService</a></p>
+<p><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservice">ModelService</a></p>
 </li>
 <li>
-<p><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicelist">ModelServiceList</a></p>
+<p><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicelist">ModelServiceList</a></p>
 </li>
 </ul>
 </div>
 <div class="sect3">
-<h4 id="k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-acceleratortypes">AcceleratorTypes</h4>
+<h4 id="k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-acceleratortypes">AcceleratorTypes</h4>
 <div class="paragraph">
 <p>AcceleratorTypes specifies set of accelerators for scheduling.</p>
 </div>
@@ -476,7 +476,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <div class="ulist">
 <ul>
 <li>
-<p><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-pdspec">PDSpec</a></p>
+<p><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-pdspec">PDSpec</a></p>
 </li>
 </ul>
 </div>
@@ -526,7 +526,7 @@ e.g., [A100, H100]<br></p>
 </table>
 </div>
 <div class="sect3">
-<h4 id="k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-containerspec">ContainerSpec</h4>
+<h4 id="k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-containerspec">ContainerSpec</h4>
 <div class="paragraph">
 <p>ContainerSpec defines container-level configuration.</p>
 </div>
@@ -536,7 +536,10 @@ e.g., [A100, H100]<br></p>
 <div class="ulist">
 <ul>
 <li>
-<p><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-pdspec">PDSpec</a></p>
+<p><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicepodspec">ModelServicePodSpec</a></p>
+</li>
+<li>
+<p><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-pdspec">PDSpec</a></p>
 </li>
 </ul>
 </div>
@@ -656,7 +659,7 @@ More info: <a href="https://kubernetes.io/docs/concepts/configuration/manage-res
 </table>
 </div>
 <div class="sect3">
-<h4 id="k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelartifacts">ModelArtifacts</h4>
+<h4 id="k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelartifacts">ModelArtifacts</h4>
 <div class="paragraph">
 <p>ModelArtifacts describes the source of the model</p>
 </div>
@@ -666,7 +669,7 @@ More info: <a href="https://kubernetes.io/docs/concepts/configuration/manage-res
 <div class="ulist">
 <ul>
 <li>
-<p><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicespec">ModelServiceSpec</a></p>
+<p><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicespec">ModelServiceSpec</a></p>
 </li>
 </ul>
 </div>
@@ -713,7 +716,7 @@ and pre-existing models loaded from a volume-mounted PVC (pvc://model-path)<br><
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p><strong><code>size</code></strong> <em><a href="#k8s-api-k8s-io-apimachinery-pkg-api-resource-quantity">Quantity</a></em></p>
+<p><strong><code>size</code></strong> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#quantity-resource-api">Quantity</a></em></p>
 </div></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
 <p>Size of the model artifacts on disk<br>
@@ -726,7 +729,7 @@ ensure Size is large enough when providing hf://&#8230;&#8203; URI<br></p>
 </table>
 </div>
 <div class="sect3">
-<h4 id="k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservice">ModelService</h4>
+<h4 id="k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservice">ModelService</h4>
 <div class="paragraph">
 <p>ModelService is the Schema for the modelservices API.</p>
 </div>
@@ -736,7 +739,7 @@ ensure Size is large enough when providing hf://&#8230;&#8203; URI<br></p>
 <div class="ulist">
 <ul>
 <li>
-<p><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicelist">ModelServiceList</a></p>
+<p><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicelist">ModelServiceList</a></p>
 </li>
 </ul>
 </div>
@@ -817,7 +820,7 @@ More info: <a href="https://git.k8s.io/community/contributors/devel/sig-architec
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p><strong><code>spec</code></strong> <em><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicespec">ModelServiceSpec</a></em></p>
+<p><strong><code>spec</code></strong> <em><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicespec">ModelServiceSpec</a></em></p>
 </div></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"></div></td>
@@ -825,7 +828,7 @@ More info: <a href="https://git.k8s.io/community/contributors/devel/sig-architec
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p><strong><code>status</code></strong> <em><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicestatus">ModelServiceStatus</a></em></p>
+<p><strong><code>status</code></strong> <em><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicestatus">ModelServiceStatus</a></em></p>
 </div></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"></div></td>
@@ -835,7 +838,7 @@ More info: <a href="https://git.k8s.io/community/contributors/devel/sig-architec
 </table>
 </div>
 <div class="sect3">
-<h4 id="k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicelist">ModelServiceList</h4>
+<h4 id="k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicelist">ModelServiceList</h4>
 <div class="paragraph">
 <p>ModelServiceList contains a list of ModelService</p>
 </div>
@@ -914,7 +917,7 @@ More info: <a href="https://git.k8s.io/community/contributors/devel/sig-architec
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p><strong><code>items</code></strong> <em><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservice">ModelService</a> array</em></p>
+<p><strong><code>items</code></strong> <em><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservice">ModelService</a> array</em></p>
 </div></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"></div></td>
@@ -924,7 +927,80 @@ More info: <a href="https://git.k8s.io/community/contributors/devel/sig-architec
 </table>
 </div>
 <div class="sect3">
-<h4 id="k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicespec">ModelServiceSpec</h4>
+<h4 id="k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicepodspec">ModelServicePodSpec</h4>
+<div class="paragraph">
+<p>ModelServicePodSpec defines the specification for pod templates that will be created by ModelService.</p>
+</div>
+<div class="sidebarblock">
+<div class="content">
+<div class="title">Appears In:</div>
+<div class="ulist">
+<ul>
+<li>
+<p><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicespec">ModelServiceSpec</a></p>
+</li>
+<li>
+<p><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-pdspec">PDSpec</a></p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 20%;">
+<col style="width: 50%;">
+<col style="width: 15%;">
+<col style="width: 15%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Field</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Default</th>
+<th class="tableblock halign-left valign-top">Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p><strong><code>replicas</code></strong> <em>integer</em></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>Replicas defines the desired number of replicas for this deployment.<br></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>1</p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>Minimum: 0<br></p>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p><strong><code>containers</code></strong> <em><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-containerspec">ContainerSpec</a> array</em></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>Container holds vllm container container details that will be overridden from base config when present.<br></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p><strong><code>initContainers</code></strong> <em><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-containerspec">ContainerSpec</a> array</em></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>InitContainers holds vllm init container details that will be overridden from base config when present.<br></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicespec">ModelServiceSpec</h4>
 <div class="paragraph">
 <p>ModelServiceSpec defines the desired state of ModelService</p>
 </div>
@@ -934,7 +1010,7 @@ More info: <a href="https://git.k8s.io/community/contributors/devel/sig-architec
 <div class="ulist">
 <ul>
 <li>
-<p><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservice">ModelService</a></p>
+<p><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservice">ModelService</a></p>
 </li>
 </ul>
 </div>
@@ -968,7 +1044,7 @@ More info: <a href="https://git.k8s.io/community/contributors/devel/sig-architec
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p><strong><code>routing</code></strong> <em><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-routing">Routing</a></em></p>
+<p><strong><code>routing</code></strong> <em><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-routing">Routing</a></em></p>
 </div></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
 <p>Routing provides information needed to create configuration for routing<br></p>
@@ -978,7 +1054,7 @@ More info: <a href="https://git.k8s.io/community/contributors/devel/sig-architec
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p><strong><code>modelArtifacts</code></strong> <em><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelartifacts">ModelArtifacts</a></em></p>
+<p><strong><code>modelArtifacts</code></strong> <em><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelartifacts">ModelArtifacts</a></em></p>
 </div></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
 <p>modelArtifacts provides information needed to download artifacts<br>
@@ -1002,7 +1078,7 @@ replica fields in this model service<br></p>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p><strong><code>decode</code></strong> <em><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-pdspec">PDSpec</a></em></p>
+<p><strong><code>decode</code></strong> <em><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-pdspec">PDSpec</a></em></p>
 </div></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
 <p>Decode is the decode portion of the spec<br></p>
@@ -1012,10 +1088,20 @@ replica fields in this model service<br></p>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p><strong><code>prefill</code></strong> <em><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-pdspec">PDSpec</a></em></p>
+<p><strong><code>prefill</code></strong> <em><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-pdspec">PDSpec</a></em></p>
 </div></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
 <p>Prefill is the prefill portion of the spec<br></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p><strong><code>endpointPicker</code></strong> <em><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicepodspec">ModelServicePodSpec</a></em></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>EndpointPicker is the endpoint picker (epp) portion of the spec<br></p>
 </div></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"></div></td>
@@ -1024,7 +1110,7 @@ replica fields in this model service<br></p>
 </table>
 </div>
 <div class="sect3">
-<h4 id="k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicestatus">ModelServiceStatus</h4>
+<h4 id="k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicestatus">ModelServiceStatus</h4>
 <div class="paragraph">
 <p>ModelServiceStatus defines the observed state of ModelService</p>
 </div>
@@ -1034,7 +1120,7 @@ replica fields in this model service<br></p>
 <div class="ulist">
 <ul>
 <li>
-<p><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservice">ModelService</a></p>
+<p><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservice">ModelService</a></p>
 </li>
 </ul>
 </div>
@@ -1234,7 +1320,7 @@ Example types: "PrefillAvailable", "DecodeProgressing", etc.<br></p>
 </table>
 </div>
 <div class="sect3">
-<h4 id="k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-pdspec">PDSpec</h4>
+<h4 id="k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-pdspec">PDSpec</h4>
 <div class="paragraph">
 <p>PDSpec defines the specification for prefill and decode deployments created by ModelService.</p>
 </div>
@@ -1244,7 +1330,7 @@ Example types: "PrefillAvailable", "DecodeProgressing", etc.<br></p>
 <div class="ulist">
 <ul>
 <li>
-<p><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicespec">ModelServiceSpec</a></p>
+<p><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicespec">ModelServiceSpec</a></p>
 </li>
 </ul>
 </div>
@@ -1282,18 +1368,38 @@ Example types: "PrefillAvailable", "DecodeProgressing", etc.<br></p>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p><strong><code>parallelism</code></strong> <em><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-parallelism">Parallelism</a></em></p>
+<p><strong><code>containers</code></strong> <em><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-containerspec">ContainerSpec</a> array</em></p>
 </div></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p>vllm<br>
-Parallelism specifies vllm parallelism that will be overriden from base config when present.<br></p>
+<p>Container holds vllm container container details that will be overridden from base config when present.<br></p>
 </div></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"></div></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p><strong><code>acceleratorTypes</code></strong> <em><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-acceleratortypes">AcceleratorTypes</a></em></p>
+<p><strong><code>initContainers</code></strong> <em><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-containerspec">ContainerSpec</a> array</em></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>InitContainers holds vllm init container details that will be overridden from base config when present.<br></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p><strong><code>parallelism</code></strong> <em><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-parallelism">Parallelism</a></em></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>vllm<br>
+Parallelism specifies vllm parallelism that will be overridden from base config when present.<br></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p><strong><code>acceleratorTypes</code></strong> <em><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-acceleratortypes">AcceleratorTypes</a></em></p>
 </div></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
 <p>pod<br>
@@ -1304,31 +1410,11 @@ to place the model pods.This will override base config when present<br></p>
 <td class="tableblock halign-left valign-top"><div class="content"></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"></div></td>
 </tr>
-<tr>
-<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p><strong><code>containers</code></strong> <em><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-containerspec">ContainerSpec</a> array</em></p>
-</div></div></td>
-<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p>Container holds vllm container container details that will be overriden from base config when present.<br></p>
-</div></div></td>
-<td class="tableblock halign-left valign-top"><div class="content"></div></td>
-<td class="tableblock halign-left valign-top"><div class="content"></div></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p><strong><code>initContainers</code></strong> <em><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-containerspec">ContainerSpec</a> array</em></p>
-</div></div></td>
-<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p>InitContainers holds vllm init container details that will be overriden from base config when present.<br></p>
-</div></div></td>
-<td class="tableblock halign-left valign-top"><div class="content"></div></td>
-<td class="tableblock halign-left valign-top"><div class="content"></div></td>
-</tr>
 </tbody>
 </table>
 </div>
 <div class="sect3">
-<h4 id="k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-parallelism">Parallelism</h4>
+<h4 id="k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-parallelism">Parallelism</h4>
 <div class="paragraph">
 <p>Parallelism defines parallelism behavior for vllm.</p>
 </div>
@@ -1338,7 +1424,7 @@ to place the model pods.This will override base config when present<br></p>
 <div class="ulist">
 <ul>
 <li>
-<p><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-pdspec">PDSpec</a></p>
+<p><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-pdspec">PDSpec</a></p>
 </li>
 </ul>
 </div>
@@ -1379,7 +1465,62 @@ This also corresponds to number of GPUs<br></p>
 </table>
 </div>
 <div class="sect3">
-<h4 id="k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-routing">Routing</h4>
+<h4 id="k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-port">Port</h4>
+<div class="sidebarblock">
+<div class="content">
+<div class="title">Appears In:</div>
+<div class="ulist">
+<ul>
+<li>
+<p><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-routing">Routing</a></p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 20%;">
+<col style="width: 50%;">
+<col style="width: 15%;">
+<col style="width: 15%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Field</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Default</th>
+<th class="tableblock halign-left valign-top">Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p><strong><code>name</code></strong> <em>string</em></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>Name that can be used in place of port number in templates<br></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p><strong><code>port</code></strong> <em>integer</em></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>Value of port<br></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>Minimum: 1<br></p>
+</div></div></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect3">
+<h4 id="k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-routing">Routing</h4>
 <div class="paragraph">
 <p>Routing provides the information needed to configure routing
 for a base model. This include creation of InferenceModel.</p>
@@ -1390,7 +1531,7 @@ for a base model. This include creation of InferenceModel.</p>
 <div class="ulist">
 <ul>
 <li>
-<p><a href="#k8s-api-github-com-neuralmagic-llm-d-model-service-api-v1alpha1-modelservicespec">ModelServiceSpec</a></p>
+<p><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-modelservicespec">ModelServiceSpec</a></p>
 </li>
 </ul>
 </div>
@@ -1452,6 +1593,17 @@ an error will be returned specifying that no valid target model is found.<br></p
 Required: {}<br></p>
 </div></div></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p><strong><code>ports</code></strong> <em><a href="#k8s-api-github-com-llm-d-llm-d-model-service-api-v1alpha1-port">Port</a> array</em></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>Ports is a list of named ports<br>
+These can be referenced by name in configuration of base configuration or model services<br></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -1461,7 +1613,7 @@ Required: {}<br></p>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2025-05-09 18:19:36 -0400
+Last updated 2025-05-14 17:04:13 -0400
 </div>
 </div>
 </body>

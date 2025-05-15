@@ -1,4 +1,4 @@
-# Based on: https://github.com/neuralmagic/llm-d-routing-sidecar/tree/dev/test/config/nixl
+# Based on: https://github.com/llm-d/llm-d-routing-sidecar/tree/dev/test/config/nixl
 #
 # Requirements:
 # Any consuming ModelService should define ports labeled:

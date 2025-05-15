@@ -1,10 +1,10 @@
 # Developer Docs
 
-Clone the [ModelService GitHub repository](https://github.com/neuralmagic/llm-d-model-service) (or a fork of it) to take advantage of the `make` commands described below.  All commands are from the project root directory.
+Clone the [ModelService GitHub repository](https://github.com/llm-d/llm-d-model-service) (or a fork of it) to take advantage of the `make` commands described below.  All commands are from the project root directory.
 
 Execution of the ModelService controller requires access to a cluster.
 A local cluster, such as a `kind` cluster, suffices for basic execution and development testing.
-However, testing end-to-end with a large language model may not be possible if the cluster does not have sufficient resources or if the [inference gateway](https://github.com/neuralmagic/gateway-api-inference-extension) is not fully configured.
+However, testing end-to-end with a large language model may not be possible if the cluster does not have sufficient resources or if the [inference gateway](https://github.com/llm-d/gateway-api-inference-extension) is not fully configured.
 
 If a cluster is not available, you can do a dry-run to identify the Kubernetes resources that will be created for a given `ModelService CR`. See [ModelService Dry Run](#modelservice-dry-run) below.
 
@@ -19,7 +19,7 @@ kubectl apply -f https://github.com/kubernetes-sigs/gateway-api-inference-extens
 
 ### Define Cluster Role for Endpoint Picker (EPP)
 
-For the endpoint picker used in the [samples](https://github.com/neuralmagic/llm-d-model-service/tree/dev/samples), the `pod-read` cluster role defined [here](https://github.com/neuralmagic/gateway-api-inference-extension/blob/dev/config/manifests/inferencepool-resources.yaml#L84-L112) works.
+For the endpoint picker used in the [samples](https://github.com/llm-d/llm-d-model-service/tree/dev/samples), the `pod-read` cluster role defined [here](https://github.com/llm-d/gateway-api-inference-extension/blob/dev/config/manifests/inferencepool-resources.yaml#L84-L112) works.
 
 ### Install ModelService CRDs
 
@@ -42,9 +42,9 @@ You can run the ModelService controller locally operating against the cluster de
 make run EPP_CLUSTERROLE=pod-read
 ```
 
-You can now create `ModelService` objects. See [samples](https://github.com/neuralmagic/llm-d-model-service/tree/dev/samples) for details.
+You can now create `ModelService` objects. See [samples](https://github.com/llm-d/llm-d-model-service/tree/dev/samples) for details.
 
-To avoid long image and model downloads, you can create dummy model services such as those in[ `samples/test`](https://github.com/neuralmagic/llm-d-model-service/tree/dev/samples/test).
+To avoid long image and model downloads, you can create dummy model services such as those in[ `samples/test`](https://github.com/llm-d/llm-d-model-service/tree/dev/samples/test).
 
 ## Running in a Cluster
 
@@ -52,7 +52,7 @@ Deploy the controller to the cluster:
 
 1. Create the target namespace `modelservice-system`
 
-    By default, the ModelService controller is deployed to the `modelservice-system` namespace. To change the target namespace, create a kustomize overlay (see [`config/dev`](https://github.com/neuralmagic/llm-d-model-service/tree/dev/config/dev)).
+    By default, the ModelService controller is deployed to the `modelservice-system` namespace. To change the target namespace, create a kustomize overlay (see [`config/dev`](https://github.com/llm-d/llm-d-model-service/tree/dev/config/dev)).
 
 2. Deploy the controller:
 
@@ -64,7 +64,7 @@ Deploy the controller to the cluster:
 
     If an image pull secret is required, you can specify it with the environment variable `IMAGE_PULL_SECRET`.
 
-You can now create `ModelService` objects. See [samples](https://github.com/neuralmagic/llm-d-model-service/tree/dev/samples) for details.
+You can now create `ModelService` objects. See [samples](https://github.com/llm-d/llm-d-model-service/tree/dev/samples) for details.
 
 ## Uninstall
 

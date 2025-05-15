@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/neuralmagic/llm-d-model-service/test/utils"
+	"github.com/llm-d/llm-d-model-service/test/utils"
 )
 
 var (
