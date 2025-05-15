@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"testing"
 
-	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
+	msv1alpha1 "github.com/llm-d/llm-d-model-service/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

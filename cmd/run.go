@@ -40,8 +40,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
-	"github.com/neuralmagic/llm-d-model-service/internal/controller"
+	msv1alpha1 "github.com/llm-d/llm-d-model-service/api/v1alpha1"
+	"github.com/llm-d/llm-d-model-service/internal/controller"
 	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"

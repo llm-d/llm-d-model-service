@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 
-	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
+	msv1alpha1 "github.com/llm-d/llm-d-model-service/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
