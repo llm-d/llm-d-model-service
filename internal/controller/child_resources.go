@@ -601,23 +601,6 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 		},
 	}
 
-	// // Post processing for containers where mountModelVolume is true
-	// // InitContainers first
-	// for i := range desiredDeployment.Spec.Template.Spec.InitContainers {
-	// 	// Get MountModelVolume boolean from pdSpec
-	// 	if ifMount := pdSpec.InitContainers[i].MountModelVolume; ifMount {
-	// 		desiredDeployment.Spec.Template.Spec.InitContainers[i].VolumeMounts = getVolumeMountsForContainer(ctx, msvc)
-	// 	}
-	// }
-
-	// // Then, Containers
-	// for i := range desiredDeployment.Spec.Template.Spec.Containers {
-	// 	// Get MountModelVolume boolean from pdSpec
-	// 	if ifMount := pdSpec.Containers[i].MountModelVolume; ifMount {
-	// 		desiredDeployment.Spec.Template.Spec.Containers[i].VolumeMounts = getVolumeMountsForContainer(ctx, msvc)
-	// 	}
-	// }
-
 	// Finally, set owner references
 	err = controllerutil.SetOwnerReference(msvc, desiredDeployment, scheme)
 	if err != nil {
