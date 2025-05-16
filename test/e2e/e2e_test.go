@@ -548,21 +548,3 @@ type tokenRequest struct {
 		Token string `json:"token"`
 	} `json:"status"`
 }
-
-func stringToReader(s string) *stringReader {
-	return &stringReader{s: s}
-}
-
-type stringReader struct {
-	s string
-	i int64
-}
-
-func (r *stringReader) Read(p []byte) (int, error) {
-	if r.i >= int64(len(r.s)) {
-		return 0, fmt.Errorf("EOF")
-	}
-	n := copy(p, r.s[r.i:])
-	r.i += int64(n)
-	return n, nil
-}
