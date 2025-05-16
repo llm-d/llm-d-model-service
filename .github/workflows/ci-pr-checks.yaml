@@ -25,23 +25,16 @@ jobs:
           cache-dependency-path: ./go.sum
 
       - name: Run lint checks
-        run: |
-          echo "Running golangci-lint..."
-
-          # Verify config file exists
-          if [ -f .golangci.yml ] || [ -f .golangci.yaml ] || [ -f .golangci.toml ]; then
-            echo "✅ Found golangci-lint config file"
-          else
-            echo "⚠️ No golangci-lint config file found. Using default linters"
-          fi
-
-          make lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.1
+          args: "--config=./.golangci.yml"
 
       - name: Run go test
         shell: bash 
         run: |
           echo "Installing Ginkgo..."
-          go install github.com/onsi/ginkgo/ginkgo@latest
+          go install github.com/onsi/ginkgo/ginkgo@v2.23.3
           export PATH=$PATH:$(go env GOPATH)/bin
           echo "Ginkgo installed:"
           ginkgo version
