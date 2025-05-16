@@ -25,9 +25,8 @@ jobs:
           cache-dependency-path: ./go.sum
 
       - name: Run lint checks
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v8
         with:
-          version: v2
           args: "--config=./.golangci.yml"
 
       - name: Run go test
