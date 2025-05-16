@@ -14,16 +14,7 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
-
-      - name: Read project name from .version.json
-        id: version
-        run: |
-          name=$(jq -r '."project-name"' .version.json)
-          echo "project_name=$name" >> "$GITHUB_OUTPUT"
-
-      - name: Print project name
-        run: echo "Project is ${{ steps.version.outputs.project_name }}"
-
+        
       - name: Sanity check repo contents
         run: ls -la
     
