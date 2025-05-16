@@ -1,19 +1,3 @@
-/*
-Copyright 2025.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package controller
 
 import (
@@ -36,7 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
+	msv1alpha1 "github.com/llm-d/llm-d-model-service/api/v1alpha1"
 	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 )
 
@@ -210,13 +194,16 @@ func (r *ModelServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	interpolatedBaseConfig = interpolatedBaseConfig.MergeChildResources(ctx, interpolatedModelService, r.Scheme, &r.RBACOptions)
 
 	// TODO: Post-process for decoupled Scaling
-	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate child resources")
+	log.FromContext(ctx).V(1).Info("creating or updating child resources now")
 
-	err = interpolatedBaseConfig.createOrUpdate(ctx, r, modelService.Spec.DecoupleScaling)
+	errs := interpolatedBaseConfig.invokeCreateOrUpdate(ctx, r, interpolatedModelService)
 
-	if err != nil {
-		log.FromContext(ctx).Error(err, "unable createorupdate from interpolatedBaseConfig")
-		return ctrl.Result{}, err
+	if len(errs) > 0 {
+		log.FromContext(ctx).Error(fmt.Errorf("problem creating %d child resources", len(errs)), "createOrUpdate failed")
+
+		// TODO: requeue here?
+		// Return the last error
+		return ctrl.Result{}, errs[len(errs)-1]
 	}
 
 	//update status

@@ -1,0 +1,41 @@
+name: CI PipelineRun
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  pull_request:
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Sanity check repo contents
+        run: ls -la
+
+      - name: Run lint checks
+        uses: ./.github/actions/lint
+
+      - name: Build container image
+        uses: ./.github/actions/docker-build-and-push
+        with:
+          image-name: my-app
+          tag: ${{ github.sha }}
+          github-token: ${{ secrets.GHCR_TOKEN }}
+        
+      - name: Run Trivy scan
+        uses: ./.github/actions/trivy-scan
+        with:
+          image: ghcr.io/llm-d/my-app:${{ github.sha }}
+
+    #   - name: Push image
+    #     if: github.ref == 'refs/heads/main'
+    #     uses: ./.github/actions/push-image
+    #     with:
+    #       image-name: my-app
+    #       tag: ${{ github.sha }}
+    #       registry: ghcr.io/llm-d

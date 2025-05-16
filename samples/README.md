@@ -19,7 +19,7 @@ Before you get started, ensure that you have the following install and running.
 If you need more guidance, refer to the [developer docs](../docs/developer.md) on how to properly install the ModelService controller and other components on your system.
 
 ## Scenarios 
-
+*Note: we have set `acceleratorTypes` to A100-80GB, please reset as per resurces available in your cluster*
 ### Scenario 1: serving a base model on vLLM on one pod
 A simple use case is online serving a model on vLLM using one deployment. We will serve [`ibm-granite/granite-3.3-2b-base`](https://huggingface.co/ibm-granite/granite-3.3-2b-base) which can be downloaded from Hugging Face without the need for a token.
 
@@ -33,14 +33,14 @@ The `simple-baseconfig` contains just one section for `decodeDeployment`, which 
 Applying the baseconfig and CR to an OpenShift cluster, you should expect a deployment and service getting created. 
 
 ```
-oc apply -f samples/baseconfigs/simple-baseconfig.yaml
-oc apply -f samples/msvcs/granite3.2.yaml
+kubectl apply -f samples/baseconfigs/simple-baseconfig.yaml
+kubectl apply -f samples/msvcs/granite3.2.yaml
 ```
 
 You may port-forward the pod or service at port 8000 (because those are the ports for the vLLM container and decode service specified in the baseconfig) and query the vLLM container. The following command port-forwards the service.
 
 ```
-oc port-forward svc/granite-base-model-service-decode 8000:8000
+kubectl port-forward svc/granite-base-model-service-decode 8000:8000
 curl  http://localhost:8000/v1/completions \
     -H "Content-Type: application/json" \
     -d '{
@@ -58,8 +58,8 @@ The platform owner may create another baseconfig used to serve models with routi
 Applying the baseconfig and CR to an OpenShift cluster, you should expect a deployment and service getting created. 
 
 ```
-oc apply -f samples/baseconfigs/universal-baseconfig.yaml
-oc apply -f samples/msvcs/facebook-nixl.yaml
+kubectl apply -f samples/baseconfigs/universal-baseconfig.yaml
+kubectl apply -f samples/msvcs/facebook-nixl.yaml
 ```
 
 You should expect to see the following resources created for this scenario:
@@ -83,7 +83,7 @@ You should expect to see the following resources created for this scenario:
 You may port-forward the services or pods and query vLLM directly. Optionally, if inference-gateway is installed in the cluster, use that which will route to the EPP. 
 
 ```
-oc port-forward svc/inference-gateway 8000:<inference-gateway-port>
+kubectl port-forward svc/inference-gateway 8000:<inference-gateway-port>
 curl  http://localhost:8000/v1/completions \
     -H "Content-Type: application/json" \
     -d '{
@@ -101,7 +101,7 @@ Note that in this scenario, we are using the same baseconfig used in the last sc
 - [baseconfigs/universal-baseconfig.yaml](./baseconfigs/universal-baseconfig.yaml)
 
 ```
-oc apply -f samples/msvcs/xpyd.yaml
+kubectl apply -f samples/msvcs/xpyd.yaml
 ```
 
 and you should see the corresponding number of pods spin up for each deployment.
@@ -113,8 +113,8 @@ Downloading a model from Hugging Face takes a long time for large models like [`
 - [baseconfigs/universal-baseconfig-pvc.yaml](./baseconfigs/universal-baseconfig-pvc.yaml)
 
 ```
-oc apply -f samples/baseconfigs/universal-baseconfig-pvc.yaml
-oc apply -f samples/msvcs/llama4.yaml
+kubectl apply -f samples/baseconfigs/universal-baseconfig-pvc.yaml
+kubectl apply -f samples/msvcs/llama4.yaml
 ```
 
 This should drastically shorten the wait time for pod creation. 

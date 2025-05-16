@@ -5,11 +5,8 @@
 A *ModelService* custom resource encapsulates the desired state of workloads and routing associated with a single base model. It automates the management of Kubernetes resources, including:
 
 * Prefill and decode deployments
-
 * Inference pool and model defined by [Gateway API Inference Extension](https://gateway-api-inference-extension.sigs.k8s.io)
-
 * [Endpoint picker (EPP) deployment and service](https://gateway-api-inference-extension.sigs.k8s.io/?h=endpoint#endpoint-selection-extension)
-
 * Relevant RBAC permissions
 
 A *ModelService* may optionally reference a **BaseConfig** — a Kubernetes ConfigMap that defines reusable, platform-managed presets for shared behavior across multiple base models.
@@ -32,11 +29,9 @@ The *ModelService* controller reconciles the cluster state to align with the con
 
 📦 Supports model loading from:
 
-* HuggingFace (public or private)
-
-* Kubernetes PVCs
-
-* OCI images
+  * HuggingFace (public or private)
+  * Kubernetes PVCs
+  * OCI images
 
 🧩 Supports value templating in both *BaseConfig* and *ModelService* resources
 
@@ -50,11 +45,9 @@ When a *ModelService* resource is reconciled:
 
 3. **Orchestration**: the controller creates or updates the following resources:
 
-* Inference workloads (prefill and decode deployments)
-
-* Routing resources (e.g., EPP deployment)
-
-* RBAC permissions
+  * Inference workloads (prefill and decode deployments)
+  * Routing resources (e.g., EPP deployment)
+  * RBAC permissions
 
 The result is a fully managed inference stack for the base model.
 
@@ -63,11 +56,8 @@ The result is a fully managed inference stack for the base model.
 ## Best Practices
 
 * Use *BaseConfig* to capture platform-level defaults and shared configurations across multiple base models.
-
 * Use *ModelService* to define behavior specific to a given base model, and override *BaseConfig* values only when necessary.
-
 * Platform teams should install *Baseconfig* presets using the `llm-d` deployer.
-
 * Base model owners should prefer using these presets to streamline onboarding of base models, rather than creating their own *BaseConfigs*.
 
 ## Docs
@@ -81,3 +71,23 @@ The result is a fully managed inference stack for the base model.
 ### [API Reference](docs/apireference.md)
 
 ### [Developer](docs/developer.md)
+
+## Roadmap
+
+`Modelservice` roadmap features in no specific order.
+
+1. Multiple base models: Create HTTPRoute and related routing configuration
+
+2. LoRA adapters: Create LoRA controller that integrates with `ModelService`
+
+3. Routing weights: Allow a logical model to expose multiple model versions via routing weights
+
+4. In-cluster model caching: download model artifacts once into cluster and reuse
+
+5. Node-level model caching: pre-load model artifacts onto nodes for fast model loading
+
+6. BaseConfig CRD: migrate from the use of configmaps to CRD for `baseconfig` resources
+
+7. Prometheus metrics exporter: Emit controller metrics
+
+8. Enable multi-node inferencing: for instance, using LWS integration

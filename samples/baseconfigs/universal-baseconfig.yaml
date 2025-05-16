@@ -1,4 +1,4 @@
-# Based on: https://github.com/neuralmagic/llm-d-routing-sidecar/tree/dev/test/config/nixl
+# Based on: https://github.com/llm-d/llm-d-routing-sidecar/tree/dev/test/config/nixl
 #
 # Requirements:
 # Any consuming ModelService should define ports labeled:
@@ -18,7 +18,7 @@ data:
         spec:
           initContainers:
             - name: routing-proxy
-              image: quay.io/llm-d/llm-d-routing-sidecar:0.0.5
+              image: ghcr.io/llm-d/llm-d-routing-sidecar:0.0.6
               securityContext:
                 allowPrivilegeEscalation: false
                 runAsNonRoot: true
@@ -33,7 +33,7 @@ data:
               restartPolicy: Always
           containers:
             - name: vllm
-              image: quay.io/llm-d/llm-d:0.0.6
+              image: grcr.io/llm-d/llm-d:0.0.8
               command:
                 - vllm
                 - serve
@@ -80,7 +80,7 @@ data:
         spec:
           containers:
             - name: vllm
-              image: quay.io/llm-d/llm-d:0.0.6
+              image: ghcr.io/llm-d/llm-d:0.0.8
               command:
                 - vllm
                 - serve
@@ -163,7 +163,7 @@ data:
                   value: "true"
                 - name: PD_PROMPT_LEN_THRESHOLD
                   value: "10"
-              image: quay.io/llm-d/llm-d-gateway-api-inference-extension-dev:0.0.5
+              image: ghcr.io/llm-d/llm-d-inference-scheduler:0.0.3
               imagePullPolicy: Always
               livenessProbe:
                 failureThreshold: 3

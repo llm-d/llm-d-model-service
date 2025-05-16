@@ -1,19 +1,3 @@
-/*
-Copyright 2025.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package controller
 
 import (
@@ -23,7 +7,7 @@ import (
 	"text/template"
 
 	"dario.cat/mergo"
-	msv1alpha1 "github.com/neuralmagic/llm-d-model-service/api/v1alpha1"
+	msv1alpha1 "github.com/llm-d/llm-d-model-service/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -55,6 +39,66 @@ type BaseConfig struct {
 	EPPServiceAccount *corev1.ServiceAccount      `json:"eppServiceAccount,omitempty"`
 	PDServiceAccount  *corev1.ServiceAccount      `json:"pdServiceAccount,omitempty"`
 	EPPRoleBinding    *rbacv1.RoleBinding         `json:"eppRoleBinding,omitempty"`
+}
+
+// shouldCreateConfigMaps returns True if there is at least one ConfigMap to be created
+func (childResource *BaseConfig) shouldCreateConfigMaps() bool {
+	return len(childResource.ConfigMaps) > 0
+}
+
+// shouldCreatePrefillDeployment returns True if the prefill deployment needs to be created
+func (childResource *BaseConfig) shouldCreatePrefillDeployment() bool {
+	return childResource.PrefillDeployment != nil
+}
+
+// shouldCreatePrefillService returns True if the prefill deployment needs to be created
+func (childResource *BaseConfig) shouldCreatePrefillService() bool {
+	return childResource.shouldCreatePrefillDeployment() && childResource.PrefillService != nil
+}
+
+// shouldCreateDecodeDeployment returns True if the decode deployment needs to be created
+func (childResource *BaseConfig) shouldCreateDecodeDeployment() bool {
+	return childResource.DecodeDeployment != nil
+}
+
+// shouldCreateDecodeService returns True if the decode deployment needs to be created
+func (childResource *BaseConfig) shouldCreateDecodeService() bool {
+	return childResource.shouldCreateDecodeDeployment() && childResource.DecodeService != nil
+}
+
+// shouldCreatePDServiceAccount returns True if either prefill or decode deployment needs to be created
+func (childResource *BaseConfig) shouldCreatePDServiceAccount() bool {
+	return childResource.shouldCreatePrefillDeployment() || childResource.shouldCreateDecodeDeployment()
+}
+
+// shouldCreateEPPDeployment returns True if the EPP deployment needs to be created
+func (childResource *BaseConfig) shouldCreateEPPDeployment() bool {
+	return childResource.EPPDeployment != nil
+}
+
+// shouldCreateEPPService returns True if the EPP deployment needs to be created
+func (childResource *BaseConfig) shouldCreateEPPService() bool {
+	return childResource.shouldCreateEPPDeployment() && childResource.EPPService != nil
+}
+
+// shouldCreateEPPServiceAccount returns True if EPP deployment needs to be created
+func (childResource *BaseConfig) shouldCreateEPPServiceAccount() bool {
+	return childResource.shouldCreateEPPDeployment() && childResource.EPPServiceAccount != nil
+}
+
+// createEPPServiceAccount returns True if EPP deployment needs to be created
+func (childResource *BaseConfig) shouldCreateEPPRoleBinding() bool {
+	return childResource.shouldCreateEPPDeployment() && childResource.EPPRoleBinding != nil
+}
+
+// shouldCreateInferencePool returns True if InferencePool needs to be created
+func (childResource *BaseConfig) shouldCreateInferencePool() bool {
+	return childResource.InferencePool != nil
+}
+
+// shouldCreateInferenceModel returns True if InferenceModel needs to be created
+func (childResource *BaseConfig) shouldCreateInferenceModel() bool {
+	return childResource.InferenceModel != nil
 }
 
 // InterpolateBaseConfigMap data strings using msvc template variable values
@@ -668,190 +712,6 @@ func (childResource *BaseConfig) setEPPRoleBinding(ctx context.Context, msvc *ms
 
 }
 
-// createOrUpdate all the child resources
-func (childResource *BaseConfig) createOrUpdate(ctx context.Context, r *ModelServiceReconciler, decoupleScaling bool) error {
-	// create or update configmaps
-	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate configmaps")
-	childResource.createOrUpdateConfigMaps(ctx, r)
-
-	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate prefill deployment")
-	childResource.createOrUpdatePDDeployment(ctx, r, PREFILL_ROLE, decoupleScaling)
-
-	log.FromContext(ctx).V(1).Info("attempting to createOrUpdate decode deployment")
-	childResource.createOrUpdatePDDeployment(ctx, r, DECODE_ROLE, decoupleScaling)
-
-	// Create or update services only if corresponding deployment exists in childResources
-	childResource.createOrUpdateServiceForDeployment(ctx, r, PREFILL_ROLE)
-	childResource.createOrUpdateServiceForDeployment(ctx, r, DECODE_ROLE)
-
-	// create of update inference pool
-	childResource.createOrUpdateInferencePool(ctx, r)
-
-	// create of update inference model
-	childResource.createOrUpdateInferenceModel(ctx, r)
-
-	if childResource.EPPDeployment != nil {
-		err := childResource.createEppDeployment(ctx, r.Client)
-		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "unable to create epp deployment")
-		}
-	}
-
-	if childResource.EPPService != nil {
-		err := childResource.createEppService(ctx, r.Client)
-		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "unable to create epp service")
-		}
-	}
-
-	if childResource.EPPServiceAccount != nil {
-		err := childResource.createEppServiceAccount(ctx, r.Client)
-		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
-		}
-	}
-
-	if childResource.EPPRoleBinding != nil {
-		err := childResource.createEppRoleBinding(ctx, r.Client)
-		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
-		}
-	}
-
-	if childResource.PDServiceAccount != nil {
-		err := childResource.createPDServiceAccount(ctx, r.Client)
-		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
-		}
-	}
-
-	return nil
-}
-
-func (childResource *BaseConfig) createOrUpdateInferenceModel(ctx context.Context, r *ModelServiceReconciler) {
-	// nothing to do without inf model
-	if childResource == nil || childResource.InferenceModel == nil {
-		return
-	}
-
-	infModelInCluster := &giev1alpha2.InferenceModel{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      childResource.InferenceModel.Name,
-			Namespace: childResource.InferenceModel.Namespace,
-		},
-	}
-
-	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, infModelInCluster, func() error {
-		infModelInCluster.Labels = childResource.InferenceModel.Labels
-		infModelInCluster.OwnerReferences = childResource.InferenceModel.OwnerReferences
-		infModelInCluster.Spec = childResource.InferenceModel.Spec
-		return nil
-	})
-
-	if err != nil {
-		if op != controllerutil.OperationResultNone {
-			log.FromContext(ctx).V(1).Error(err, "unable to create inference model")
-		}
-	}
-}
-
-func (childResource *BaseConfig) createOrUpdateConfigMaps(ctx context.Context, r *ModelServiceReconciler) {
-	for i := range childResource.ConfigMaps {
-		cm := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      childResource.ConfigMaps[i].Name,
-				Namespace: childResource.ConfigMaps[i].Namespace,
-			}}
-
-		op, err := controllerutil.CreateOrUpdate(ctx, r.Client, cm, func() error {
-			cm.OwnerReferences = childResource.ConfigMaps[i].OwnerReferences
-			cm.Labels = childResource.ConfigMaps[i].Labels
-			cm.Data = childResource.ConfigMaps[i].Data
-			return nil
-		})
-		if err != nil {
-			if op != controllerutil.OperationResultNone {
-				log.FromContext(ctx).V(1).Error(err, "unable to create configmap")
-			}
-		}
-	}
-}
-
-func (childResource *BaseConfig) createOrUpdatePDDeployment(ctx context.Context, r *ModelServiceReconciler, role string, decoupleScaling bool) {
-
-	var desiredDeployment *appsv1.Deployment
-
-	if role == PREFILL_ROLE {
-		desiredDeployment = childResource.PrefillDeployment
-	} else {
-		desiredDeployment = childResource.DecodeDeployment
-	}
-
-	if desiredDeployment != nil {
-		deploymentInCluster := &appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      desiredDeployment.Name,
-				Namespace: desiredDeployment.Namespace,
-			}}
-
-		op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deploymentInCluster, func() error {
-			deploymentInCluster.OwnerReferences = desiredDeployment.OwnerReferences
-			deploymentInCluster.Labels = desiredDeployment.Labels
-			inClusterReplicas := deploymentInCluster.Spec.Replicas
-			deploymentInCluster.Spec = desiredDeployment.Spec
-			if !deploymentInCluster.CreationTimestamp.IsZero() && decoupleScaling {
-				log.FromContext(ctx).V(1).Info("scaling is decoupled, setting deployment replica value to incluster replica count")
-				deploymentInCluster.Spec.Replicas = inClusterReplicas
-			}
-			return nil
-		})
-		log.FromContext(ctx).V(1).Info("from CreateOrUpdate", "op", op)
-		if err != nil {
-			if op != controllerutil.OperationResultNone {
-				log.FromContext(ctx).V(1).Error(err, "unable to create deployment for "+role, "operation", op)
-			}
-		}
-	}
-}
-
-func (childResource *BaseConfig) createOrUpdateServiceForDeployment(ctx context.Context, r *ModelServiceReconciler, role string) {
-
-	var service *corev1.Service
-	var deployment *appsv1.Deployment
-
-	if role == PREFILL_ROLE {
-		service = childResource.PrefillService
-		deployment = childResource.PrefillDeployment
-	} else {
-		service = childResource.DecodeService
-		deployment = childResource.DecodeDeployment
-	}
-
-	// Create service for the deployment iff deployment exists and service is defined in baseConfig
-	if deployment != nil && service != nil {
-		log.FromContext(ctx).V(1).Info("service for "+role, "service", service)
-
-		svcInCluster := &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      service.Name,
-				Namespace: service.Namespace,
-			}}
-
-		op, err := controllerutil.CreateOrUpdate(ctx, r.Client, svcInCluster, func() error {
-			svcInCluster.Labels = service.Labels
-			svcInCluster.OwnerReferences = service.OwnerReferences
-			svcInCluster.Spec = service.Spec
-			return nil
-		})
-
-		if err != nil {
-			if op != controllerutil.OperationResultNone {
-				log.FromContext(ctx).V(1).Error(err, "unable to create service for "+role)
-			}
-		}
-	}
-}
-
 func getInferencePoolLabels(ctx context.Context, msvc *msv1alpha1.ModelService) map[giev1alpha2.LabelKey]giev1alpha2.LabelValue {
 	commonLabels := getCommonLabels(ctx, msvc)
 	m := make(map[giev1alpha2.LabelKey]giev1alpha2.LabelValue, len(commonLabels))
@@ -1009,179 +869,211 @@ func (childResources *BaseConfig) mergeInferencePool(ctx context.Context, msvc *
 	return childResources
 }
 
-func (childResource *BaseConfig) createOrUpdateInferencePool(ctx context.Context, r *ModelServiceReconciler) {
-	// nothing to do without inf model
-	if childResource == nil || childResource.InferencePool == nil {
-		return
+// invokeCreateOrUpdate decides whether to invoke a createOrUpdate call for each child resource
+func (childResource *BaseConfig) invokeCreateOrUpdate(ctx context.Context, r *ModelServiceReconciler, msvc *msv1alpha1.ModelService) []error {
+
+	var results []error
+
+	// CreateOrUpdate ConfigMaps
+	if childResource.shouldCreateConfigMaps() {
+		results = append(results, createOrUpdateConfigMaps(ctx, r, childResource.ConfigMaps)...)
 	}
 
-	inferencePoolInCluster := &giev1alpha2.InferencePool{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      childResource.InferencePool.Name,
-			Namespace: childResource.InferencePool.Namespace,
-		},
+	// CreateOrUpdate PD deployments, services, and SA
+	if childResource.shouldCreatePrefillDeployment() {
+		results = append(results, createOrUpdatePDDeployment(ctx, r, childResource.PrefillDeployment, msvc.Spec.DecoupleScaling))
 	}
-	log.FromContext(ctx).V(1).Info("merged inf pool", "data", childResource.InferencePool)
-	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, inferencePoolInCluster, func() error {
-		inferencePoolInCluster.Labels = childResource.InferenceModel.Labels
-		inferencePoolInCluster.OwnerReferences = childResource.InferenceModel.OwnerReferences
-		inferencePoolInCluster.Spec = childResource.InferencePool.Spec
-		return nil
-	})
 
-	if err != nil {
-		if op != controllerutil.OperationResultNone {
-			log.FromContext(ctx).V(1).Error(err, "unable to create inference pool")
+	if childResource.shouldCreatePrefillService() {
+		results = append(results, createOrUpdateService(ctx, r, childResource.PrefillService))
+	}
+
+	if childResource.shouldCreateDecodeDeployment() {
+		results = append(results, createOrUpdatePDDeployment(ctx, r, childResource.DecodeDeployment, msvc.Spec.DecoupleScaling))
+	}
+
+	if childResource.shouldCreateDecodeService() {
+		results = append(results, createOrUpdateService(ctx, r, childResource.DecodeService))
+	}
+
+	if childResource.shouldCreatePDServiceAccount() {
+		results = append(results, createOrUpdateServiceAccount(ctx, r, childResource.PDServiceAccount))
+	}
+
+	// CreateOrUpdate routing components and RBACs for each if required
+	if childResource.shouldCreateEPPDeployment() {
+		results = append(results, createOrUpdateDeployment(ctx, r, childResource.EPPDeployment))
+	}
+
+	if childResource.shouldCreateEPPService() {
+		results = append(results, createOrUpdateService(ctx, r, childResource.EPPService))
+	}
+
+	if childResource.shouldCreateEPPServiceAccount() {
+		results = append(results, createOrUpdateServiceAccount(ctx, r, childResource.EPPServiceAccount))
+	}
+
+	if childResource.shouldCreateEPPRoleBinding() {
+		results = append(results, createOrUpdateRoleBinding(ctx, r, childResource.EPPRoleBinding))
+	}
+
+	if childResource.shouldCreateInferencePool() {
+		results = append(results, createOrUpdateInferencePool(ctx, r, childResource.InferencePool))
+	}
+
+	if childResource.shouldCreateInferenceModel() {
+		results = append(results, createOrUpdateInferenceModel(ctx, r, childResource.InferenceModel))
+	}
+
+	// Keep only the actual errors
+	var nonNilErrors []error
+	for _, e := range results {
+		if e != nil {
+			nonNilErrors = append(nonNilErrors, e)
 		}
 	}
 
+	return nonNilErrors
 }
 
-// createEppDeployment spawns epp deployment from immutable configmap
-func (childResource *BaseConfig) createEppDeployment(ctx context.Context, kubeClient client.Client) error {
+// genericCreateOrUpdate is a generic function that creates or updates an object in the cluster
+// desiredObjectState is the desired state of the object
+// emptyObject is an empty object that can be used to retrieve the current object in the cluster, if present,
+// and update it to the desired state
+// the mutate func for createOrUpdate is a merge between the currentObject and desiredObject
+// the merge ensures that annotations and labels are preseved while the spec is updated to the desired staet
+func genericCreateOrUpdate(ctx context.Context, r *ModelServiceReconciler, desiredObjectState client.Object, emptyObject client.Object) error {
+	var err error
 
-	if childResource == nil || childResource.EPPDeployment == nil {
-		return nil
-	}
+	desiredObjName := desiredObjectState.GetName()
+	desiredObjNamespace := desiredObjectState.GetNamespace()
 
-	deploymentTobeCreatedOrUpdated := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			//baseconfig should have corret epp args for
-			// poolname and namespaces
-			// poolname format: <model-name>-modelservice
-			// eg: facebook-opt-125m-model-service
-			// namespace should be the namespace of msvc
-			Name:      childResource.EPPDeployment.Name,
-			Namespace: childResource.EPPDeployment.Namespace,
-		},
-	}
+	// emptyObject is the object to look for in the cluster
+	log.FromContext(ctx).V(1).Info("looking to createOrUpdate object in cluster: ", "obj name", desiredObjName, "obj namespace", desiredObjNamespace, "obj kind", desiredObjectState.GetObjectKind())
 
-	op, err := controllerutil.CreateOrUpdate(ctx, kubeClient, deploymentTobeCreatedOrUpdated, func() error {
-		deploymentTobeCreatedOrUpdated.Labels = childResource.EPPDeployment.Labels
-		deploymentTobeCreatedOrUpdated.OwnerReferences = childResource.EPPDeployment.OwnerReferences
-		deploymentTobeCreatedOrUpdated.Spec = childResource.EPPDeployment.Spec
-		return nil
+	// Set the empty object with the name and namespace so we can look it up in the cluster
+	// and populate emptyObject with the current state of the object
+	emptyObject.SetName(desiredObjName)
+	emptyObject.SetNamespace(desiredObjNamespace)
+
+	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, emptyObject, func() error {
+		// Mergo merge with override means labels, annotations (maps) key-value pairs are preseved
+		// while other fields are overriden if not nil in desiredObjectState
+		mergeErr := mergo.Merge(emptyObject, desiredObjectState, mergo.WithOverride)
+		if mergeErr != nil {
+			log.FromContext(ctx).V(1).Error(err, "attemping to merge inside createOrUpdate, but failed for object "+emptyObject.GetName())
+		} else {
+			log.FromContext(ctx).V(1).Info("successfully merged object in cluster" + emptyObject.GetName())
+		}
+
+		return mergeErr
 	})
 
+	log.FromContext(ctx).V(1).Info("performed createOrUpdate", "obj name", emptyObject.GetName(), "operation", op)
 	if err != nil {
-		if op != controllerutil.OperationResultNone {
-			log.FromContext(ctx).V(1).Error(err, "unable to create epp deployment from immutable base configmap ")
-			return err
-		}
+		log.FromContext(ctx).V(1).Error(err, "createOrUpdate failed", "obj name", emptyObject.GetName())
 	}
-	return nil
+
+	return err
 }
 
-// createEppDeployment spawns epp service from immutable configmap
-func (childResource *BaseConfig) createEppService(ctx context.Context, kubeClient client.Client) error {
+// createOrUpdatePDDeploymentInCluster is a function for creating or updating a PD deployment in the cluster,
+// taking into account decoupling scaling
+// generally mirrors genericCreateOrUpdate
+// TODO: can we consolidate the two funcs into a more generic function?
+func createOrUpdatePDDeploymentInCluster(ctx context.Context, r *ModelServiceReconciler, desiredObjectState appsv1.Deployment, emptyObject *appsv1.Deployment, decoupleScaling bool) error {
+	var err error
 
-	if childResource == nil || childResource.EPPService == nil {
-		return nil
-	}
+	desiredObjName := desiredObjectState.GetName()
+	desiredObjNamespace := desiredObjectState.GetNamespace()
 
-	serviceTobeCreatedOrUpdated := corev1.Service{ObjectMeta: metav1.ObjectMeta{
-		Name:      childResource.EPPService.Name,
-		Namespace: childResource.EPPService.Namespace,
-	}}
+	// emptyObject is the object to look for in the cluster
+	log.FromContext(ctx).V(1).Info("looking to createOrUpdate object in cluster: ", "obj name", desiredObjName, "obj namespace", desiredObjNamespace, "obj kind", desiredObjectState.GetObjectKind())
 
-	op, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &serviceTobeCreatedOrUpdated, func() error {
-		serviceTobeCreatedOrUpdated.Labels = childResource.EPPService.Labels
-		serviceTobeCreatedOrUpdated.OwnerReferences = childResource.EPPService.OwnerReferences
-		serviceTobeCreatedOrUpdated.Spec = childResource.EPPService.Spec
-		return nil
+	// Set the empty object with the name and namespace so we can look it up in the cluster
+	// and populate emptyObject with the current state of the object
+	emptyObject.SetName(desiredObjName)
+	emptyObject.SetNamespace(desiredObjNamespace)
+
+	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, emptyObject, func() error {
+		log.FromContext(ctx).V(1).Info("initial replica count", "replica", emptyObject.Spec.Replicas)
+
+		// We should only update replica if decoupleScaling is False
+		if !emptyObject.GetCreationTimestamp().Time.IsZero() && decoupleScaling {
+			log.FromContext(ctx).V(1).Info("scaling is decoupled, setting deployment replica value to incluster replica count")
+			desiredObjectState.Spec.Replicas = nil
+		}
+
+		// Mergo merge with override means labels, annotations (maps) key-value pairs are preseved
+		// while other fields are overriden if not nil in desiredObjectState
+		mergeErr := mergo.Merge(emptyObject, desiredObjectState, mergo.WithOverride)
+		if mergeErr != nil {
+			log.FromContext(ctx).V(1).Error(err, "attemping to merge inside createOrUpdate, but failed for object "+emptyObject.GetName())
+		} else {
+			log.FromContext(ctx).V(1).Info("successfully merged PD deployment in cluster" + emptyObject.GetName())
+			log.FromContext(ctx).V(1).Info("successfully merged PD deployment in cluster", "replica", emptyObject.Spec.Replicas)
+		}
+
+		return mergeErr
 	})
 
+	log.FromContext(ctx).V(1).Info("performed createOrUpdate", "obj name", emptyObject.GetName(), "operation", op)
 	if err != nil {
-		if op != controllerutil.OperationResultNone {
-			log.FromContext(ctx).V(1).Error(err, "unable to create epp service from immutable base configmap ")
-			return err
-		}
+		log.FromContext(ctx).V(1).Error(err, "createOrUpdate failed", "obj name", emptyObject.GetName())
 	}
-	return nil
+
+	return err
 }
 
-// createEppDeployment spawns epp service from immutable configmap
-func (childResource *BaseConfig) createEppServiceAccount(ctx context.Context, kubeClient client.Client) error {
-
-	if childResource == nil || childResource.EPPServiceAccount == nil {
-		return nil
+// createOrUpdateConfigMaps creates or updates multiple of ConfigMaps in the cluster
+func createOrUpdateConfigMaps(ctx context.Context, r *ModelServiceReconciler, desiredConfigMaps []corev1.ConfigMap) []error {
+	var errors []error
+	for _, desiredConfigMap := range desiredConfigMaps {
+		emptyConfigMap := corev1.ConfigMap{}
+		errors = append(errors, genericCreateOrUpdate(ctx, r, &desiredConfigMap, &emptyConfigMap))
 	}
-
-	saTobeCreatedOrUpdated := &corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      childResource.EPPServiceAccount.Name,
-			Namespace: childResource.EPPDeployment.Namespace,
-		},
-	}
-
-	op, err := controllerutil.CreateOrUpdate(ctx, kubeClient, saTobeCreatedOrUpdated, func() error {
-		saTobeCreatedOrUpdated.Labels = childResource.EPPServiceAccount.Labels
-		saTobeCreatedOrUpdated.OwnerReferences = childResource.EPPServiceAccount.OwnerReferences
-		saTobeCreatedOrUpdated.ImagePullSecrets = childResource.EPPServiceAccount.ImagePullSecrets
-		return nil
-	})
-
-	if err != nil {
-		if op != controllerutil.OperationResultNone {
-			log.FromContext(ctx).V(1).Error(err, "unable to create epp service account")
-			return err
-		}
-	}
-	return nil
+	return errors
 }
 
-// createEppDeployment spawns epp service from immutable configmap
-func (childResource *BaseConfig) createEppRoleBinding(ctx context.Context, kubeClient client.Client) error {
-
-	if childResource == nil || childResource.EPPRoleBinding == nil {
-		return nil
-	}
-	eppRoleBindingInCluster := rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      childResource.EPPRoleBinding.Name,
-			Namespace: childResource.EPPRoleBinding.Namespace,
-		}}
-
-	op, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &eppRoleBindingInCluster, func() error {
-		eppRoleBindingInCluster.Labels = childResource.EPPRoleBinding.Labels
-		eppRoleBindingInCluster.OwnerReferences = childResource.EPPRoleBinding.OwnerReferences
-		eppRoleBindingInCluster.Subjects = childResource.EPPRoleBinding.Subjects
-		eppRoleBindingInCluster.RoleRef = childResource.EPPRoleBinding.RoleRef
-		return nil
-	})
-	if err != nil {
-		if op != controllerutil.OperationResultNone {
-			log.FromContext(ctx).V(1).Error(err, "unable to create epp rolebinding from immutable base configmap ")
-			return err
-		}
-	}
-	return nil
+// createOrUpdateDeployment creates or updates a deployment object in the cluster
+func createOrUpdateDeployment(ctx context.Context, r *ModelServiceReconciler, desiredDeployment *appsv1.Deployment) error {
+	emptyDeployment := appsv1.Deployment{}
+	return genericCreateOrUpdate(ctx, r, desiredDeployment, &emptyDeployment)
 }
 
-// createPDServiceAccount creates or updates service account for p and d deployments
-func (childResource *BaseConfig) createPDServiceAccount(ctx context.Context, kubeClient client.Client) error {
-	if childResource == nil || childResource.PDServiceAccount == nil {
-		return nil
-	}
+// createOrUpdatePDDeployment creates or updates a PD deployment object in the cluster
+// specifically, takes into account decoupleScaling
+func createOrUpdatePDDeployment(ctx context.Context, r *ModelServiceReconciler, desiredDeployment *appsv1.Deployment, decoupleScaling bool) error {
+	emptyDeployment := appsv1.Deployment{}
+	return createOrUpdatePDDeploymentInCluster(ctx, r, *desiredDeployment, &emptyDeployment, decoupleScaling)
+}
 
-	saToBeCreatedOrUpdated := corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{
-		Name:      childResource.PDServiceAccount.Name,
-		Namespace: childResource.PDServiceAccount.Namespace,
-	}}
+// createOrUpdateService creates or updates a service object in the cluster
+func createOrUpdateService(ctx context.Context, r *ModelServiceReconciler, desiredService *corev1.Service) error {
+	emptyService := corev1.Service{}
+	return genericCreateOrUpdate(ctx, r, desiredService, &emptyService)
+}
 
-	op, err := controllerutil.CreateOrUpdate(ctx, kubeClient, &saToBeCreatedOrUpdated, func() error {
-		saToBeCreatedOrUpdated.Labels = childResource.PDServiceAccount.Labels
-		saToBeCreatedOrUpdated.OwnerReferences = childResource.PDServiceAccount.OwnerReferences
-		saToBeCreatedOrUpdated.ImagePullSecrets = childResource.PDServiceAccount.ImagePullSecrets
-		return nil
-	})
+// createOrUpdateServiceAccount creates or updates a serviceAccount object in the cluster
+func createOrUpdateServiceAccount(ctx context.Context, r *ModelServiceReconciler, desiredServiceAccount *corev1.ServiceAccount) error {
+	emptyServiceAccount := corev1.ServiceAccount{}
+	return genericCreateOrUpdate(ctx, r, desiredServiceAccount, &emptyServiceAccount)
+}
 
-	if err != nil {
-		if op != controllerutil.OperationResultNone {
-			log.FromContext(ctx).V(1).Error(err, "unable to create pd service account")
-			return err
-		}
-	}
+// createOrUpdateRoleBinding creates or updates a RoleBinding object in the cluster
+func createOrUpdateRoleBinding(ctx context.Context, r *ModelServiceReconciler, desiredRoleBinding *rbacv1.RoleBinding) error {
+	emptyRoleBinding := rbacv1.RoleBinding{}
+	return genericCreateOrUpdate(ctx, r, desiredRoleBinding, &emptyRoleBinding)
+}
 
-	return nil
+// createOrUpdateInferencePool creates or updates a InferencePool object in the cluster
+func createOrUpdateInferencePool(ctx context.Context, r *ModelServiceReconciler, desiredInferencePool *giev1alpha2.InferencePool) error {
+	emptyInferencePool := giev1alpha2.InferencePool{}
+	return genericCreateOrUpdate(ctx, r, desiredInferencePool, &emptyInferencePool)
+}
+
+// createOrUpdateInferenceModel creates or updates a InferenceModel object in the cluster
+func createOrUpdateInferenceModel(ctx context.Context, r *ModelServiceReconciler, desiredInferenceModel *giev1alpha2.InferenceModel) error {
+	emptyInferenceModel := giev1alpha2.InferenceModel{}
+	return genericCreateOrUpdate(ctx, r, desiredInferenceModel, &emptyInferenceModel)
 }
