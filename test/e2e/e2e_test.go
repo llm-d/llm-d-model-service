@@ -146,7 +146,7 @@ data:
     type: ClusterIP
 `
 
-var imageName = "quay.io/redhattraining/hello-world-nginx"
+var imageName = "ghcr.io/linuxserver/nginx:1.26.3-r0-ls319"
 var _ = Describe("Manager", Ordered, func() {
 	var controllerPodName string
 
