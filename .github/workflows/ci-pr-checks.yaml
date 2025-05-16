@@ -1,9 +1,6 @@
 name: CI - PR Checks
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
