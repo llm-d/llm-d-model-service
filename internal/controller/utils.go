@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/llm-d/llm-d-model-service/api/v1alpha1"
 	msv1alpha1 "github.com/llm-d/llm-d-model-service/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -305,7 +304,7 @@ func ConvertToContainerSlice(c []msv1alpha1.ContainerSpec) []corev1.Container {
 // ConvertToContainerSliceWithVolumeMount converts []Containers to []corev1.Container
 // c is the targeted container slice (can be initContainer or Container)
 // msvc is the msvc so we can get the URI and populate the relevant volumeMount
-func ConvertToContainerSliceWithVolumeMount(ctx context.Context, c []v1alpha1.ContainerSpec, msvc *msv1alpha1.ModelService) []corev1.Container {
+func ConvertToContainerSliceWithVolumeMount(ctx context.Context, c []msv1alpha1.ContainerSpec, msvc *msv1alpha1.ModelService) []corev1.Container {
 
 	containerSlice := ConvertToContainerSlice(c)
 	for i := range c {
