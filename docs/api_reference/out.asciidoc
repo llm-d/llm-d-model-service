@@ -125,7 +125,7 @@ Three types of URIs are support to enable models packaged as images (oci://<imag
 models downloaded from HuggingFace (hf://<model-repo>/<model-name>) +
 and pre-existing models loaded from a volume-mounted PVC (pvc://model-path) + |  | 
 | *`authSecretName`* __string__ | Name of the authentication secret. Contains HF_TOKEN + |  | 
-| *`size`* __xref:{anchor_prefix}-k8s-io-apimachinery-pkg-api-resource-quantity[$$Quantity$$]__ | Size of the model artifacts on disk +
+| *`size`* __link:https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#quantity-resource-api[$$Quantity$$]__ | Size of the model artifacts on disk +
 ensure Size is large enough when providing hf://... URI + |  | 
 |===
 

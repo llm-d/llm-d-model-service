@@ -1,19 +1,3 @@
-/*
-Copyright 2025.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package controller
 
 import (
@@ -315,7 +299,7 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 		msvc.Status.PrefillDeploymentRef = &prefillDeploymentName
 		prefillDeploymentFromCluster := &appsv1.Deployment{}
 		// Mirror conditions with "Prefill" prefix
-		err := r.Client.Get(ctx, client.ObjectKey{Name: prefillDeploymentName, Namespace: msvc.Namespace}, prefillDeploymentFromCluster)
+		err := r.Get(ctx, client.ObjectKey{Name: prefillDeploymentName, Namespace: msvc.Namespace}, prefillDeploymentFromCluster)
 		if err != nil {
 			log.FromContext(ctx).Error(err, "unable to get prefill deployment")
 			conditions = append(conditions, metav1.Condition{
@@ -348,7 +332,7 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 		decodeDeploymentName := deploymentName(msvc, DECODE_ROLE)
 		msvc.Status.DecodeDeploymentRef = &decodeDeploymentName
 		decodeDeploymentFromCluster := &appsv1.Deployment{}
-		err := r.Client.Get(ctx, client.ObjectKey{Name: decodeDeploymentName, Namespace: msvc.Namespace}, decodeDeploymentFromCluster)
+		err := r.Get(ctx, client.ObjectKey{Name: decodeDeploymentName, Namespace: msvc.Namespace}, decodeDeploymentFromCluster)
 		if err != nil {
 			log.FromContext(ctx).Error(err, "unable to get prefill deployment")
 			conditions = append(conditions, metav1.Condition{
@@ -382,7 +366,7 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 		eppName := eppDeploymentName(msvc)
 		msvc.Status.EppDeploymentRef = &eppName
 		eppDeploymentFromCluster := &appsv1.Deployment{}
-		err := r.Client.Get(ctx, client.ObjectKey{Name: eppName, Namespace: msvc.Namespace}, eppDeploymentFromCluster)
+		err := r.Get(ctx, client.ObjectKey{Name: eppName, Namespace: msvc.Namespace}, eppDeploymentFromCluster)
 		if err != nil {
 			log.FromContext(ctx).Error(err, "unable to get Epp deployment")
 			conditions = append(conditions, metav1.Condition{
@@ -415,7 +399,7 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 	msvc.Status.Conditions = conditions
 
 	latest := &msv1alpha1.ModelService{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: msvc.Name, Namespace: msvc.Namespace}, latest); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: msvc.Name, Namespace: msvc.Namespace}, latest); err != nil {
 		if errors.IsNotFound(err) {
 			log.FromContext(ctx).Info("ModelService no longer exists, skipping status update")
 			return nil
