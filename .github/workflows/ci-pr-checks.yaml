@@ -27,10 +27,10 @@ jobs:
       - name: Sanity check repo contents
         run: ls -la
     
-      - name: Cache go.sum
+      - name: Set up go with cache
         uses: actions/setup-go@v5
         with:
-          go-version: '>=1.20.0'
+          go-version: '>=1.24.0'
           cache-dependency-path: ./go.sum
 
       - name: Run lint checks
