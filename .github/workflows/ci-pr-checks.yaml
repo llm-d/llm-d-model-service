@@ -14,21 +14,37 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
-
-      - name: Read project name from .version.json
-        id: version
-        run: |
-          name=$(jq -r '."project-name"' .version.json)
-          echo "project_name=$name" >> "$GITHUB_OUTPUT"
-
-      - name: Print project name
-        run: echo "Project is ${{ steps.version.outputs.project_name }}"
-
+        
       - name: Sanity check repo contents
         run: ls -la
+    
+      - name: Set up go with cache
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.0'
+          cache-dependency-path: ./go.sum
 
       - name: Run lint checks
-        uses: ./.github/actions/lint
+        run: |
+          echo "Running golangci-lint..."
 
-      - name: Test
-        uses: ./.github/actions/go-test
+          # Verify config file exists
+          if [ -f .golangci.yml ] || [ -f .golangci.yaml ] || [ -f .golangci.toml ]; then
+            echo "✅ Found golangci-lint config file"
+          else
+            echo "⚠️ No golangci-lint config file found. Using default linters"
+          fi
+
+          make lint
+
+      - name: Run go test
+        shell: bash 
+        run: |
+          # echo "Installing Ginkgo..."
+          # go install github.com/onsi/ginkgo/ginkgo@v2.23.3
+          # export PATH=$PATH:$(go env GOPATH)/bin
+          # echo "Ginkgo installed:"
+          # ginkgo version
+          # echo "Running tests with Ginkgo..."
+          # go env -w GOFLAGS=-buildvcs=false
+          make test
