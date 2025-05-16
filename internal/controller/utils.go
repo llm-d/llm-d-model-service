@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/llm-d/llm-d-model-service/api/v1alpha1"
 	msv1alpha1 "github.com/llm-d/llm-d-model-service/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -206,7 +205,7 @@ func sanitizeName(s string) (string, error) {
 }
 
 // ConvertToContainerSlice converts []Containers to []corev1.Container
-func ConvertToContainerSlice(c []v1alpha1.ContainerSpec) []corev1.Container {
+func ConvertToContainerSlice(c []msv1alpha1.ContainerSpec) []corev1.Container {
 
 	containerSlice := make([]corev1.Container, len(c))
 
