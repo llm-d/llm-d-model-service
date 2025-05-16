@@ -1,16 +1,25 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	msv1alpha1 "github.com/llm-d/llm-d-model-service/api/v1alpha1"
 	"github.com/llm-d/llm-d-model-service/test/utils"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 )
 
 var (
@@ -37,6 +46,12 @@ func TestE2E(t *testing.T) {
 	RunSpecs(t, "e2e suite")
 }
 
+var (
+	k8sClient client.Client
+	cfg       *rest.Config
+	ctx       = context.TODO()
+)
+
 var _ = BeforeSuite(func() {
 	By("creating Kind cluster if not exists")
 	cmd := exec.Command("kind", "get", "clusters")
@@ -48,6 +63,26 @@ var _ = BeforeSuite(func() {
 		_, err := utils.Run(cmd)
 		ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to create Kind cluster")
 	}
+
+	var kubeconfig string
+	if os.Getenv("KUBECONFIG") != "" {
+		kubeconfig = os.Getenv("KUBECONFIG")
+	} else {
+		homeDir, _ := os.UserHomeDir()
+		kubeconfig = filepath.Join(homeDir, ".kube", "config")
+	}
+	cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+	Expect(err).ToNot(HaveOccurred(), "Failed to build kubeconfig")
+	var scheme = runtime.NewScheme()
+
+	err = clientgoscheme.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	Expect(msv1alpha1.AddToScheme(scheme)).To(Succeed())
+	Expect(giev1alpha2.Install(scheme)).To(Succeed())
+	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
+	Expect(err).ToNot(HaveOccurred(), "Failed to create k8s client")
+
 	By("building the manager(Operator) image")
 	cmd = exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectImage))
 	_, err = utils.Run(cmd)

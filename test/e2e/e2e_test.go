@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,7 +12,15 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	msv1alpha1 "github.com/llm-d/llm-d-model-service/api/v1alpha1"
 	"github.com/llm-d/llm-d-model-service/test/utils"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
+	"sigs.k8s.io/yaml"
 )
 
 // namespace where the project is deployed in
@@ -26,6 +35,118 @@ const metricsServiceName = "modelservice-controller-manager-metrics-service"
 // metricsRoleBindingName is the name of the RBAC that will be created to allow get the metrics data
 const metricsRoleBindingName = "modelservice-metrics-binding"
 
+const (
+	modelServiceName    = "llama-3-1-8b-instruct"
+	decodeWorkloadName  = "llama-3-1-8b-instruct-decode"
+	prefillWorkloadName = "llama-3-1-8b-instruct-prefill"
+)
+
+const configMapYAML = `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: basic-base-conf
+data:
+  configMaps: |
+    - metadata:
+        name: cm1
+      data: 
+        key1: value1
+        key2: value2
+    - metadata:
+        name: cm2
+      data:
+        key3: value3
+        key4: value4
+  decodeDeployment: |
+    spec:
+      replicas: 2
+      template:
+        spec:
+          containers:
+          - name: llm
+            command:
+            - sleep
+  decodeService: |
+    spec:
+      selector:
+        app.kubernetes.io/name: decodeServiceLabelInBaseConfig
+      ports:
+        - protocol: TCP
+          port: 80
+          targetPort: 9376
+  prefillDeployment: |
+    spec:
+      replicas: 2
+      template:
+        spec:
+          containers:
+          - name: llm
+            command:
+            - sleep
+  prefillService: |
+    spec:
+      selector:
+        app.kubernetes.io/name: prefillServiceLabelInBaseConfig
+      ports:
+        - protocol: TCP
+          port: 80
+          targetPort: 9376
+  inferenceModel: |
+    spec:
+      criticality: Standard    
+  inferencePool: |
+    spec:
+      targetPortNumber: 9376
+  eppDeployment: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: epp
+      namespace: default
+    spec:
+      replicas: 1
+      template:
+        spec:
+          terminationGracePeriodSeconds: 130
+          containers:
+          - name: epp
+            image: busybox
+            ports:
+            - containerPort: 9002
+            - containerPort: 9003
+            - name: metrics
+              containerPort: 9090
+            livenessProbe:
+              grpc:
+                port: 9003
+                service: inference-extension
+              initialDelaySeconds: 5
+              periodSeconds: 10
+            readinessProbe:
+              grpc:
+                port: 9003
+                service: inference-extension
+              initialDelaySeconds: 5
+              periodSeconds: 10 
+  eppService: |
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: llm-llama3-8b-instruct-epp
+      namespace: default
+    spec:
+      selector:
+        app: llm-llama3-8b-instruct-epp
+      ports:
+      - protocol: TCP
+        port: 9002
+        targetPort: 9002
+        appProtocol: http2
+    type: ClusterIP
+`
+
+var imageName = "quay.io/redhattraining/hello-world-nginx"
 var _ = Describe("Manager", Ordered, func() {
 	var controllerPodName string
 
@@ -201,7 +322,7 @@ var _ = Describe("Manager", Ordered, func() {
 				cmd := exec.Command("kubectl", "logs", controllerPodName, "-n", namespace)
 				output, err := utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).To(ContainSubstring("controller-runtime.metrics\tServing metrics server"),
+				g.Expect(output).To(ContainSubstring("Serving metrics server"),
 					"Metrics server not yet started")
 			}
 			Eventually(verifyMetricsServerStarted).Should(Succeed())
@@ -256,15 +377,117 @@ var _ = Describe("Manager", Ordered, func() {
 
 		// +kubebuilder:scaffold:e2e-webhooks-checks
 
-		// TODO: Customize the e2e test suite with scenarios specific to your project.
-		// Consider applying sample/CR(s) and check their status and/or verifying
-		// the reconciliation by using the metrics, i.e.:
-		// metricsOutput := getMetricsOutput()
-		// Expect(metricsOutput).To(ContainSubstring(
-		//    fmt.Sprintf(`controller_runtime_reconcile_total{controller="%s",result="success"} 1`,
-		//    strings.ToLower(<Kind>),
-		// ))
+		It("creates multiple ModelService resources using kubectl", func() {
+			By("Creating the basic base configmap")
+			var cm corev1.ConfigMap
+			err := yaml.Unmarshal([]byte(configMapYAML), &cm)
+			Expect(err).NotTo(HaveOccurred())
+
+			cm.Namespace = "default"
+
+			err = k8sClient.Create(ctx, &cm)
+			Expect(err).NotTo(HaveOccurred())
+
+			By(fmt.Sprintf("Creating ModelService %s", modelServiceName))
+
+			modelService := &msv1alpha1.ModelService{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: msv1alpha1.GroupVersion.String(),
+					Kind:       "ModelService",
+				}, ObjectMeta: metav1.ObjectMeta{
+					Name:      modelServiceName,
+					Namespace: namespace,
+				},
+				Spec: msv1alpha1.ModelServiceSpec{
+					ModelArtifacts: msv1alpha1.ModelArtifacts{
+						URI: "pvc://llama-pvc/path/to/model",
+					},
+					Routing: msv1alpha1.Routing{
+						ModelName: modelServiceName,
+					},
+					DecoupleScaling: false,
+					Decode: &msv1alpha1.PDSpec{
+						ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
+							Containers: []msv1alpha1.ContainerSpec{
+								{
+									Name:  "llm",
+									Image: &imageName,
+								},
+							},
+						},
+					},
+					Prefill: &msv1alpha1.PDSpec{
+						ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
+							Containers: []msv1alpha1.ContainerSpec{
+								{
+									Name:  "llm",
+									Image: &imageName,
+								},
+							},
+						},
+					},
+					BaseConfigMapRef: &corev1.ObjectReference{
+						Name:      "basic-base-conf",
+						Namespace: "default",
+					},
+				},
+			}
+
+			By(fmt.Sprintf("Creating ModelService %s", modelServiceName))
+			err = k8sClient.Create(context.TODO(), modelService)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("Checking if Decode deployment was created")
+			var decode appsv1.Deployment
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: decodeWorkloadName, Namespace: namespace}, &decode)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+
+			By("Checking if prefill deployment was created")
+			var prefill appsv1.Deployment
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: prefillWorkloadName, Namespace: namespace}, &prefill)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+
+			By("Checking if a PD SA was created")
+			sa := corev1.ServiceAccount{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: modelServiceName + "-sa", Namespace: namespace}, &sa)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+
+			By("Validating that the EPP ServiceAccount was created")
+			eppSA := corev1.ServiceAccount{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: modelServiceName + "-epp-sa", Namespace: namespace}, &eppSA)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+
+			By("Checking if a epp RoleBinding was created")
+			rolebinding := rbacv1.RoleBinding{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: modelServiceName + "-epp-rolebinding", Namespace: namespace}, &rolebinding)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+
+			By("Validating that the inferencepool was created")
+			infPool := giev1alpha2.InferencePool{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: modelServiceName + "-inference-pool", Namespace: namespace}, &infPool)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+
+			By("Validating that the inferencemodel was created")
+			infModel := giev1alpha2.InferenceModel{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: modelServiceName, Namespace: namespace}, &infModel)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+		})
 	})
+
 })
 
 // serviceAccountToken returns a token for the specified service account in the given namespace.
@@ -324,4 +547,22 @@ type tokenRequest struct {
 	Status struct {
 		Token string `json:"token"`
 	} `json:"status"`
+}
+
+func stringToReader(s string) *stringReader {
+	return &stringReader{s: s}
+}
+
+type stringReader struct {
+	s string
+	i int64
+}
+
+func (r *stringReader) Read(p []byte) (int, error) {
+	if r.i >= int64(len(r.s)) {
+		return 0, fmt.Errorf("EOF")
+	}
+	n := copy(p, r.s[r.i:])
+	r.i += int64(n)
+	return n, nil
 }
