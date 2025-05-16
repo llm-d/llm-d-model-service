@@ -28,6 +28,7 @@ const cm1Name = "cm1"
 const cm2Name = "cm2"
 const decodeWorkloadName = "llama-3-1-8b-instruct-decode"
 const prefillWorkloadName = "llama-3-1-8b-instruct-prefill"
+const llamaPVCName = "llama-pvc"
 
 const configMapYAML = `
 apiVersion: v1
@@ -200,8 +201,9 @@ var _ = Describe("ModelService Controller", func() {
 						ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
 							Containers: []msv1alpha1.ContainerSpec{
 								{
-									Name:  "llm",
-									Image: &imageName,
+									Name:             "llm",
+									Image:            &imageName,
+									MountModelVolume: true,
 								},
 							},
 						},
@@ -358,6 +360,22 @@ var _ = Describe("ModelService Controller", func() {
 				return *ms.Status.DecodeDeploymentRef, nil
 			}, time.Second*5, time.Millisecond*500).Should(Equal(deploymentName(modelService, "decode")))
 
+			By("Ensuring decode deployment has a PVC volume")
+			decodePodVolume := decode.Spec.Template.Spec.Volumes
+			Expect(len(decodePodVolume)).To(Equal(1))
+			Expect(decodePodVolume[0].Name).To(Equal(modelStorageVolumeName))
+			Expect(decodePodVolume[0].PersistentVolumeClaim.ClaimName).To(Equal(llamaPVCName))
+
+			By("Ensuring decode deployment has a volume mount for PVC")
+			decodeContainers := decode.Spec.Template.Spec.Containers
+			Expect(len(decodeContainers)).To(Equal(1))
+			firstDecodeContainerMount := decodeContainers[0].VolumeMounts
+			Expect(len(firstDecodeContainerMount)).To(Equal(1))
+
+			By("Ensuring decode deployment's container volume mount has the correct name and mount path")
+			Expect(firstDecodeContainerMount[0].Name).To(Equal(modelStorageVolumeName))
+			Expect(firstDecodeContainerMount[0].MountPath).To(Equal(modelStorageRoot))
+
 			By("Deleting the decode deployment")
 			Expect(k8sClient.Delete(ctx, &decode)).To(Succeed())
 
@@ -395,6 +413,18 @@ var _ = Describe("ModelService Controller", func() {
 			updated.Status.PrefillDeploymentRef = ptr.To(prefill.Name)
 			err = k8sClient.Status().Update(ctx, updated)
 			Expect(err).NotTo(HaveOccurred())
+
+			By("Ensuring prefill deployment has a PVC volume")
+			prefillPodVolume := prefill.Spec.Template.Spec.Volumes
+			Expect(len(prefillPodVolume)).To(Equal(1))
+			Expect(prefillPodVolume[0].Name).To(Equal(modelStorageVolumeName))
+			Expect(prefillPodVolume[0].PersistentVolumeClaim.ClaimName).To(Equal(llamaPVCName))
+
+			By("Ensuring prefill deployment doesn't have a volume mount for PVC")
+			prefillContainers := prefill.Spec.Template.Spec.Containers
+			Expect(len(prefillContainers)).To(Equal(1))
+			firstPrefillContainerMount := prefillContainers[0].VolumeMounts
+			Expect(len(firstPrefillContainerMount)).To(Equal(0))
 
 			By("Deleting the prefill deployment")
 			Expect(k8sClient.Delete(ctx, &prefill)).To(Succeed())

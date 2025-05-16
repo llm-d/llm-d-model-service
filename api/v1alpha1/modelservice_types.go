@@ -127,6 +127,16 @@ type ContainerSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Boolean to indicate mounting the model artifacts to this container
+	// For URIs with pvc:// prefix, a model-storage volume is created and mounted with the mountPath: /cache
+	// For URIs with hf:// prefix, modelArtifact.authSecretName is used as the secret key reference,
+	// and the value is mounted to an environment variable called HF_TOKEN
+	// For URIs with oci:// prefix, an OCI volume with image reference (https://kubernetes.io/blog/2024/08/16/kubernetes-1-31-image-volume-source/)
+	// is created and mounted with the mountPath oci-dir
+	// default:false
+	// +optional
+	MountModelVolume bool `json:"mountModelVolume,omitempty"`
 }
 
 // Routing provides the information needed to configure routing

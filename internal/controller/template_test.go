@@ -16,6 +16,7 @@ const modelName = "modelName"
 const sanitizedModelName = "modelname"
 const pvcName = "pvc-name"
 const modelPath = "path/to/" + modelName
+const mountedModelPathInVolume = modelStorageRoot + pathSep + modelPath
 const pvcURI = "pvc://" + pvcName + "/" + modelPath
 const hfModelName = pvcName + "/" + modelName
 const hfURI = "hf://" + hfModelName
@@ -76,6 +77,9 @@ func TestTemplateVars(t *testing.T) {
 		},
 		"ModelPath": {
 			expectedValue: modelPath,
+		},
+		"MountedModelPath": {
+			expectedValue: mountedModelPathInVolume,
 		},
 		"AuthSecretName": {
 			expectedValue: authSecretName,

@@ -655,6 +655,22 @@ More info: <a href="https://kubernetes.io/docs/concepts/configuration/manage-res
 <td class="tableblock halign-left valign-top"><div class="content"></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"></div></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p><strong><code>mountModelVolume</code></strong> <em>boolean</em></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>Boolean to indicate mounting the model artifacts to this container<br>
+For URIs with pvc:// prefix, a model-storage volume is created and mounted with the mountPath: /cache<br>
+For URIs with hf:// prefix, modelArtifact.authSecretName is used as the secret key reference,<br>
+and the value is mounted to an environment variable called HF_TOKEN<br>
+For URIs with oci:// prefix, an OCI volume with image reference (<a href="https://kubernetes.io/blog/2024/08/16/kubernetes-1-31-image-volume-source/" class="bare">https://kubernetes.io/blog/2024/08/16/kubernetes-1-31-image-volume-source/</a>)<br>
+is created and mounted with the mountPath oci-dir<br>
+default:false<br></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -1613,7 +1629,11 @@ These can be referenced by name in configuration of base configuration or model 
 </div>
 <div id="footer">
 <div id="footer-text">
+<<<<<<< HEAD
+Last updated 2025-05-15 11:58:12 -0400
+=======
 Last updated 2025-05-14 17:04:13 -0400
+>>>>>>> upstream/main
 </div>
 </div>
 </body>
