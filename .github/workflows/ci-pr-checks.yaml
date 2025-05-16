@@ -1,0 +1,34 @@
+name: CI - PR Checks
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Read project name from .version.json
+        id: version
+        run: |
+          name=$(jq -r '."project-name"' .version.json)
+          echo "project_name=$name" >> "$GITHUB_OUTPUT"
+
+      - name: Print project name
+        run: echo "Project is ${{ steps.version.outputs.project_name }}"
+
+      - name: Sanity check repo contents
+        run: ls -la
+
+      - name: Run lint checks
+        uses: ./.github/actions/lint
+
+      - name: Test
+        uses: ./.github/actions/go-test
