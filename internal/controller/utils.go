@@ -13,7 +13,7 @@ import (
 )
 
 const modelStorageVolumeName = "model-storage"
-const modelStorageRoot = "/cache"
+const modelStorageRoot = "/model-cache"
 const pathSep = "/"
 const DECODE_ROLE = "decode"
 const PREFILL_ROLE = "prefill"
@@ -119,8 +119,12 @@ func mountedModelPath(modelService *msv1alpha1.ModelService) (string, error) {
 			// output is /cache/path/to/model
 			mountedModelPath = modelStorageRoot + pathSep + modelPath
 		}
-	// TODOs for HF and OIC
-	// case HF:
+
+	case HF:
+		// The mountModelPath for HF is just the storage root, ie. model-cache
+		mountedModelPath = modelStorageRoot
+
+	// TODO
 	// case OCI:
 
 	case UnknownURI:
@@ -130,14 +134,17 @@ func mountedModelPath(modelService *msv1alpha1.ModelService) (string, error) {
 	return mountedModelPath, err
 }
 
+// isHFURI returns True if the URI begins with hf://
 func isHFURI(uri string) bool {
 	return strings.HasPrefix(uri, MODEL_ARTIFACT_URI_HF_PREFIX)
 }
 
+// isPVCURI returns True if the URI begins with pvc://
 func isPVCURI(uri string) bool {
 	return strings.HasPrefix(uri, MODEL_ARTIFACT_URI_PVC_PREFIX)
 }
 
+// isOCIURI returns True if the URI begins with oci://
 func isOCIURI(uri string) bool {
 	return strings.HasPrefix(uri, MODEL_ARTIFACT_URI_OCI_PREFIX)
 }
@@ -179,6 +186,31 @@ func parsePVCURI(modelArtifact *msv1alpha1.ModelArtifacts) ([]string, error) {
 	return parts, nil
 }
 
+// parseHFURI returns parts from a valid hf URI, or
+// returns an error if the HF URI is invalid
+// returns two strings:
+// First string is the repo-id
+// Second string is the model-id
+func parseHFURI(modelArtifact *msv1alpha1.ModelArtifacts) (string, string, error) {
+	var repoID string
+	var modelID string
+	if modelArtifact == nil {
+		return repoID, modelID, fmt.Errorf("modelArtifact is nil")
+	}
+
+	uri := modelArtifact.URI
+	if !isHFURI(uri) {
+		return repoID, modelID, fmt.Errorf("URI does not have hf prefix: %s", uri)
+	}
+
+	parts := strings.Split(strings.TrimPrefix(uri, MODEL_ARTIFACT_URI_HF_PREFIX), pathSep)
+	if len(parts) != 2 {
+		return repoID, modelID, fmt.Errorf("invalid hf URI format: %s; need hf://<repo-id>/<model-id>", uri)
+	}
+
+	return parts[0], parts[1], nil
+}
+
 // getVolumeMountForContainer returns a VolumeMount for a container where MountModelVolume: true
 func getVolumeMountsForContainer(ctx context.Context, msvc *msv1alpha1.ModelService) []corev1.VolumeMount {
 
@@ -187,19 +219,19 @@ func getVolumeMountsForContainer(ctx context.Context, msvc *msv1alpha1.ModelServ
 	uriType := UriType(msvc.Spec.ModelArtifacts.URI)
 
 	switch uriType {
-	case PVC:
-		// don't need the parts
-		if _, err := parsePVCURI(&msvc.Spec.ModelArtifacts); err == nil {
-			desiredVolumeMount = &corev1.VolumeMount{
-				Name:      modelStorageVolumeName,
-				MountPath: modelStorageRoot,
-				ReadOnly:  true,
-			}
-		} else {
-			log.FromContext(ctx).V(1).Error(err, "uri type: "+msvc.Spec.ModelArtifacts.URI)
+
+	// The volume mount for HF and PVC is the same
+	// volumeMounts:
+	// - mountPath: /model-cache
+	//   name: model-storage
+	case PVC, HF:
+		desiredVolumeMount = &corev1.VolumeMount{
+			Name:      modelStorageVolumeName,
+			MountPath: modelStorageRoot,
+			ReadOnly:  true,
 		}
-	// TODO for these
-	// case HF:
+
+	// TODO
 	// case OCI:
 	case UnknownURI:
 		// do nothing
@@ -234,10 +266,24 @@ func getVolumeForPDDeployment(ctx context.Context, msvc *msv1alpha1.ModelService
 				},
 			}
 		} else {
-			log.FromContext(ctx).V(1).Error(err, "uri type: "+msvc.Spec.ModelArtifacts.URI)
+			log.FromContext(ctx).V(1).Error(err, "uri: "+msvc.Spec.ModelArtifacts.URI)
 		}
-	// TODO for these
-	// case HF:
+	// Return an emptyDir volume with ModelArtifacts.Size
+	case HF:
+		if _, _, err := parseHFURI(&msvc.Spec.ModelArtifacts); err == nil {
+			desiredVolume = &corev1.Volume{
+				Name: modelStorageVolumeName,
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{
+						SizeLimit: msvc.Spec.ModelArtifacts.Size,
+					},
+				},
+			}
+		} else {
+			log.FromContext(ctx).V(1).Error(err, "uri: "+msvc.Spec.ModelArtifacts.URI)
+		}
+
+	// TODO
 	// case OCI:
 	case UnknownURI:
 		// do nothing
@@ -249,6 +295,45 @@ func getVolumeForPDDeployment(ctx context.Context, msvc *msv1alpha1.ModelService
 	}
 
 	return volumes
+}
+
+// getEnvsForcontainer returns the desired list of env vars for the container for the given URI type
+// For hf URIs, it returns an EnvVar which has a reference to a secretKey, provided by ModelArtifacts,
+// with HF_TOKEN in that secret
+// Other URI types do not need the controller to add any EnvVars
+func getEnvsForcontainer(ctx context.Context, msvc *msv1alpha1.ModelService) []corev1.EnvVar {
+	envs := []corev1.EnvVar{}
+	var desiredEnv *corev1.EnvVar
+
+	uriType := UriType(msvc.Spec.ModelArtifacts.URI)
+
+	switch uriType {
+	// only HF case needs a EnvVar, PVC and OCI don't
+	case HF:
+		if msvc.Spec.ModelArtifacts.AuthSecretName != nil {
+			desiredEnv = &corev1.EnvVar{
+				Name: ENV_HF_TOKEN,
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: *msvc.Spec.ModelArtifacts.AuthSecretName,
+						},
+						Key: ENV_HF_TOKEN,
+					},
+				},
+			}
+		}
+
+	case UnknownURI:
+		// do nothing
+		log.FromContext(ctx).V(1).Error(fmt.Errorf("uri type is unknown, cannot populate volumes"), "uri type: "+msvc.Spec.ModelArtifacts.URI)
+	}
+
+	if desiredEnv != nil {
+		envs = append(envs, *desiredEnv)
+	}
+
+	return envs
 }
 
 // sanitizeName converts an routing.ModelNAme into a valid Kubernetes label value
@@ -301,14 +386,16 @@ func ConvertToContainerSlice(c []msv1alpha1.ContainerSpec) []corev1.Container {
 	return containerSlice
 }
 
-// ConvertToContainerSliceWithVolumeMount converts []Containers to []corev1.Container
+// ConvertToContainerSliceWithURIInfo converts []Containers to []corev1.Container
+// with the relevant volumeMount and env for containers where mountModelPath is true
 // c is the targeted container slice (can be initContainer or Container)
-// msvc is the msvc so we can get the URI and populate the relevant volumeMount
-func ConvertToContainerSliceWithVolumeMount(ctx context.Context, c []msv1alpha1.ContainerSpec, msvc *msv1alpha1.ModelService) []corev1.Container {
+// msvc is the msvc so we can get the URI and populate the relevant volumeMount and env
+func ConvertToContainerSliceWithURIInfo(ctx context.Context, c []msv1alpha1.ContainerSpec, msvc *msv1alpha1.ModelService) []corev1.Container {
 
 	containerSlice := ConvertToContainerSlice(c)
 	for i := range c {
 		if c[i].MountModelVolume {
+			containerSlice[i].Env = getEnvsForcontainer(ctx, msvc)
 			containerSlice[i].VolumeMounts = getVolumeMountsForContainer(ctx, msvc)
 		}
 	}

@@ -117,6 +117,10 @@ func (t *TemplateVars) from(ctx context.Context, msvc *msv1alpha1.ModelService) 
 		return err
 	}
 
+	// Compute the mountedModelPath variable, given the URI type
+	// PVC: /path/to/model
+	// HF: /model-cache
+	// OCI: /model-cache
 	mountedModelPath, err := mountedModelPath(msvc)
 	if err != nil {
 		return err

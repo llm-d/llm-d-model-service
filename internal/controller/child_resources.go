@@ -569,8 +569,8 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 				},
 				Spec: corev1.PodSpec{
 					// populate containers
-					InitContainers: ConvertToContainerSliceWithVolumeMount(ctx, pdSpec.InitContainers, msvc),
-					Containers:     ConvertToContainerSliceWithVolumeMount(ctx, pdSpec.Containers, msvc),
+					InitContainers: ConvertToContainerSliceWithURIInfo(ctx, pdSpec.InitContainers, msvc),
+					Containers:     ConvertToContainerSliceWithURIInfo(ctx, pdSpec.Containers, msvc),
 
 					// populate node affinity
 					Affinity: nodeAffinity,

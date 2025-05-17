@@ -1,0 +1,35 @@
+apiVersion: llm-d.ai/v1alpha1
+kind: ModelService
+metadata:
+  name: busybox
+spec:
+  decoupleScaling: false
+
+  baseConfigMapRef:
+    name: basic-basic-conf
+
+  routing: 
+    modelName: ibm-granite/granite-3.3-2b-instruct
+    ports:
+    - name: inport
+      port: 80
+    - name: outport
+      port: 9376
+
+  modelArtifacts:
+    uri: hf://ibm-granite/granite-3.3-2b-instruct
+    authSecretName: hf-secret
+    size: 5Gi
+
+  # describe decode pods
+  decode:
+    replicas: 1
+    containers:
+    - name: "sidecar"
+      image: "nginx"
+    - name: "llm"
+      image: busybox
+      args:
+      - "{{ .HFModelName }}"
+      - "{{ .MountedModelPath }}"
+      mountModelVolume: true 
