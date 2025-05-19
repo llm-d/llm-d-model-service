@@ -7,12 +7,15 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	msv1alpha1 "github.com/llm-d/llm-d-model-service/api/v1alpha1"
 )
 
 const PVC_NAME = "my-pvc"
 const MODEL_PATH = "path/to/model"
+const HF_REPO_ID = "ibm-granite"
+const HF_MODEL_ID = "granite-3.3-2b-instruct"
 
 var _ = Describe("Model Artifacts", func() {
 	Context("Given a model artifact with an invalid URI prefix", func() {
@@ -25,8 +28,12 @@ var _ = Describe("Model Artifacts", func() {
 			Expect(isPVCURI(modelArtifact.URI)).To(BeFalse())
 			Expect(isHFURI(modelArtifact.URI)).To(BeFalse())
 
-			By("Parsing uri should fail")
+			By("Parsing PVC uri should fail")
 			_, err := parsePVCURI(&modelArtifact)
+			Expect(err).NotTo(BeNil())
+
+			By("Parsing HF uri should fail")
+			_, _, err = parseHFURI(&modelArtifact)
 			Expect(err).NotTo(BeNil())
 		})
 	})
@@ -46,7 +53,7 @@ var _ = Describe("Model Artifacts", func() {
 			},
 			"hf://repo-id/model-id": {
 				expectedURIType:        HF,
-				expectedModelMountPath: "", // TODO
+				expectedModelMountPath: modelStorageRoot,
 			},
 			"pvc://pvc-name": {
 				expectedURIType:        PVC,
@@ -58,7 +65,7 @@ var _ = Describe("Model Artifacts", func() {
 			},
 			"hf://wrong": {
 				expectedURIType:        HF,
-				expectedModelMountPath: "", // TODO
+				expectedModelMountPath: modelStorageRoot,
 			},
 			"random://": {
 				expectedURIType:        UnknownURI,
@@ -130,8 +137,9 @@ var _ = Describe("Model Artifacts", func() {
 			By("checking type of uri")
 			Expect(isPVCURI(modelArtifact.URI)).To(BeTrue())
 			Expect(isHFURI(modelArtifact.URI)).To(BeFalse())
+			Expect(isOCIURI(modelArtifact.URI)).To(BeFalse())
 
-			By("Parsing uri should be successful")
+			By("Parsing uri parts should be successful")
 			parts, err := parsePVCURI(&modelArtifact)
 			Expect(err).To(BeNil())
 			Expect(len(parts) > 1).To(BeTrue())
@@ -155,15 +163,70 @@ var _ = Describe("Model Artifacts", func() {
 			Expect(firstVolume.PersistentVolumeClaim.ClaimName).To(Equal(PVC_NAME))
 			Expect(firstVolume.PersistentVolumeClaim.ReadOnly).To(BeTrue())
 		})
+
+		It("should produce a valid env list", func() {
+			envs := getEnvsForcontainer(ctx, &modelService)
+			Expect(len(envs)).To(Equal(0))
+		})
 	})
+
 	Context("Given a model artifact with a valid HF URI", func() {
+
+		ctx := context.Background()
+		authSecretName := "auth-secret-key"
+		sizeLimit := "5Gi"
+		sizeLimitQuan := resource.MustParse(sizeLimit)
+
 		modelArtifact := msv1alpha1.ModelArtifacts{
-			URI: fmt.Sprintf("hf://%s/%s", "repo", "model"),
+			URI:            fmt.Sprintf("hf://%s/%s", HF_REPO_ID, HF_MODEL_ID),
+			AuthSecretName: &authSecretName,
+			Size:           &sizeLimitQuan,
 		}
+
+		modelService := msv1alpha1.ModelService{
+			Spec: msv1alpha1.ModelServiceSpec{
+				ModelArtifacts: modelArtifact,
+			},
+		}
+
 		It("should parse correctly", func() {
 			By("checking type of uri")
 			Expect(isPVCURI(modelArtifact.URI)).To(BeFalse())
 			Expect(isHFURI(modelArtifact.URI)).To(BeTrue())
+			Expect(isOCIURI(modelArtifact.URI)).To(BeFalse())
+
+			By("Parsing uri parts should be successful")
+			repo, model, err := parseHFURI(&modelArtifact)
+			Expect(err).To(BeNil())
+			Expect(repo).To(Equal(HF_REPO_ID))
+			Expect(model).To(Equal(HF_MODEL_ID))
+		})
+
+		It("should produce a valid volumeMounts list", func() {
+			volumeMounts := getVolumeMountsForContainer(ctx, &modelService)
+			Expect(len(volumeMounts)).To(Equal(1))
+			firstVolumeMount := volumeMounts[0]
+
+			Expect(firstVolumeMount.Name).To(Equal(modelStorageVolumeName))
+			Expect(firstVolumeMount.MountPath).To(Equal(modelStorageRoot))
+		})
+
+		It("should produce a valid volumes list", func() {
+			volumes := getVolumeForPDDeployment(ctx, &modelService)
+			Expect(len(volumes)).To(Equal(1))
+			firstVolume := volumes[0]
+			Expect(firstVolume.Name).To(Equal(modelStorageVolumeName))
+			Expect(firstVolume.EmptyDir.SizeLimit.String()).To(Equal(sizeLimit))
+		})
+
+		It("should produce a valid env list", func() {
+			envs := getEnvsForcontainer(ctx, &modelService)
+			Expect(len(envs)).To(Equal(1))
+			firstEnvVar := envs[0]
+
+			Expect(firstEnvVar.Name).To(Equal(ENV_HF_TOKEN))
+			Expect(firstEnvVar.ValueFrom.SecretKeyRef.Name).To(Equal(authSecretName))
+			Expect(firstEnvVar.ValueFrom.SecretKeyRef.Key).To(Equal(ENV_HF_TOKEN))
 		})
 	})
 })

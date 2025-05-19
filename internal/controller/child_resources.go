@@ -569,8 +569,8 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 				},
 				Spec: corev1.PodSpec{
 					// populate containers
-					InitContainers: ConvertToContainerSliceWithVolumeMount(ctx, pdSpec.InitContainers, msvc),
-					Containers:     ConvertToContainerSliceWithVolumeMount(ctx, pdSpec.Containers, msvc),
+					InitContainers: convertToContainerSliceWithURIInfo(ctx, pdSpec.InitContainers, msvc),
+					Containers:     convertToContainerSliceWithURIInfo(ctx, pdSpec.Containers, msvc),
 
 					// populate node affinity
 					Affinity: nodeAffinity,
@@ -765,8 +765,8 @@ func (childResources *BaseConfig) mergeEppDeployment(ctx context.Context, msvc *
 		modelSrvPodSpec = msvc.Spec.EndpointPicker
 	}
 	src.Spec.Replicas = modelSrvPodSpec.Replicas
-	src.Spec.Template.Spec.Containers = ConvertToContainerSlice(modelSrvPodSpec.Containers)
-	src.Spec.Template.Spec.InitContainers = ConvertToContainerSlice(modelSrvPodSpec.InitContainers)
+	src.Spec.Template.Spec.Containers = convertToContainerSlice(modelSrvPodSpec.Containers)
+	src.Spec.Template.Spec.InitContainers = convertToContainerSlice(modelSrvPodSpec.InitContainers)
 
 	// set epp service account name
 	src.Spec.Template.Spec.ServiceAccountName = eppServiceAccountName(msvc)
