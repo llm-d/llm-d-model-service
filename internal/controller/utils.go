@@ -12,28 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const modelStorageVolumeName = "model-storage"
-const modelStorageRoot = "/model-cache"
-const pathSep = "/"
-const DECODE_ROLE = "decode"
-const PREFILL_ROLE = "prefill"
-const MODEL_ARTIFACT_URI_PVC = "pvc"
-const MODEL_ARTIFACT_URI_HF = "hf"
-const MODEL_ARTIFACT_URI_OCI = "oci"
-const MODEL_ARTIFACT_URI_PVC_PREFIX = MODEL_ARTIFACT_URI_PVC + "://"
-const MODEL_ARTIFACT_URI_HF_PREFIX = MODEL_ARTIFACT_URI_HF + "://"
-const MODEL_ARTIFACT_URI_OCI_PREFIX = MODEL_ARTIFACT_URI_OCI + "://"
-const ENV_HF_TOKEN = "HF_TOKEN"
-
-type URIType string
-
-const (
-	PVC        URIType = "pvc"
-	HF         URIType = "hf"
-	OCI        URIType = "oci"
-	UnknownURI URIType = "unknown"
-)
-
 // deploymentName returns the name that should be used for a deployment object
 func deploymentName(modelService *msv1alpha1.ModelService, role string) string {
 	sanitizedName, err := sanitizeName(modelService.Name + "-" + role)
@@ -361,10 +339,10 @@ func sanitizeName(s string) (string, error) {
 	return s, nil
 }
 
-// ConvertToContainerSlice converts []Containers to []corev1.Container
+// convertToContainerSlice converts []Containers to []corev1.Container
 // Note we lose information about MountModelVolume, ok for EndpointPicker container
 // but not ok for PDSpec containers
-func ConvertToContainerSlice(c []msv1alpha1.ContainerSpec) []corev1.Container {
+func convertToContainerSlice(c []msv1alpha1.ContainerSpec) []corev1.Container {
 
 	containerSlice := make([]corev1.Container, len(c))
 
@@ -386,13 +364,13 @@ func ConvertToContainerSlice(c []msv1alpha1.ContainerSpec) []corev1.Container {
 	return containerSlice
 }
 
-// ConvertToContainerSliceWithURIInfo converts []Containers to []corev1.Container
+// convertToContainerSliceWithURIInfo converts []Containers to []corev1.Container
 // with the relevant volumeMount and env for containers where mountModelPath is true
 // c is the targeted container slice (can be initContainer or Container)
 // msvc is the msvc so we can get the URI and populate the relevant volumeMount and env
-func ConvertToContainerSliceWithURIInfo(ctx context.Context, c []msv1alpha1.ContainerSpec, msvc *msv1alpha1.ModelService) []corev1.Container {
+func convertToContainerSliceWithURIInfo(ctx context.Context, c []msv1alpha1.ContainerSpec, msvc *msv1alpha1.ModelService) []corev1.Container {
 
-	containerSlice := ConvertToContainerSlice(c)
+	containerSlice := convertToContainerSlice(c)
 	for i := range c {
 		if c[i].MountModelVolume {
 			containerSlice[i].Env = getEnvsForcontainer(ctx, msvc)
