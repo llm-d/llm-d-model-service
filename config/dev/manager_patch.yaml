@@ -17,3 +17,8 @@
 - op: add
   path: /spec/template/spec/containers/0/args/-
   value: --epp-pull-secrets=$EPP_PULL_SECRETS
+
+# Make image pull policy configurable -- e.g., Always, Never, IfNotPresent
+- op: add
+  path: /spec/template/spec/containers/0/imagePullPolicy
+  value: ${IMAGE_PULL_POLICY}

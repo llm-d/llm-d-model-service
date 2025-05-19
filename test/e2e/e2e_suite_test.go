@@ -1,15 +1,25 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	msv1alpha1 "github.com/llm-d/llm-d-model-service/api/v1alpha1"
 	"github.com/llm-d/llm-d-model-service/test/utils"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 )
 
 var (
@@ -23,7 +33,7 @@ var (
 
 	// projectImage is the name of the image which will be build and loaded
 	// with the code source changes to be tested.
-	projectImage = "example.com/modelservice:v0.0.1"
+	projectImage = "llm-d.ai/modelservice:v0.0.1"
 )
 
 // TestE2E runs the end-to-end (e2e) test suite for the project. These tests execute in an isolated,
@@ -36,10 +46,46 @@ func TestE2E(t *testing.T) {
 	RunSpecs(t, "e2e suite")
 }
 
+var (
+	k8sClient client.Client
+	cfg       *rest.Config
+	ctx       = context.TODO()
+)
+
 var _ = BeforeSuite(func() {
+	By("creating Kind cluster if not exists")
+	cmd := exec.Command("kind", "get", "clusters")
+	out, err := cmd.CombinedOutput()
+	Expect(err).ToNot(HaveOccurred())
+	if strings.Contains(string(out), "No") {
+		cmd = exec.Command("kind", "create", "cluster", "--image",
+			"kindest/node:v1.32.0@sha256:c48c62eac5da28cdadcf560d1d8616cfa6783b58f0d94cf63ad1bf49600cb027")
+		_, err := utils.Run(cmd)
+		ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to create Kind cluster")
+	}
+
+	var kubeconfig string
+	if os.Getenv("KUBECONFIG") != "" {
+		kubeconfig = os.Getenv("KUBECONFIG")
+	} else {
+		homeDir, _ := os.UserHomeDir()
+		kubeconfig = filepath.Join(homeDir, ".kube", "config")
+	}
+	cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+	Expect(err).ToNot(HaveOccurred(), "Failed to build kubeconfig")
+	var scheme = runtime.NewScheme()
+
+	err = clientgoscheme.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	Expect(msv1alpha1.AddToScheme(scheme)).To(Succeed())
+	Expect(giev1alpha2.Install(scheme)).To(Succeed())
+	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
+	Expect(err).ToNot(HaveOccurred(), "Failed to create k8s client")
+
 	By("building the manager(Operator) image")
-	cmd := exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectImage))
-	_, err := utils.Run(cmd)
+	cmd = exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectImage))
+	_, err = utils.Run(cmd)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to build the manager(Operator) image")
 
 	// TODO(user): If you want to change the e2e test vendor from Kind, ensure the image is
