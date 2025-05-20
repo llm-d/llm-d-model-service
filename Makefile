@@ -4,6 +4,7 @@ DEV_VERSION ?= 0.0.1
 PROD_VERSION ?= 0.0.0
 IMAGE_TAG_BASE ?= ghcr.io/llm-d/$(PROJECT_NAME)
 IMG = $(IMAGE_TAG_BASE):$(DEV_VERSION)
+IMG_ARCHIVE ?= /tmp/image.tar
 IMAGE_PULL_SECRET ?= quay-secret-llm-d
 NAMESPACE ?= hc4ai-operator
 LOG_LEVEL ?= info
@@ -120,6 +121,10 @@ run: manifests generate fmt vet ## Run a controller from your host.
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
 	$(CONTAINER_TOOL) build -t ${IMG} .
+
+.PHONY: archive-image
+archive-image: ## Save docker image as tar file
+	$(CONTAINER_TOOL) save -o ${IMG_ARCHIVE} ${IMG}
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
