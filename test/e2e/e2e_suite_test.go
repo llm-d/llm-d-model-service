@@ -125,4 +125,9 @@ var _ = AfterSuite(func() {
 		_, _ = fmt.Fprintf(GinkgoWriter, "Uninstalling CertManager...\n")
 		utils.UninstallCertManager()
 	}
+
+	// delete test cluster
+	cmd := exec.Command("kind", "delete", "cluster", "--name", testCluster)
+	_, _ = utils.Run(cmd)
+
 })
