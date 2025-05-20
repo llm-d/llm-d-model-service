@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -35,6 +34,8 @@ var (
 	// with the code source changes to be tested.
 	projectImage = "llm-d.ai/modelservice:v0.0.1"
 	imageArchive = "/tmp/llm-d.ai-modelservice-v0.0.1.tar"
+	testCluster  = "kind-modelservice-test"
+	kindImage    = "kindest/node:v1.32.0@sha256:c48c62eac5da28cdadcf560d1d8616cfa6783b58f0d94cf63ad1bf49600cb027"
 )
 
 // TestE2E runs the end-to-end (e2e) test suite for the project. These tests execute in an isolated,
@@ -54,16 +55,18 @@ var (
 )
 
 var _ = BeforeSuite(func() {
-	By("creating Kind cluster if not exists")
-	cmd := exec.Command("kind", "get", "clusters")
-	out, err := cmd.CombinedOutput()
-	Expect(err).ToNot(HaveOccurred())
-	if strings.Contains(string(out), "No") {
-		cmd = exec.Command("kind", "create", "cluster", "--image",
-			"kindest/node:v1.32.0@sha256:c48c62eac5da28cdadcf560d1d8616cfa6783b58f0d94cf63ad1bf49600cb027")
-		_, err := utils.Run(cmd)
-		ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to create Kind cluster")
-	}
+	By("deleting kind cluster if it exists")
+	cmd := exec.Command("kind", "delete", "cluster", "--name", testCluster)
+	_, _ = utils.Run(cmd)
+	// ignore problems
+
+	By("creating Kind cluster")
+	cmd = exec.Command("kind", "create", "cluster", "--image", kindImage, "--name", testCluster)
+	_, err := utils.Run(cmd)
+	ExpectWithOffset(1, err).NotTo(
+		HaveOccurred(),
+		fmt.Sprintf("Failed to create Kind cluster %s", testCluster),
+	)
 
 	var kubeconfig string
 	if os.Getenv("KUBECONFIG") != "" {
@@ -97,7 +100,7 @@ var _ = BeforeSuite(func() {
 	// TODO(user): If you want to change the e2e test vendor from Kind, ensure the image is
 	// built and available before running the tests. Also, remove the following block.
 	By("loading the manager(Operator) image on Kind")
-	err = utils.LoadImageToKindClusterWithName(imageArchive)
+	err = utils.LoadImageToKindClusterWithName(imageArchive, testCluster)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to load the manager(Operator) image into Kind")
 
 	// The tests-e2e are intended to run on a temporary cluster that is created and destroyed for testing.
