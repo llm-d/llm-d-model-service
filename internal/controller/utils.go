@@ -199,16 +199,21 @@ func getVolumeMountsForContainer(ctx context.Context, msvc *msv1alpha1.ModelServ
 	switch uriType {
 
 	// The volume mount for HF and PVC is the same
+	// except that HF volume is not readOnly
 	// volumeMounts:
 	// - mountPath: /model-cache
 	//   name: model-storage
-	case PVC, HF:
+	case PVC:
 		desiredVolumeMount = &corev1.VolumeMount{
 			Name:      modelStorageVolumeName,
 			MountPath: modelStorageRoot,
 			ReadOnly:  true,
 		}
-
+	case HF:
+		desiredVolumeMount = &corev1.VolumeMount{
+			Name:      modelStorageVolumeName,
+			MountPath: modelStorageRoot,
+		}
 	// TODO
 	// case OCI:
 	case UnknownURI:

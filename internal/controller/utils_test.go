@@ -209,6 +209,7 @@ var _ = Describe("Model Artifacts", func() {
 
 			Expect(firstVolumeMount.Name).To(Equal(modelStorageVolumeName))
 			Expect(firstVolumeMount.MountPath).To(Equal(modelStorageRoot))
+			Expect(firstVolumeMount.ReadOnly).To(BeFalse())
 		})
 
 		It("should produce a valid volumes list", func() {
