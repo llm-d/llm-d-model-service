@@ -7,6 +7,7 @@ package controller
 const modelStorageVolumeName = "model-storage"
 const modelStorageRoot = "/model-cache"
 const pathSep = "/"
+const ociPathToModelSep = "::"
 const DECODE_ROLE = "decode"
 const PREFILL_ROLE = "prefill"
 const MODEL_ARTIFACT_URI_PVC = "pvc"

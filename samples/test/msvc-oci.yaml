@@ -1,0 +1,34 @@
+apiVersion: llm-d.ai/v1alpha1
+kind: ModelService
+metadata:
+  name: busybox
+spec:
+  decoupleScaling: false
+
+  baseConfigMapRef:
+    name: basic-basic-conf
+
+  routing: 
+    modelName: ibm-granite/granite-3.3-2b-instruct
+    ports:
+    - name: inport
+      port: 80
+    - name: outport
+      port: 9376
+
+  modelArtifacts:
+    uri: oci://image-with-tag:0.0.1::/path/to/model
+    pullPolicy: IfNotPresent
+
+  # describe decode pods
+  decode:
+    replicas: 1
+    containers:
+    - name: "sidecar"
+      image: "nginx"
+    - name: "llm"
+      image: busybox
+      args:
+      - "{{ .ModelPath }}"
+      - "{{ .MountedModelPath }}"
+      mountModelVolume: true 

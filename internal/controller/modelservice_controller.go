@@ -103,24 +103,37 @@ func (t *TemplateVars) from(ctx context.Context, msvc *msv1alpha1.ModelService) 
 		t.AuthSecretName = *msvc.Spec.ModelArtifacts.AuthSecretName
 	}
 
+	// Compute ModelPath variable and HFModelName for HF prefix
+	var err error
 	uri := msvc.Spec.ModelArtifacts.URI
-	if strings.HasPrefix(uri, HF_PREFIX) {
-		t.HFModelName = strings.TrimPrefix(uri, HF_PREFIX)
-		t.ModelPath = t.HFModelName
-	} else if strings.HasPrefix(uri, PVC_PREFIX) {
-		tail := strings.TrimPrefix(uri, PVC_PREFIX)
-		segments := strings.Split(tail, pathSep)
-		t.ModelPath = strings.Join(segments[1:], pathSep)
-	} else {
-		err := fmt.Errorf("unsupported prefix")
-		log.FromContext(ctx).V(1).Error(err, "cannot get template vars", "uri", uri)
-		return err
+	uriType := UriType(uri)
+	switch uriType {
+	case HF:
+		if repoID, modelID, err := parseHFURI(&msvc.Spec.ModelArtifacts); err == nil {
+			t.HFModelName = repoID + pathSep + modelID
+			t.ModelPath = t.HFModelName
+		}
+	case PVC:
+		if _, modelPath, err := parsePVCURI(&msvc.Spec.ModelArtifacts); err == nil {
+			t.ModelPath = strings.Join(modelPath, pathSep)
+		}
+	case OCI:
+		if _, modelPath, err := parseOCIURI(&msvc.Spec.ModelArtifacts); err == nil {
+			t.ModelPath = strings.Join(modelPath, pathSep)
+		}
+	case UnknownURI:
+		err = fmt.Errorf("unsupported prefix")
+		log.FromContext(ctx).V(1).Error(err, "uri", uri)
 	}
 
-	// Compute the mountedModelPath variable, given the URI type
-	// PVC: /path/to/model
+	if err != nil {
+		log.FromContext(ctx).V(1).Error(err, "cannot parse uri and thus cannot populate some ModelPath template vars", "uri", uri)
+	}
+
+	// Compute the MountedModelPath variable, given the URI type
+	// PVC: /model-cache/path/to/model
 	// HF: /model-cache
-	// OCI: /model-cache
+	// OCI: /model-cache/path/to/model
 	mountedModelPath, err := mountedModelPath(msvc)
 	if err != nil {
 		return err

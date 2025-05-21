@@ -10,9 +10,9 @@ import (
 )
 
 // assertEqualSlices checks if two slices are equal in length, order, and content.
-func assertEqualSlices[T comparable](t *testing.T, got, want []T) {
-	if !reflect.DeepEqual(got, want) {
-		sliceError := fmt.Errorf("slices do not match:\ngot:  %v\nwant: %v", got, want)
+func assertEqualSlices[T comparable](t *testing.T, expected, actual []T) {
+	if !reflect.DeepEqual(expected, actual) {
+		sliceError := fmt.Errorf("slices do not match:\nwant:  %v\ngot: %v", expected, actual)
 		assert.NoError(t, sliceError, "error with comparing slices")
 	}
 }

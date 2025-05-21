@@ -1387,6 +1387,14 @@ spec:
                   authSecretName:
                     description: Name of the authentication secret. Contains HF_TOKEN
                     type: string
+                  pullPolicy:
+                    description: |-
+                      OCI image pull policy.
+                      One of Always, Never, IfNotPresent.
+                      Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
+                      Cannot be updated.
+                      More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
+                    type: string
                   size:
                     anyOf:
                     - type: integer

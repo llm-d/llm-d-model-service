@@ -199,6 +199,13 @@ type ModelArtifacts struct {
 	//
 	// +optional
 	Size *res.Quantity `json:"size,omitempty"`
+	// OCI image pull policy.
+	// One of Always, Never, IfNotPresent.
+	// Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
+	// Cannot be updated.
+	// More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
+	// +optional
+	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty" protobuf:"bytes,14,opt,name=pullPolicy,casttype=PullPolicy"`
 }
 
 // ModelServicePodSpec defines the specification for pod templates that will be created by ModelService.

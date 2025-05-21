@@ -732,11 +732,25 @@ and pre-existing models loaded from a volume-mounted PVC (pvc://model-path)<br><
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
-<p><strong><code>size</code></strong> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#quantity-resource-api">Quantity</a></em></p>
+<p><strong><code>size</code></strong> <em><a href="#k8s-api-k8s-io-apimachinery-pkg-api-resource-quantity">Quantity</a></em></p>
 </div></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
 <p>Size of the model artifacts on disk<br>
 ensure Size is large enough when providing hf://&#8230;&#8203; URI<br></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p><strong><code>pullPolicy</code></strong> <em><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#pullpolicy-v1-core">PullPolicy</a></em></p>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
+<p>OCI image pull policy.<br>
+One of Always, Never, IfNotPresent.<br>
+Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.<br>
+Cannot be updated.<br>
+More info: <a href="https://kubernetes.io/docs/concepts/containers/images#updating-images" class="bare">https://kubernetes.io/docs/concepts/containers/images#updating-images</a><br></p>
 </div></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"></div></td>
@@ -1629,11 +1643,7 @@ These can be referenced by name in configuration of base configuration or model 
 </div>
 <div id="footer">
 <div id="footer-text">
-<<<<<<< HEAD
-Last updated 2025-05-15 11:58:12 -0400
-=======
-Last updated 2025-05-14 17:04:13 -0400
->>>>>>> upstream/main
+Last updated 2025-05-21 13:57:32 -0400
 </div>
 </div>
 </body>
