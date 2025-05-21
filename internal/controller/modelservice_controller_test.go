@@ -875,7 +875,7 @@ var _ = Describe("ModelService Controller", func() {
 			Expect(decode.Spec.Template.Spec.Volumes[0].Name).To(Equal(modelStorageVolumeName))
 			Expect(decode.Spec.Template.Spec.Volumes[0].EmptyDir).To(Not(BeNil()))
 
-			By("checking hte decode container where mountModelVolume is true has a volume mount")
+			By("checking the decode container where mountModelVolume is true has a volume mount")
 			Expect(len(decode.Spec.Template.Spec.Containers)).To(Equal(1))
 			Expect(len(decode.Spec.Template.Spec.Containers[0].VolumeMounts)).To(Equal(1))
 			Expect(decode.Spec.Template.Spec.Containers[0].VolumeMounts[0].Name).To(Equal(modelStorageVolumeName))
@@ -889,6 +889,111 @@ var _ = Describe("ModelService Controller", func() {
 			By("checking decode container args are interpolated")
 			Expect(len(decode.Spec.Template.Spec.Containers[0].Args)).To(Equal(1))
 			Expect(decode.Spec.Template.Spec.Containers[0].Args[0]).To(Equal(modelStorageRoot))
+		})
+	})
+
+	Context("When reconciling a OCI ModelService", func() {
+		It("should create child resources correctly", func() {
+			// hfMSVC names
+			ociMSVCName := "oci-msvc"
+			ociImageName := "oci-image-with-tag:0.1.1"
+			ociURI := MODEL_ARTIFACT_URI_OCI_PREFIX + ociImageName + ociPathToModelSep + modelPath
+			ociMountedModelPath := modelStorageRoot + pathSep + modelPath
+
+			ociNamespacedName := types.NamespacedName{
+				Name:      ociMSVCName,
+				Namespace: namespace,
+			}
+
+			// variable definitions
+			ociMSVC := &msv1alpha1.ModelService{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: msv1alpha1.GroupVersion.String(),
+					Kind:       "ModelService",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ociMSVCName,
+					Namespace: namespace,
+				},
+				Spec: msv1alpha1.ModelServiceSpec{
+					ModelArtifacts: msv1alpha1.ModelArtifacts{
+						URI: ociURI,
+					},
+					Routing: msv1alpha1.Routing{
+						ModelName: modelServiceName,
+					},
+					Decode: &msv1alpha1.PDSpec{
+						ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
+							Containers: []msv1alpha1.ContainerSpec{
+								{
+									Name:  "llm",
+									Image: &imageName,
+									Args: []string{
+										"{{ .MountedModelPath }}",
+									},
+									MountModelVolume: true,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			// Create ociMSVC in the cluster
+			By("creating the ociMSVC in the cluster")
+			err := k8sClient.Create(ctx, ociMSVC)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Fetch from cluster
+			By("fetching the ociMSVC in the cluster")
+			var ociMSVCInCluster msv1alpha1.ModelService
+			err = k8sClient.Get(ctx, ociNamespacedName, &ociMSVCInCluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Reconcile resource
+			By("Reconciling the ModelService")
+			reconciler := &ModelServiceReconciler{
+				Client:      k8sClient,
+				Scheme:      k8sClient.Scheme(),
+				RBACOptions: *rbacOptions,
+			}
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: ociNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify child resources
+			By("fetching the decode deployment child resource")
+			// fetch decode resource name
+			decodeNamespacedName := types.NamespacedName{
+				Name:      deploymentName(ociMSVC, DECODE_ROLE),
+				Namespace: namespace,
+			}
+
+			var decode appsv1.Deployment
+			err = k8sClient.Get(ctx, decodeNamespacedName, &decode)
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, decodeNamespacedName, &decode)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+			Expect(err).NotTo(HaveOccurred())
+
+			By("checking decode child has an oci image volume with the default pull policy")
+			Expect(len(decode.Spec.Template.Spec.Volumes)).To(Equal(1))
+			Expect(decode.Spec.Template.Spec.Volumes[0].Name).To(Equal(modelStorageVolumeName))
+			Expect(decode.Spec.Template.Spec.Volumes[0].Image).To(Not(BeNil()))
+			Expect(decode.Spec.Template.Spec.Volumes[0].Image.Reference).To(Equal(ociImageName))
+			Expect(decode.Spec.Template.Spec.Volumes[0].Image.PullPolicy).To(Equal(corev1.PullIfNotPresent))
+
+			By("checking the decode container where mountModelVolume is true has a volume mount")
+			Expect(len(decode.Spec.Template.Spec.Containers)).To(Equal(1))
+			Expect(len(decode.Spec.Template.Spec.Containers[0].VolumeMounts)).To(Equal(1))
+			Expect(decode.Spec.Template.Spec.Containers[0].VolumeMounts[0].Name).To(Equal(modelStorageVolumeName))
+			Expect(decode.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath).To(Equal(modelStorageRoot))
+
+			By("checking decode container args are interpolated")
+			Expect(len(decode.Spec.Template.Spec.Containers[0].Args)).To(Equal(1))
+			Expect(decode.Spec.Template.Spec.Containers[0].Args[0]).To(Equal(ociMountedModelPath))
 		})
 	})
 
