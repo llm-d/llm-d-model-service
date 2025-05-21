@@ -1,0 +1,29 @@
+name: Build API documentation
+
+on:
+    workflow_dispatch:
+
+jobs:
+    apidoc:
+        runs-on: ubuntu-latest
+        steps:
+        - name: checkout repository
+          uses: actions/checkout@v4
+
+        # generate asciidoc from source
+        - name: install go
+          uses: actions/setup-go@v5
+        - name: Go Installer
+          uses: mattdowdell/go-installer@v0.3.0
+          with:
+            package: github.com/elastic/crd-ref-docs
+        - name: generate asciidoc
+          run: crd-ref-docs --source-path=./api/v1alpha1  --config=./docs/api_reference/config.yaml --output-path=./docs/api_reference
+
+        # convert to html using asciidoc
+        - name: install ruby
+          uses: ruby/setup-ruby@v1
+        - name: install asciidoc
+          uses: reitzig/actions-asciidoctor@v2.0.2
+        - name: convert asciidoc to html
+          run: asciidoctor ./docs/api_reference/out.asciidoc
