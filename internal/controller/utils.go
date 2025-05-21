@@ -280,21 +280,21 @@ func getVolumeForPDDeployment(ctx context.Context, msvc *msv1alpha1.ModelService
 	return volumes
 }
 
-// getEnvsForcontainer returns the desired list of env vars for the container for the given URI type
+// getEnvsForContainer returns the desired list of env vars for the container for the given URI type
 // For hf URIs, it returns an EnvVar which has a reference to a secretKey, provided by ModelArtifacts,
 // with HF_TOKEN in that secret
 // Other URI types do not need the controller to add any EnvVars
-func getEnvsForcontainer(ctx context.Context, msvc *msv1alpha1.ModelService) []corev1.EnvVar {
+func getEnvsForContainer(ctx context.Context, msvc *msv1alpha1.ModelService) []corev1.EnvVar {
 	envs := []corev1.EnvVar{}
-	var desiredEnv *corev1.EnvVar
 
 	uriType := UriType(msvc.Spec.ModelArtifacts.URI)
 
 	switch uriType {
 	// only HF case needs a EnvVar, PVC and OCI don't
 	case HF:
+		// Add a HF_TOKEN env
 		if msvc.Spec.ModelArtifacts.AuthSecretName != nil {
-			desiredEnv = &corev1.EnvVar{
+			hfTokenEnv := corev1.EnvVar{
 				Name: ENV_HF_TOKEN,
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
@@ -305,15 +305,23 @@ func getEnvsForcontainer(ctx context.Context, msvc *msv1alpha1.ModelService) []c
 					},
 				},
 			}
+			envs = append(envs, hfTokenEnv)
+		}
+
+		// Add a HF_HOME env which points to the mountPath
+		if mountedModelPath, err := mountedModelPath(msvc); err == nil {
+			hfHomeEnv := corev1.EnvVar{
+				Name:  ENV_HF_HOME,
+				Value: mountedModelPath,
+			}
+			envs = append(envs, hfHomeEnv)
+		} else {
+			log.FromContext(ctx).V(1).Error(err, "cannot parse hf uri to get the mountedModelPath")
 		}
 
 	case UnknownURI:
 		// do nothing
 		log.FromContext(ctx).V(1).Error(fmt.Errorf("uri type is unknown, cannot populate volumes"), "uri type: "+msvc.Spec.ModelArtifacts.URI)
-	}
-
-	if desiredEnv != nil {
-		envs = append(envs, *desiredEnv)
 	}
 
 	return envs
@@ -378,7 +386,7 @@ func convertToContainerSliceWithURIInfo(ctx context.Context, c []msv1alpha1.Cont
 	containerSlice := convertToContainerSlice(c)
 	for i := range c {
 		if c[i].MountModelVolume {
-			containerSlice[i].Env = getEnvsForcontainer(ctx, msvc)
+			containerSlice[i].Env = getEnvsForContainer(ctx, msvc)
 			containerSlice[i].VolumeMounts = getVolumeMountsForContainer(ctx, msvc)
 		}
 	}

@@ -165,7 +165,7 @@ var _ = Describe("Model Artifacts", func() {
 		})
 
 		It("should produce a valid env list", func() {
-			envs := getEnvsForcontainer(ctx, &modelService)
+			envs := getEnvsForContainer(ctx, &modelService)
 			Expect(len(envs)).To(Equal(0))
 		})
 	})
@@ -221,13 +221,17 @@ var _ = Describe("Model Artifacts", func() {
 		})
 
 		It("should produce a valid env list", func() {
-			envs := getEnvsForcontainer(ctx, &modelService)
-			Expect(len(envs)).To(Equal(1))
-			firstEnvVar := envs[0]
+			envs := getEnvsForContainer(ctx, &modelService)
+			Expect(len(envs)).To(Equal(2))
+			hfTokenEnvVar := envs[0]
 
-			Expect(firstEnvVar.Name).To(Equal(ENV_HF_TOKEN))
-			Expect(firstEnvVar.ValueFrom.SecretKeyRef.Name).To(Equal(authSecretName))
-			Expect(firstEnvVar.ValueFrom.SecretKeyRef.Key).To(Equal(ENV_HF_TOKEN))
+			Expect(hfTokenEnvVar.Name).To(Equal(ENV_HF_TOKEN))
+			Expect(hfTokenEnvVar.ValueFrom.SecretKeyRef.Name).To(Equal(authSecretName))
+			Expect(hfTokenEnvVar.ValueFrom.SecretKeyRef.Key).To(Equal(ENV_HF_TOKEN))
+
+			hfHomeEnvVar := envs[1]
+			Expect(hfHomeEnvVar.Name).To(Equal(ENV_HF_HOME))
+			Expect(hfHomeEnvVar.Value).To(Equal(modelStorageRoot))
 		})
 	})
 })

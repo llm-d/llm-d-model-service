@@ -881,8 +881,10 @@ var _ = Describe("ModelService Controller", func() {
 			Expect(decode.Spec.Template.Spec.Containers[0].VolumeMounts[0].Name).To(Equal(modelStorageVolumeName))
 			Expect(decode.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath).To(Equal(modelStorageRoot))
 
-			By("checking decode does not have envs because authSecretName is not provided")
-			Expect(len(decode.Spec.Template.Spec.Containers[0].Env)).To(Equal(0))
+			By("checking decode has 1 env for HF_HOME and none for HF_TOKEN because authSecretName is not provided")
+			Expect(len(decode.Spec.Template.Spec.Containers[0].Env)).To(Equal(1))
+			Expect(decode.Spec.Template.Spec.Containers[0].Env[0].Name).To(Equal(ENV_HF_HOME))
+			Expect(decode.Spec.Template.Spec.Containers[0].Env[0].Value).To(Equal(modelStorageRoot))
 
 			By("checking decode container args are interpolated")
 			Expect(len(decode.Spec.Template.Spec.Containers[0].Args)).To(Equal(1))
