@@ -18,6 +18,7 @@ import (
 	msv1alpha1 "github.com/llm-d/llm-d-model-service/api/v1alpha1"
 	"github.com/llm-d/llm-d-model-service/internal/controller"
 	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 func readModelService(ctx context.Context, filename string, logger logr.Logger) (*msv1alpha1.ModelService, error) {
@@ -99,6 +100,11 @@ func generateManifests(ctx context.Context, manifestFile string, configFile stri
 	err = msv1alpha1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		logger.Info("unable to add model service to scheme")
+		return nil, err
+	}
+	err = gatewayv1.Install(scheme.Scheme)
+	if err != nil {
+		logger.Info("unable to add gateway api extension to scheme")
 		return nil, err
 	}
 	err = giev1alpha2.Install(scheme.Scheme)

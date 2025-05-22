@@ -173,9 +173,14 @@ var _ = Describe("Manager", Ordered, func() {
 		By("installing external CRDs")
 
 		cmd = exec.Command("kubectl", "apply", "-f",
+			"https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml")
+		_, err = utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred(), "Failed to install Gateway API CRDs")
+
+		cmd = exec.Command("kubectl", "apply", "-f",
 			"https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/v0.3.0/manifests.yaml")
 		_, err = utils.Run(cmd)
-		Expect(err).NotTo(HaveOccurred(), "Failed to install CRDs")
+		Expect(err).NotTo(HaveOccurred(), "Failed to install Gateway API Inference Extension CRDs")
 
 		By("installing rolebinding for Epp")
 

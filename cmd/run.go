@@ -29,6 +29,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -83,6 +84,7 @@ func runController() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(msv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(gatewayv1.Install(scheme))
 	utilruntime.Must(giev1alpha2.Install(scheme))
 	var opts = zap.Options{
 		Development: false,
