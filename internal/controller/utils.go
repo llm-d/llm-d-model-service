@@ -282,7 +282,9 @@ func getVolumeForPDDeployment(ctx context.Context, msvc *msv1alpha1.ModelService
 	switch uriType {
 	// Return a volume with persistentVolumeClaim
 	case PVC:
-		if pvcName, _, err := parsePVCURI(&msvc.Spec.ModelArtifacts); err == nil {
+		if pvcName, _, err := parsePVCURI(&msvc.Spec.ModelArtifacts); err != nil {
+			log.FromContext(ctx).V(1).Error(err, "uri: "+msvc.Spec.ModelArtifacts.URI)
+		} else {
 			desiredVolume = &corev1.Volume{
 				Name: modelStorageVolumeName,
 				VolumeSource: corev1.VolumeSource{
@@ -292,12 +294,12 @@ func getVolumeForPDDeployment(ctx context.Context, msvc *msv1alpha1.ModelService
 					},
 				},
 			}
-		} else {
-			log.FromContext(ctx).V(1).Error(err, "uri: "+msvc.Spec.ModelArtifacts.URI)
 		}
 	// Return an emptyDir volume with ModelArtifacts.Size
 	case HF:
-		if _, _, err := parseHFURI(&msvc.Spec.ModelArtifacts); err == nil {
+		if _, _, err := parseHFURI(&msvc.Spec.ModelArtifacts); err != nil {
+			log.FromContext(ctx).V(1).Error(err, "uri: "+msvc.Spec.ModelArtifacts.URI)
+		} else {
 			desiredVolume = &corev1.Volume{
 				Name: modelStorageVolumeName,
 				VolumeSource: corev1.VolumeSource{
@@ -306,13 +308,13 @@ func getVolumeForPDDeployment(ctx context.Context, msvc *msv1alpha1.ModelService
 					},
 				},
 			}
-		} else {
-			log.FromContext(ctx).V(1).Error(err, "uri: "+msvc.Spec.ModelArtifacts.URI)
 		}
 
 	// Return a volume with image reference
 	case OCI:
-		if image, _, err := parseOCIURI(&msvc.Spec.ModelArtifacts); err == nil {
+		if image, _, err := parseOCIURI(&msvc.Spec.ModelArtifacts); err != nil {
+			log.FromContext(ctx).V(1).Error(err, "uri: "+msvc.Spec.ModelArtifacts.URI)
+		} else {
 			desiredVolume = &corev1.Volume{
 				Name: modelStorageVolumeName,
 				VolumeSource: corev1.VolumeSource{
@@ -322,8 +324,6 @@ func getVolumeForPDDeployment(ctx context.Context, msvc *msv1alpha1.ModelService
 					},
 				},
 			}
-		} else {
-			log.FromContext(ctx).V(1).Error(err, "uri: "+msvc.Spec.ModelArtifacts.URI)
 		}
 	case UnknownURI:
 		// do nothing
