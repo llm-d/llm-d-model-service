@@ -249,6 +249,11 @@ func (in *ModelServiceStatus) DeepCopyInto(out *ModelServiceStatus) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.HTTPRouteRef != nil {
+		in, out := &in.HTTPRouteRef, &out.HTTPRouteRef
+		*out = new(string)
+		**out = **in
+	}
 	if in.InferenceModelRef != nil {
 		in, out := &in.InferenceModelRef, &out.InferenceModelRef
 		*out = new(string)

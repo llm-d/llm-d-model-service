@@ -364,6 +364,11 @@ type ModelServiceStatus struct {
 	// this reference will be nil
 	//
 	EppDeploymentRef *string `json:"eppDeploymentRef,omitempty"`
+	// HTTPRoute identifies the HTTPRoute resource
+	// if HTTPRoute is yet to be created,
+	// this reference will be nil
+	//
+	HTTPRouteRef *string `json:"httpRouteRef,omitempty"`
 	// InferenceModelRef identifies the inference model resource
 	// if inference model is yet to be created,
 	// this reference will be nil

@@ -2449,6 +2449,12 @@ spec:
                   if EppRoleBinding is yet to be created,
                   this reference will be nil
                 type: string
+              httpRouteRef:
+                description: |-
+                  HTTPRoute identifies the HTTPRoute resource
+                  if HTTPRoute is yet to be created,
+                  this reference will be nil
+                type: string
               inferenceModelRef:
                 description: |-
                   InferenceModelRef identifies the inference model resource

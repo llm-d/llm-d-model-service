@@ -96,7 +96,7 @@ func (childResource *BaseConfig) shouldCreateEPPRoleBinding() bool {
 // shouldCreateHTTPRoute returns True if HTTPRoute needs to be created
 // should be created if there's an InferencePool or if HTTPRoute is specified in the baseconfig
 func (childResource *BaseConfig) shouldCreateHTTPRoute() bool {
-	return childResource.HTTPRoute != nil || childResource.shouldCreateInferencePool()
+	return childResource.HTTPRoute != nil
 }
 
 // shouldCreateInferencePool returns True if InferencePool needs to be created
@@ -334,7 +334,7 @@ func (interpolatedBaseConfig *BaseConfig) MergeChildResources(ctx context.Contex
 		interpolatedBaseConfig.setPDServiceAccount(ctx, modelService, scheme, rbacOptions)
 	}
 
-	if interpolatedBaseConfig.HTTPRoute != nil || interpolatedBaseConfig.InferencePool != nil {
+	if interpolatedBaseConfig.HTTPRoute != nil || len(modelService.Spec.Routing.GatewayRefs) > 0 {
 		log.FromContext(ctx).V(1).Info("attempting to update HTTPRoute")
 		interpolatedBaseConfig.mergeHTTPRoute(ctx, modelService, scheme)
 	}
@@ -843,8 +843,12 @@ func (childResources *BaseConfig) mergeEppService(ctx context.Context, msvc *msv
 // mergeHTTPRoute uses msvc fields to update childResource HTTPRoute resource.
 func (childResources *BaseConfig) mergeHTTPRoute(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
 
-	if childResources == nil || childResources.HTTPRoute == nil {
+	if childResources == nil {
 		return childResources
+	}
+
+	if childResources.HTTPRoute == nil {
+		childResources.HTTPRoute = &gatewayv1.HTTPRoute{}
 	}
 
 	// Get dest HTTPRoute
@@ -865,6 +869,7 @@ func (childResources *BaseConfig) mergeHTTPRoute(ctx context.Context, msvc *msv1
 			Name:      httpRouteName(msvc),
 			Namespace: msvc.Namespace,
 		},
+
 		Spec: gatewayv1.HTTPRouteSpec{
 			CommonRouteSpec: gatewayv1.CommonRouteSpec{
 				ParentRefs: msvc.Spec.Routing.GatewayRefs,
