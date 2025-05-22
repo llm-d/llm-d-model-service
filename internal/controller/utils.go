@@ -223,7 +223,7 @@ func parseOCIURI(modelArtifact *msv1alpha1.ModelArtifacts) (string, []string, er
 	// Split by ::
 	parts := strings.Split(strings.TrimPrefix(uri, MODEL_ARTIFACT_URI_OCI_PREFIX), ociPathToModelSep)
 	if len(parts) != 2 {
-		return imageIdentifier, pathToModel, fmt.Errorf("invalid oci URI format: %s; need oci://<image identifier with tag>::/path/to/model. Please double check if you are missing %s which did not resul in exactly two segments", uri, ociPathToModelSep)
+		return imageIdentifier, pathToModel, fmt.Errorf("invalid oci URI format: %s; need oci://<image identifier with tag>::/path/to/model. Please double check if you are missing %s which did not result in exactly two segments", uri, ociPathToModelSep)
 	}
 
 	imageIdentifier = parts[0]
