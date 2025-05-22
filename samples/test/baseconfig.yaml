@@ -111,7 +111,7 @@ data:
     spec:
       parentRefs:
       - name: inference-gateway-name
-        port: 1234
+        port: 12345
       rules:
       - matches:
         - path:
