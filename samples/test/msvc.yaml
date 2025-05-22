@@ -15,6 +15,9 @@ spec:
       port: 80
     - name: outport
       port: 9376
+    gatewayRefs:
+    - name: inference-gateway-name
+      port: 1112
 
   modelArtifacts:
     uri: pvc://llama-of-the-future/path/to/llama-2075

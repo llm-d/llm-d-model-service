@@ -12,6 +12,7 @@ When a ModelService resource is reconciled, it creates and maintains the followi
 
 ## Routing
 
+* HTTPRoute
 * Inference pool
 * Inference model
 * Endpoint picker (EPP) deployment and service 

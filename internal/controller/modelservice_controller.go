@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	msv1alpha1 "github.com/llm-d/llm-d-model-service/api/v1alpha1"
 	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
@@ -169,6 +170,7 @@ func (t *TemplateFuncs) from(ctx context.Context, msvc *msv1alpha1.ModelService)
 // +kubebuilder:rbac:groups=llm-d.ai,resources=modelservices/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments/scale,verbs=update;patch
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=inference.networking.x-k8s.io,resources=inferencemodels,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=inference.networking.x-k8s.io,resources=inferencepools,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
@@ -250,6 +252,7 @@ func (r *ModelServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.Service{}, handler.EnqueueRequestsFromMapFunc(r.serviceMapFunc)).
 		Watches(&rbacv1.RoleBinding{}, handler.EnqueueRequestsFromMapFunc(r.roleBindingMapFunc)).
 		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(r.configMapMapFunc)).
+		Watches(&gatewayv1.HTTPRoute{}, handler.EnqueueRequestsFromMapFunc(r.httpRouteMapFunc)).
 		Watches(&giev1alpha2.InferenceModel{}, handler.EnqueueRequestsFromMapFunc(r.inferenceModelMapFunc)).
 		Watches(&giev1alpha2.InferencePool{}, handler.EnqueueRequestsFromMapFunc(r.inferencePoolMapFunc)).
 		Watches(&corev1.ServiceAccount{}, handler.EnqueueRequestsFromMapFunc(r.serviceAccountMapFunc)).
@@ -290,6 +293,10 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 	if err != nil {
 		return err
 	}
+
+	httpRouteName := httpRouteName(msvc)
+	msvc.Status.HTTPRouteRef = &httpRouteName
+
 	infModelName := infModelName(msvc)
 	msvc.Status.InferenceModelRef = &infModelName
 
@@ -491,6 +498,18 @@ func (r *ModelServiceReconciler) inferencePoolMapFunc(ctx context.Context, obj c
 		return nil
 	}
 	shouldReturn, result := requeueMsvcReq(ctx, ip)
+	if shouldReturn {
+		return result
+	}
+	return nil
+}
+
+func (r *ModelServiceReconciler) httpRouteMapFunc(ctx context.Context, obj client.Object) []reconcile.Request {
+	im, ok := obj.(*gatewayv1.HTTPRoute)
+	if !ok {
+		return nil
+	}
+	shouldReturn, result := requeueMsvcReq(ctx, im)
 	if shouldReturn {
 		return result
 	}

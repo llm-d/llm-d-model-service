@@ -21,6 +21,16 @@ func deploymentName(modelService *msv1alpha1.ModelService, role string) string {
 	return sanitizedName
 }
 
+// httpRouteName returns the name of the inference pool object
+func httpRouteName(modelService *msv1alpha1.ModelService) string {
+	sanitizedName, err := sanitizeName(modelService.Name + "-http-route")
+	if err != nil {
+		return "http-route"
+	}
+
+	return sanitizedName
+}
+
 // infPoolName returns the name of the inference pool object
 func infPoolName(modelService *msv1alpha1.ModelService) string {
 	sanitizedName, err := sanitizeName(modelService.Name + "-inference-pool")
