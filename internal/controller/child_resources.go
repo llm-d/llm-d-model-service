@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	"sigs.k8s.io/yaml"
 )
 
@@ -32,6 +33,7 @@ type BaseConfig struct {
 	DecodeDeployment  *appsv1.Deployment          `json:"decodeDeployment,omitempty"`
 	PrefillService    *corev1.Service             `json:"prefillService,omitempty"`
 	DecodeService     *corev1.Service             `json:"decodeService,omitempty"`
+	HTTPRoute         *gatewayv1.HTTPRoute        `json:"httpRoute,omitempty"`
 	InferencePool     *giev1alpha2.InferencePool  `json:"inferencePool,omitempty"`
 	InferenceModel    *giev1alpha2.InferenceModel `json:"inferenceModel,omitempty"`
 	EPPDeployment     *appsv1.Deployment          `json:"eppDeployment,omitempty"`
@@ -89,6 +91,12 @@ func (childResource *BaseConfig) shouldCreateEPPServiceAccount() bool {
 // createEPPServiceAccount returns True if EPP deployment needs to be created
 func (childResource *BaseConfig) shouldCreateEPPRoleBinding() bool {
 	return childResource.shouldCreateEPPDeployment() && childResource.EPPRoleBinding != nil
+}
+
+// shouldCreateHTTPRoute returns True if HTTPRoute needs to be created
+// should be created if there's an InferencePool or if HTTPRoute is specified in the baseconfig
+func (childResource *BaseConfig) shouldCreateHTTPRoute() bool {
+	return childResource.HTTPRoute != nil || childResource.shouldCreateInferencePool()
 }
 
 // shouldCreateInferencePool returns True if InferencePool needs to be created
@@ -276,6 +284,9 @@ func BaseConfigFromCM(cm *corev1.ConfigMap) (*BaseConfig, error) {
 	if err := deserialize("decodeService", &bc.DecodeService); err != nil {
 		return nil, fmt.Errorf("failed to decode decodeService: %w", err)
 	}
+	if err := deserialize("httpRoute", &bc.HTTPRoute); err != nil {
+		return nil, fmt.Errorf("failed to decode httpRoute: %w", err)
+	}
 	if err := deserialize("inferencePool", &bc.InferencePool); err != nil {
 		return nil, fmt.Errorf("failed to decode inferencePool: %w", err)
 	}
@@ -321,6 +332,11 @@ func (interpolatedBaseConfig *BaseConfig) MergeChildResources(ctx context.Contex
 	if interpolatedBaseConfig.PrefillDeployment != nil || interpolatedBaseConfig.DecodeDeployment != nil {
 		// some pd pods are getting created; set SA and RB here
 		interpolatedBaseConfig.setPDServiceAccount(ctx, modelService, scheme, rbacOptions)
+	}
+
+	if interpolatedBaseConfig.HTTPRoute != nil {
+		log.FromContext(ctx).V(1).Info("attempting to update HTTPRoute")
+		interpolatedBaseConfig.mergeHTTPRoute(ctx, modelService, scheme)
 	}
 
 	if interpolatedBaseConfig.InferencePool != nil {
@@ -824,6 +840,76 @@ func (childResources *BaseConfig) mergeEppService(ctx context.Context, msvc *msv
 	return childResources
 }
 
+// mergeHTTPRoute uses msvc fields to update childResource HTTPRoute resource.
+func (childResources *BaseConfig) mergeHTTPRoute(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
+
+	if childResources == nil || childResources.HTTPRoute == nil {
+		return childResources
+	}
+
+	// Get dest HTTPRoute
+	dest := *childResources.HTTPRoute
+
+	group := gatewayv1.Group("inference.networking.x-k8s.io")
+	kind := gatewayv1.Kind("InferencePool")
+
+	// At this point, we are going to create the desired HTTPRoute
+	// with the parentRefs supplied by the user and
+	// with InferencePool being a backendRef (we are adding this)
+	src := &gatewayv1.HTTPRoute{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "HTTPRoute",
+			APIVersion: "gateway.networking.k8s.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      httpRouteName(msvc),
+			Namespace: msvc.Namespace,
+		},
+		Spec: gatewayv1.HTTPRouteSpec{
+			CommonRouteSpec: gatewayv1.CommonRouteSpec{
+				ParentRefs: msvc.Spec.Routing.GatewayRefs,
+			},
+			Rules: []gatewayv1.HTTPRouteRule{
+				{
+					BackendRefs: []gatewayv1.HTTPBackendRef{
+						{
+							// InferencePool is added as a backendRef
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Group: &group,
+									Kind:  &kind,
+									Name:  gatewayv1.ObjectName(infPoolName(msvc)),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Mergo merge src into dst
+	if err := mergo.Merge(&dest,
+		src,
+		mergo.WithOverride,
+		mergo.WithTransformers(parentRefSliceTransformer{}),
+	); err != nil {
+		log.FromContext(ctx).V(1).Error(err, "problem with httproute merge")
+		return childResources
+	}
+
+	// Set owner reference for the merged service
+	if err := controllerutil.SetOwnerReference(msvc, &dest, scheme); err != nil {
+		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for httproute")
+		return childResources
+	}
+
+	// Set the merged inferncepool in the child resource
+	childResources.HTTPRoute = &dest
+
+	return childResources
+}
+
 // mergeInferencePool uses msvc fields to update childResource InferencePool resource.
 func (childResources *BaseConfig) mergeInferencePool(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme) *BaseConfig {
 
@@ -922,6 +1008,10 @@ func (childResource *BaseConfig) invokeCreateOrUpdate(ctx context.Context, r *Mo
 
 	if childResource.shouldCreateEPPRoleBinding() {
 		results = append(results, createOrUpdateRoleBinding(ctx, r, childResource.EPPRoleBinding))
+	}
+
+	if childResource.shouldCreateHTTPRoute() {
+		results = append(results, createOrUpdateHTTPRoute(ctx, r, childResource.HTTPRoute))
 	}
 
 	if childResource.shouldCreateInferencePool() {
@@ -1071,6 +1161,12 @@ func createOrUpdateServiceAccount(ctx context.Context, r *ModelServiceReconciler
 func createOrUpdateRoleBinding(ctx context.Context, r *ModelServiceReconciler, desiredRoleBinding *rbacv1.RoleBinding) error {
 	emptyRoleBinding := rbacv1.RoleBinding{}
 	return genericCreateOrUpdate(ctx, r, desiredRoleBinding, &emptyRoleBinding)
+}
+
+// createOrUpdateHTTPRoute creates or updates a HTTPRoute object in the cluster
+func createOrUpdateHTTPRoute(ctx context.Context, r *ModelServiceReconciler, desiredInferenceModel *gatewayv1.HTTPRoute) error {
+	emptyHTTPRoute := gatewayv1.HTTPRoute{}
+	return genericCreateOrUpdate(ctx, r, desiredInferenceModel, &emptyHTTPRoute)
 }
 
 // createOrUpdateInferencePool creates or updates a InferencePool object in the cluster
