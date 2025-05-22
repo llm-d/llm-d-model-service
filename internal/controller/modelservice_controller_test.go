@@ -817,7 +817,114 @@ var _ = Describe("ModelService Controller", func() {
 			Expect(prefillDeployment.Spec.Replicas).Should(Equal(&replicas))
 
 		})
+	})
 
+	Context("When reconciling a HF ModelService", func() {
+		It("should create child resources correctly", func() {
+			// hfMSVC names
+			hfMSVCName := "hf-msvc"
+			hfRepo := "repo"
+			hfModel := "model-id"
+			hfURI := HF_PREFIX + pathSep + hfRepo + hfModel
+
+			hfNamespacedName := types.NamespacedName{
+				Name:      hfMSVCName,
+				Namespace: namespace,
+			}
+
+			// variable definitions
+			hfMSVC := &msv1alpha1.ModelService{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: msv1alpha1.GroupVersion.String(),
+					Kind:       "ModelService",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      hfMSVCName,
+					Namespace: namespace,
+				},
+				Spec: msv1alpha1.ModelServiceSpec{
+					ModelArtifacts: msv1alpha1.ModelArtifacts{
+						URI: hfURI,
+					},
+					Routing: msv1alpha1.Routing{
+						ModelName: modelServiceName,
+					},
+					Decode: &msv1alpha1.PDSpec{
+						ModelServicePodSpec: msv1alpha1.ModelServicePodSpec{
+							Containers: []msv1alpha1.ContainerSpec{
+								{
+									Name:  "llm",
+									Image: &imageName,
+									Args: []string{
+										"{{ .MountedModelPath }}",
+									},
+									MountModelVolume: true,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			// Create hfMSVC in the cluster
+			By("creating the hfMSVC in the cluster")
+			err := k8sClient.Create(ctx, hfMSVC)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Fetch from cluster
+			By("fetching the hfMSVC in the cluster")
+			var hfMSVCInCluster msv1alpha1.ModelService
+			err = k8sClient.Get(ctx, hfNamespacedName, &hfMSVCInCluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Reconcile resource
+			By("Reconciling the ModelService")
+			reconciler := &ModelServiceReconciler{
+				Client:      k8sClient,
+				Scheme:      k8sClient.Scheme(),
+				RBACOptions: *rbacOptions,
+			}
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: hfNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify child resources
+			By("fetching the decode deployment child resource")
+			// fetch decode resource name
+			decodeNamespacedName := types.NamespacedName{
+				Name:      deploymentName(hfMSVC, DECODE_ROLE),
+				Namespace: namespace,
+			}
+
+			var decode appsv1.Deployment
+			err = k8sClient.Get(ctx, decodeNamespacedName, &decode)
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, decodeNamespacedName, &decode)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+			Expect(err).NotTo(HaveOccurred())
+
+			By("checking decode child has an empty dir volume")
+			Expect(len(decode.Spec.Template.Spec.Volumes)).To(Equal(1))
+			Expect(decode.Spec.Template.Spec.Volumes[0].Name).To(Equal(modelStorageVolumeName))
+			Expect(decode.Spec.Template.Spec.Volumes[0].EmptyDir).To(Not(BeNil()))
+
+			By("checking hte decode container where mountModelVolume is true has a volume mount")
+			Expect(len(decode.Spec.Template.Spec.Containers)).To(Equal(1))
+			Expect(len(decode.Spec.Template.Spec.Containers[0].VolumeMounts)).To(Equal(1))
+			Expect(decode.Spec.Template.Spec.Containers[0].VolumeMounts[0].Name).To(Equal(modelStorageVolumeName))
+			Expect(decode.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath).To(Equal(modelStorageRoot))
+
+			By("checking decode has 1 env for HF_HOME and none for HF_TOKEN because authSecretName is not provided")
+			Expect(len(decode.Spec.Template.Spec.Containers[0].Env)).To(Equal(1))
+			Expect(decode.Spec.Template.Spec.Containers[0].Env[0].Name).To(Equal(ENV_HF_HOME))
+			Expect(decode.Spec.Template.Spec.Containers[0].Env[0].Value).To(Equal(modelStorageRoot))
+
+			By("checking decode container args are interpolated")
+			Expect(len(decode.Spec.Template.Spec.Containers[0].Args)).To(Equal(1))
+			Expect(decode.Spec.Template.Spec.Containers[0].Args[0]).To(Equal(modelStorageRoot))
+		})
 	})
 
 	Context("When reconciling a MSVC with errorneous BaseConfig", func() {

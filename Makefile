@@ -4,6 +4,7 @@ DEV_VERSION ?= 0.0.1
 PROD_VERSION ?= 0.0.0
 IMAGE_TAG_BASE ?= ghcr.io/llm-d/$(PROJECT_NAME)
 IMG = $(IMAGE_TAG_BASE):$(DEV_VERSION)
+IMG_ARCHIVE ?= /tmp/image.tar
 IMAGE_PULL_SECRET ?= quay-secret-llm-d
 NAMESPACE ?= hc4ai-operator
 LOG_LEVEL ?= info
@@ -69,7 +70,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet setup-envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./...)  -v IMAGE_PULL_POLICY=Never -coverprofile cover.out
 
 # TODO(user): To use a different vendor for e2e tests, modify the setup under 'tests/e2e'.
 # The default setup assumes Kind is pre-installed and builds/loads the Manager Docker image locally.
@@ -120,6 +121,10 @@ run: manifests generate fmt vet ## Run a controller from your host.
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
 	$(CONTAINER_TOOL) build -t ${IMG} .
+
+.PHONY: archive-image
+archive-image: ## Save docker image as tar file
+	$(CONTAINER_TOOL) save -o ${IMG_ARCHIVE} ${IMG}
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.

@@ -67,6 +67,7 @@ spec:
           - --log-level=$LOG_LEVEL
           - --epp-cluster-role=$EPP_CLUSTER_ROLE
         image: controller:latest
+        imagePullPolicy: Always
         name: manager
         ports: []
         securityContext:
