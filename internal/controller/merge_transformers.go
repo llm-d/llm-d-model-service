@@ -247,6 +247,35 @@ func (c parentRefSliceTransformer) Transformer(typ reflect.Type) func(dst, src r
 	return genericSliceTransformer(typ, mergeFunc, mergeKey)
 }
 
+// backendRefTransformer: transformer for merging two BackendRef objects
+type backendRefTransformer struct{}
+
+// Transformer merges two []gatewayv1.BackendRef based on their Name,
+// and applies transformers for each Container.Spec fields
+func (c backendRefTransformer) Transformer(typ reflect.Type) func(dst, src reflect.Value) error {
+
+	// mergeKey for merging two BackendRef is the Name of the BackendRef
+	mergeKey := "Name"
+
+	// dstBackendRef (comes from baseconfig)
+	// srcBackendRef (comes from msvc and controller logic)
+	mergeFunc := func(dstBackendRef *gatewayv1.BackendRef, srcBackendRef gatewayv1.BackendRef) error {
+
+		err := mergo.Merge(dstBackendRef,
+			srcBackendRef,
+			mergo.WithAppendSlice,
+			mergo.WithOverride)
+
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	return genericSliceTransformer(typ, mergeFunc, mergeKey)
+}
+
 // MergeContainerSlices merges src slice into dest in place
 func MergeContainerSlices(dest, src []corev1.Container) ([]corev1.Container, error) {
 	err := mergo.Merge(&dest, src, mergo.WithTransformers(containerSliceTransformer{}))
@@ -264,6 +293,17 @@ func MergeGatewayRefSlices(dest, src []gatewayv1.ParentReference) ([]gatewayv1.P
 
 	if err != nil {
 		return []gatewayv1.ParentReference{}, err
+	}
+
+	return dest, err
+}
+
+// MergeBackendRefSlices merges src slice containing gatewayv1.ParentRefs into dest in place
+func MergeBackendRefSlices(dest, src []gatewayv1.BackendRef) ([]gatewayv1.BackendRef, error) {
+	err := mergo.Merge(&dest, src, mergo.WithTransformers(backendRefTransformer{}))
+
+	if err != nil {
+		return []gatewayv1.BackendRef{}, err
 	}
 
 	return dest, err

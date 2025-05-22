@@ -104,3 +104,21 @@ data:
         targetPort: 9002
         appProtocol: http2
     type: ClusterIP   
+  
+  httpRoute: |
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+    spec:
+      parentRefs:
+      - name: inference-gateway-name
+        port: 1234
+      rules:
+      - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      - backendRefs:
+        - group: inference.networking.x-k8s.io
+          kind: InferencePool
+          name: {{ .InferencePoolName }}
+          port: {{ "outport" | getPort }}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 // assertEqualSlices checks if two slices are equal in length, order, and content.
@@ -230,6 +231,258 @@ func TestMergeContainerSlices(t *testing.T) {
 					// ...
 				}
 
+			}
+		})
+	}
+}
+
+// Returns a *gatewayv1.PortNumber from an int
+func portNumberPtr(port int) *gatewayv1.PortNumber {
+	portNum := gatewayv1.PortNumber(int32(port))
+	return &portNum
+}
+
+func TestMergeParentRefSlices(t *testing.T) {
+
+	tests := []struct {
+		name                string
+		destSlice           []gatewayv1.ParentReference
+		srcSlice            []gatewayv1.ParentReference
+		expectedMergedSlice []gatewayv1.ParentReference
+		expectError         bool
+	}{
+		{
+			name:                "no content should merge",
+			destSlice:           []gatewayv1.ParentReference{},
+			srcSlice:            []gatewayv1.ParentReference{},
+			expectedMergedSlice: []gatewayv1.ParentReference{},
+		},
+		{
+			name:      "one src should merge into dest",
+			destSlice: []gatewayv1.ParentReference{},
+			srcSlice: []gatewayv1.ParentReference{
+				{
+					Name: "parent-ref-name",
+				},
+			},
+			expectedMergedSlice: []gatewayv1.ParentReference{
+				{
+					Name: "parent-ref-name",
+				},
+			},
+		},
+		{
+			name: "src should append to dest",
+			destSlice: []gatewayv1.ParentReference{
+				{
+					Name: "parent-ref-name",
+				},
+			},
+			srcSlice: []gatewayv1.ParentReference{
+				{
+					Name: "parent-ref-name-2",
+				},
+			},
+			expectedMergedSlice: []gatewayv1.ParentReference{
+				{
+					Name: "parent-ref-name",
+				},
+				{
+					Name: "parent-ref-name-2",
+				},
+			},
+		},
+		{
+			name: "src should merge into dest based on Name if field is omitted in dest",
+			destSlice: []gatewayv1.ParentReference{
+				{
+					Name: "parent-ref-name",
+				},
+			},
+			srcSlice: []gatewayv1.ParentReference{
+				{
+					Name: "parent-ref-name",
+					Port: portNumberPtr(1234),
+				},
+			},
+			expectedMergedSlice: []gatewayv1.ParentReference{
+				{
+					Name: "parent-ref-name",
+					Port: portNumberPtr(1234),
+				},
+			},
+		},
+		{
+			name: "src should replace field into dest based on Name for non-empty fields",
+			destSlice: []gatewayv1.ParentReference{
+				{
+					Name: "parent-ref-name",
+					Port: portNumberPtr(1234),
+				},
+			},
+			srcSlice: []gatewayv1.ParentReference{
+				{
+					Name: "parent-ref-name",
+					Port: portNumberPtr(2345),
+				},
+			},
+			expectedMergedSlice: []gatewayv1.ParentReference{
+				{
+					Name: "parent-ref-name",
+					Port: portNumberPtr(2345),
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			actualMergedSlice, err := MergeGatewayRefSlices(tt.destSlice, tt.srcSlice)
+
+			if tt.expectError {
+				assert.Error(t, err, "expected error but got none")
+			} else {
+				assert.NoError(t, err)
+
+				// Assert that destSlice matches mergedSlice
+				assert.Equal(t, len(tt.expectedMergedSlice), len(actualMergedSlice))
+				assertEqualSlices(t, tt.expectedMergedSlice, actualMergedSlice)
+			}
+		})
+	}
+}
+
+func TestMergeBackendRefSlices(t *testing.T) {
+
+	tests := []struct {
+		name                string
+		destSlice           []gatewayv1.BackendRef
+		srcSlice            []gatewayv1.BackendRef
+		expectedMergedSlice []gatewayv1.BackendRef
+		expectError         bool
+	}{
+		{
+			name:                "no content should merge",
+			destSlice:           []gatewayv1.BackendRef{},
+			srcSlice:            []gatewayv1.BackendRef{},
+			expectedMergedSlice: []gatewayv1.BackendRef{},
+		},
+		{
+			name:      "one src should merge into dest",
+			destSlice: []gatewayv1.BackendRef{},
+			srcSlice: []gatewayv1.BackendRef{
+				{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: "backend-ref-name",
+					},
+				},
+			},
+			expectedMergedSlice: []gatewayv1.BackendRef{
+				{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: "backend-ref-name",
+					},
+				},
+			},
+		},
+		{
+			name: "src should append to dest",
+			destSlice: []gatewayv1.BackendRef{
+				{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: "backend-ref-name",
+					},
+				},
+			},
+			srcSlice: []gatewayv1.BackendRef{
+				{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: "backend-ref-name-2",
+					},
+				},
+			},
+			expectedMergedSlice: []gatewayv1.BackendRef{
+				{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: "backend-ref-name",
+					},
+				},
+				{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: "backend-ref-name-2",
+					},
+				},
+			},
+		},
+		{
+			name: "src should merge into dest based on Name if field is omitted in dest",
+			destSlice: []gatewayv1.BackendRef{
+				{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: "backend-ref-name",
+					},
+				},
+			},
+			srcSlice: []gatewayv1.BackendRef{
+				{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: "backend-ref-name",
+						Port: portNumberPtr(1234),
+					},
+				},
+			},
+			expectedMergedSlice: []gatewayv1.BackendRef{
+				{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: "backend-ref-name",
+						Port: portNumberPtr(1234),
+					},
+				},
+			},
+		},
+		{
+			name: "src should replace field into dest based on Name for non-empty fields",
+			destSlice: []gatewayv1.BackendRef{
+				{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: "backend-ref-name",
+						Port: portNumberPtr(1234),
+					},
+				},
+			},
+			srcSlice: []gatewayv1.BackendRef{
+				{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: "backend-ref-name",
+						Port: portNumberPtr(2345),
+					},
+				},
+			},
+			expectedMergedSlice: []gatewayv1.BackendRef{
+				{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: "backend-ref-name",
+						Port: portNumberPtr(2345),
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			actualMergedSlice, err := MergeBackendRefSlices(tt.destSlice, tt.srcSlice)
+
+			if tt.expectError {
+				assert.Error(t, err, "expected error but got none")
+			} else {
+				assert.NoError(t, err)
+
+				// Assert that destSlice matches mergedSlice
+				assert.Equal(t, len(tt.expectedMergedSlice), len(actualMergedSlice))
+				assertEqualSlices(t, tt.expectedMergedSlice, actualMergedSlice)
 			}
 		})
 	}

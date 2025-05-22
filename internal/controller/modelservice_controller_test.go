@@ -12,6 +12,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	"sigs.k8s.io/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -133,6 +134,21 @@ data:
         targetPort: 9002
         appProtocol: http2
     type: ClusterIP
+  httpRoute: |
+    spec:
+      parentRefs:
+      - name: inference-gateway-name
+        port: 1234
+      rules:
+      - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      - backendRefs:
+        - group: inference.networking.x-k8s.io
+          kind: InferencePool
+          name: {{ .InferencePoolName }}
+          port: {{ "outport" | getPort }}
 `
 
 // Name is required for configMap creation by MSVC
@@ -603,6 +619,14 @@ var _ = Describe("ModelService Controller", func() {
 
 				return true
 			}, time.Second*10, time.Millisecond*500).Should(BeTrue())
+
+			By("Validating that the EPP ServiceAccount was created")
+			httpRoute := gatewayv1.HTTPRoute{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: httpRouteName(modelService), Namespace: namespace}, &httpRoute)
+				return err == nil
+			}, time.Second*5, time.Millisecond*500).Should(BeTrue())
+			Expect(httpRoute.OwnerReferences).ToNot(BeEmpty())
 
 			By("Validating that the inferencepool was created")
 			infPool := giev1alpha2.InferencePool{}

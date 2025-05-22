@@ -181,6 +181,7 @@ type Routing struct {
 	// +optional
 	Ports []Port `json:"ports,omitempty"`
 
+	// GatewayRef is merged to baseconfig based on the Name field.
 	// Directly from Gateway API: https://gateway-api.sigs.k8s.io/reference/spec/#commonroutespec
 	// ParentRefs references the resources (usually Gateways) that a Route wants
 	// to be attached to. Note that the referenced parent resource needs to

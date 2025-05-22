@@ -4,11 +4,17 @@ Clone the [ModelService GitHub repository](https://github.com/llm-d/llm-d-model-
 
 Execution of the ModelService controller requires access to a cluster.
 A local cluster, such as a `kind` cluster, suffices for basic execution and development testing.
-However, testing end-to-end with a large language model may not be possible if the cluster does not have sufficient resources or if the [inference gateway](https://github.com/llm-d/gateway-api-inference-extension) is not fully configured.
+However, testing end-to-end with a large language model may not be possible if the cluster does not have sufficient resources or if the [inference gateway](https://gateway-api.sigs.k8s.io/) and [inference gateway extension](https://github.com/llm-d/gateway-api-inference-extension) are not fully configured.
 
 If a cluster is not available, you can do a dry-run to identify the Kubernetes resources that will be created for a given `ModelService CR`. See [ModelService Dry Run](#modelservice-dry-run) below.
 
 ## Prerequisites
+
+### Install Kubernetes Gateway API CRDs
+
+```
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
+```
 
 ### Install Kubernetes Gateway API Inference Extension CRDs
 

@@ -334,7 +334,7 @@ func (interpolatedBaseConfig *BaseConfig) MergeChildResources(ctx context.Contex
 		interpolatedBaseConfig.setPDServiceAccount(ctx, modelService, scheme, rbacOptions)
 	}
 
-	if interpolatedBaseConfig.HTTPRoute != nil {
+	if interpolatedBaseConfig.HTTPRoute != nil || interpolatedBaseConfig.InferencePool != nil {
 		log.FromContext(ctx).V(1).Info("attempting to update HTTPRoute")
 		interpolatedBaseConfig.mergeHTTPRoute(ctx, modelService, scheme)
 	}
@@ -892,7 +892,14 @@ func (childResources *BaseConfig) mergeHTTPRoute(ctx context.Context, msvc *msv1
 	if err := mergo.Merge(&dest,
 		src,
 		mergo.WithOverride,
-		mergo.WithTransformers(parentRefSliceTransformer{}),
+		mergo.WithAppendSlice,
+		mergo.WithTransformers(compositeTransformer{
+			transformers: []mergo.Transformers{
+				// merge parentRef and backendRef slices
+				parentRefSliceTransformer{},
+				backendRefTransformer{},
+			},
+		}),
 	); err != nil {
 		log.FromContext(ctx).V(1).Error(err, "problem with httproute merge")
 		return childResources
