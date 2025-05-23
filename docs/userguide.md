@@ -17,7 +17,7 @@ Understand how `ModelService` fits into the Kubernetes ecosystem, what resources
    Load models from Hugging Face, PVCs, or OCI images and mount them into serving containers.
 
 <!-- 3. **[Templating Reference](userguide/templating-reference.md)** -->
-1. **Templating Reference**
+3. **Templating Reference**
    Use Go templates in `ModelService` and `BaseConfig` to dynamically generate configurations for child resources.
 
 <!-- 4. **[Decouple Scaling](userguide/decouple-scaling.md)** -->
