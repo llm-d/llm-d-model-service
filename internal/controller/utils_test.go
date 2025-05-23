@@ -7,6 +7,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	msv1alpha1 "github.com/llm-d/llm-d-model-service/api/v1alpha1"
@@ -16,6 +17,7 @@ const PVC_NAME = "my-pvc"
 const MODEL_PATH = "path/to/model"
 const HF_REPO_ID = "ibm-granite"
 const HF_MODEL_ID = "granite-3.3-2b-instruct"
+const OCI_IMAGE = "image-with-tag:0.0.1"
 
 var _ = Describe("Model Artifacts", func() {
 	Context("Given a model artifact with an invalid URI prefix", func() {
@@ -29,7 +31,7 @@ var _ = Describe("Model Artifacts", func() {
 			Expect(isHFURI(modelArtifact.URI)).To(BeFalse())
 
 			By("Parsing PVC uri should fail")
-			_, err := parsePVCURI(&modelArtifact)
+			_, _, err := parsePVCURI(&modelArtifact)
 			Expect(err).NotTo(BeNil())
 
 			By("Parsing HF uri should fail")
@@ -45,11 +47,11 @@ var _ = Describe("Model Artifacts", func() {
 		}{
 			"pvc://pvc-name/path/to/model": {
 				expectedURIType:        PVC,
-				expectedModelMountPath: modelStorageRoot + pathSep + "path/to/model",
+				expectedModelMountPath: modelStorageRoot + pathSep + MODEL_PATH,
 			},
 			"oci://repo-with-tag::path/to/model": {
 				expectedURIType:        OCI,
-				expectedModelMountPath: "", // TODO
+				expectedModelMountPath: modelStorageRoot + pathSep + MODEL_PATH,
 			},
 			"hf://repo-id/model-id": {
 				expectedURIType:        HF,
@@ -59,9 +61,15 @@ var _ = Describe("Model Artifacts", func() {
 				expectedURIType:        PVC,
 				expectedModelMountPath: "",
 			},
+			// invalid OCI
 			"oci://": {
 				expectedURIType:        OCI,
-				expectedModelMountPath: "", // TODO
+				expectedModelMountPath: "",
+			},
+			// valid OCI
+			"oci://::": {
+				expectedURIType:        OCI,
+				expectedModelMountPath: modelStorageRoot + pathSep,
 			},
 			"hf://wrong": {
 				expectedURIType:        HF,
@@ -140,11 +148,10 @@ var _ = Describe("Model Artifacts", func() {
 			Expect(isOCIURI(modelArtifact.URI)).To(BeFalse())
 
 			By("Parsing uri parts should be successful")
-			parts, err := parsePVCURI(&modelArtifact)
+			pvcName, modelPath, err := parsePVCURI(&modelArtifact)
 			Expect(err).To(BeNil())
-			Expect(len(parts) > 1).To(BeTrue())
-			Expect(parts[0]).To(Equal(PVC_NAME))
-			Expect(strings.Join(parts[1:], "/")).To(Equal(MODEL_PATH))
+			Expect(pvcName).To(Equal(PVC_NAME))
+			Expect(strings.Join(modelPath, pathSep)).To(Equal(MODEL_PATH))
 		})
 		It("should produce a valid volumeMounts list", func() {
 			volumeMounts := getVolumeMountsForContainer(ctx, &modelService)
@@ -232,6 +239,72 @@ var _ = Describe("Model Artifacts", func() {
 			hfHomeEnvVar := envs[1]
 			Expect(hfHomeEnvVar.Name).To(Equal(ENV_HF_HOME))
 			Expect(hfHomeEnvVar.Value).To(Equal(modelStorageRoot))
+		})
+	})
+
+	Context("Given a model artifact with a valid OCI URI", func() {
+
+		ctx := context.Background()
+
+		pullPolicy := corev1.PullAlways
+		modelArtifact := msv1alpha1.ModelArtifacts{
+			URI:        fmt.Sprintf("oci://%s::%s", OCI_IMAGE, modelPath),
+			PullPolicy: pullPolicy,
+		}
+
+		modelService := msv1alpha1.ModelService{
+			Spec: msv1alpha1.ModelServiceSpec{
+				ModelArtifacts: modelArtifact,
+			},
+		}
+
+		It("should parse correctly", func() {
+			By("checking type of uri")
+			Expect(isPVCURI(modelArtifact.URI)).To(BeFalse())
+			Expect(isHFURI(modelArtifact.URI)).To(BeFalse())
+			Expect(isOCIURI(modelArtifact.URI)).To(BeTrue())
+
+			By("Parsing uri parts should be successful")
+			image, ociModelPath, err := parseOCIURI(&modelArtifact)
+			Expect(err).To(BeNil())
+			Expect(image).To(Equal(OCI_IMAGE))
+			Expect(strings.Join(ociModelPath, pathSep)).To(Equal(modelPath))
+		})
+
+		It("should produce a valid volumeMounts list", func() {
+			volumeMounts := getVolumeMountsForContainer(ctx, &modelService)
+			Expect(len(volumeMounts)).To(Equal(1))
+			firstVolumeMount := volumeMounts[0]
+
+			Expect(firstVolumeMount.Name).To(Equal(modelStorageVolumeName))
+			Expect(firstVolumeMount.MountPath).To(Equal(modelStorageRoot))
+			Expect(firstVolumeMount.ReadOnly).To(BeTrue())
+		})
+
+		It("should produce a valid volumes list if pull policy is present", func() {
+			volumes := getVolumeForPDDeployment(ctx, &modelService)
+			Expect(len(volumes)).To(Equal(1))
+			firstVolume := volumes[0]
+			Expect(firstVolume.Name).To(Equal(modelStorageVolumeName))
+			Expect(firstVolume.Image.Reference).To(Equal(OCI_IMAGE))
+			Expect(firstVolume.Image.PullPolicy).To(Equal(pullPolicy))
+		})
+
+		It("should produce a valid volumes list if pull policy is not declared", func() {
+			modelService.Spec.ModelArtifacts = msv1alpha1.ModelArtifacts{
+				URI: fmt.Sprintf("oci://%s::%s", OCI_IMAGE, modelPath),
+			}
+
+			volumes := getVolumeForPDDeployment(ctx, &modelService)
+			Expect(len(volumes)).To(Equal(1))
+			firstVolume := volumes[0]
+			Expect(firstVolume.Name).To(Equal(modelStorageVolumeName))
+			Expect(firstVolume.Image.Reference).To(Equal(OCI_IMAGE))
+		})
+
+		It("should produce a valid env list", func() {
+			envs := getEnvsForContainer(ctx, &modelService)
+			Expect(len(envs)).To(Equal(0))
 		})
 	})
 })

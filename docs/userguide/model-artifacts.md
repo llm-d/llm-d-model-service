@@ -4,7 +4,7 @@ The `modelArtifacts` section under the `spec` of a `ModelService` defines how mo
 
 ## Purpose
 
-Without `ModelService`, users must manually configure vLLM arguments, environment variables, and pod/container specifications. This requires a deep understanding of both vLLM and the composition of model artifacts. The `ModelService` controller automates these configurations, enabling users to focus solely on specifying the model source.
+The `ModelService` controller automates configurations, enabling users to focus solely on specifying the model source. Without `ModelService`, users must manually configure vLLM arguments, environment variables, and pod/container specifications. This requires a deep understanding of both vLLM and the composition of model artifacts. 
 
 ## Model Artifact Sources and Behaviors
 
@@ -99,6 +99,45 @@ Various template variable are exposed as a result of using the `"pvc://"` prefix
 
 - `{{ .MountedModelPath }}`: this is equal to `/model-cache/<path/to/model>` where `</path/to/model>` comes from the URI. In the above example, `{{ .MountedModelPath }}` interpolates to `/model-cache/path/to/granite`
 
-### 3. Loading the model from an image volume
+### 3. Loading the model as OCI arifacts using an image volume
 
-NotImplemented.
+Model artifacts can be built into images and consumed by Kubernetes volumes. This is called [image volume](https://kubernetes.io/docs/tasks/configure-pod-container/image-volumes/), and is in beta state as of Kubernetes v1.33. If the cluster has `ImageVolume` enabled as a feature gate, then model owners can mount models from OCI images. 
+
+#### URI Format 
+
+`"oci://<image-with-tag>::<path/to/model>"`
+
+Example: `"oci://redhat/granite-7b-lab-gguf:1.0::/"`
+
+(This OCI image comes from https://hub.docker.com/r/redhat/granite-7b-lab-gguf)
+
+#### Additional Fields 
+
+- `pullPolicy` (one of: `IfNotPresent`, `Always`, and `Never`): the [pull policy](https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy) of the OCI image. If specified, this is the pull policy supplied to the `volume.image.pullPolicy`
+
+#### Behavior 
+
+- A image volume with the name `model-storage` is created for the deployment. The reference to the image is `<image-with-tag>`
+- A read-only `volumeMount` with the `mountPath: model-cache` is created for each container where `mountModelVolume: true`
+
+
+#### Example Deployment Snippet
+
+```yaml
+volumes:
+  - name: model-storage
+    image:
+      reference: redhat/granite-7b-lab-gguf:1.0
+containers:
+  - name: vllm
+    volumeMounts:
+      - mountPath: /model-cache
+        name: model-storage
+        readOnly: true 
+```
+
+#### Template variables
+
+Various template variable are exposed as a result of using the `"oci://"` prefix, with `.MountedModelPath` being particularly useful if vLLM arguments require it.
+
+- `{{ .MountedModelPath }}`: this is equal to `/model-cache/<path/to/model>` where `</path/to/model>` comes from the URI. In the above example, `{{ .MountedModelPath }}` interpolates to `/model-cache` because `<path/to/model> = "/"`
