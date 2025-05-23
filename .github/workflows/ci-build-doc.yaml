@@ -1,0 +1,40 @@
+name: Build API documentation
+
+on:
+    workflow_dispatch:
+
+jobs:
+    apidoc:
+        runs-on: ubuntu-latest
+        steps:
+        - name: checkout repository
+          uses: actions/checkout@v4
+
+        # generate asciidoc from source
+        - run: wget https://github.com/elastic/crd-ref-docs/releases/download/v0.1.0/crd-ref-docs_0.1.0_Linux_x86_64.tar.gz
+        - run: tar -xvf crd-ref-docs_0.1.0_Linux_x86_64.tar.gz
+        - run: ./crd-ref-docs --source-path=./api/v1alpha1  --config=./docs/api_reference/config.yaml --output-path=./docs/api_reference
+
+        # convert to html using asciidoc
+        - name: install ruby
+          uses: ruby/setup-ruby@v1
+          with:
+            ruby-version: '3.4.4'
+        - name: install asciidoc
+          uses: reitzig/actions-asciidoctor@v2.0.2
+        - name: convert asciidoc to html
+          run: asciidoctor ./docs/api_reference/out.asciidoc
+
+        - name: create PR for changes
+          id: cpr
+          uses: peter-evans/create-pull-request@v7
+          with:
+            add-paths: |
+              docs/api_reference/*
+            commit-message: "updated API doc"
+            signoff: true
+        - name: Check outputs
+          if: ${{ steps.cpr.outputs.pull-request-number }}
+          run: |
+            echo "Pull Request Number - ${{ steps.cpr.outputs.pull-request-number }}"
+            echo "Pull Request URL - ${{ steps.cpr.outputs.pull-request-url }}"
