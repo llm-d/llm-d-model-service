@@ -13,12 +13,11 @@ Understand how `ModelService` fits into the Kubernetes ecosystem, what resources
 1. **[Model Name](userguide/model-name.md)**
    How inference clients refer to your model using OpenAI-compatible APIs.
 
-<!-- 2. **[Model Artifacts](userguide/model-artifacts.md)** -->
-2. **Model Artifacts**
+2. **[Model Artifacts](userguide/model-artifacts.md)**
    Load models from Hugging Face, PVCs, or OCI images and mount them into serving containers.
 
 <!-- 3. **[Templating Reference](userguide/templating-reference.md)** -->
-3. **Templating Reference**
+1. **Templating Reference**
    Use Go templates in `ModelService` and `BaseConfig` to dynamically generate configurations for child resources.
 
 <!-- 4. **[Decouple Scaling](userguide/decouple-scaling.md)** -->
