@@ -115,7 +115,7 @@ func mountedModelPath(modelService *msv1alpha1.ModelService) (string, error) {
 	// The mountModelPath for OCI is what comes after :: in the URI
 	case OCI:
 		if _, modelPathSlice, err := parseOCIURI(&modelService.Spec.ModelArtifacts); err == nil {
-			// if uri is oci://image-with-tag:0.0.1::path/to/model
+			// if uri is oci+native://image-with-tag:0.0.1::path/to/model
 			// output is /model-cache/path/to/model
 			joinedModelPath := strings.Join(modelPathSlice, pathSep)
 			mountedModelPath = modelStorageRoot + pathSep + joinedModelPath
@@ -138,7 +138,7 @@ func isPVCURI(uri string) bool {
 	return strings.HasPrefix(uri, MODEL_ARTIFACT_URI_PVC_PREFIX)
 }
 
-// isOCIURI returns True if the URI begins with oci://
+// isOCIURI returns True if the URI begins with oci+native://
 func isOCIURI(uri string) bool {
 	return strings.HasPrefix(uri, MODEL_ARTIFACT_URI_OCI_PREFIX)
 }
@@ -233,7 +233,7 @@ func parseOCIURI(modelArtifact *msv1alpha1.ModelArtifacts) (string, []string, er
 	// Split by ::
 	parts := strings.Split(strings.TrimPrefix(uri, MODEL_ARTIFACT_URI_OCI_PREFIX), ociPathToModelSep)
 	if len(parts) != 2 {
-		return imageIdentifier, pathToModel, fmt.Errorf("invalid oci URI format: %s; need oci://<image identifier with tag>::/path/to/model. Please double check if you are missing %s which did not result in exactly two segments", uri, ociPathToModelSep)
+		return imageIdentifier, pathToModel, fmt.Errorf("invalid oci URI format: %s; need oci+native://<image identifier with tag>::/path/to/model. Please double check if you are missing %s which did not result in exactly two segments", uri, ociPathToModelSep)
 	}
 
 	imageIdentifier = parts[0]

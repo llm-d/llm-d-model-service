@@ -105,9 +105,9 @@ Model artifacts can be built into images and consumed by Kubernetes volumes. Thi
 
 #### URI Format 
 
-`"oci://<image-with-tag>::<path/to/model>"`
+`"oci+native://<image-with-tag>::<path/to/model>"`
 
-Example: `"oci://redhat/granite-7b-lab-gguf:1.0::/"`
+Example: `"oci+native://redhat/granite-7b-lab-gguf:1.0::/"`
 
 (This OCI image comes from https://hub.docker.com/r/redhat/granite-7b-lab-gguf)
 
@@ -138,6 +138,6 @@ containers:
 
 #### Template variables
 
-Various template variable are exposed as a result of using the `"oci://"` prefix, with `.MountedModelPath` being particularly useful if vLLM arguments require it.
+Various template variable are exposed as a result of using the `"oci+native://"` prefix, with `.MountedModelPath` being particularly useful if vLLM arguments require it.
 
 - `{{ .MountedModelPath }}`: this is equal to `/model-cache/<path/to/model>` where `</path/to/model>` comes from the URI. In the above example, `{{ .MountedModelPath }}` interpolates to `/model-cache` because `<path/to/model> = "/"`

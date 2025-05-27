@@ -17,7 +17,7 @@ spec:
       port: 9376
 
   modelArtifacts:
-    uri: oci://image-with-tag:0.0.1::path/to/model
+    uri: oci+native://image-with-tag:0.0.1::path/to/model
     pullPolicy: IfNotPresent
 
   # describe decode pods

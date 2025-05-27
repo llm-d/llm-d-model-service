@@ -133,7 +133,7 @@ type ContainerSpec struct {
 	// For URIs with pvc:// prefix, a model-storage volume is created and mounted with the mountPath: /cache
 	// For URIs with hf:// prefix, modelArtifact.authSecretName is used as the secret key reference,
 	// and the value is mounted to an environment variable called HF_TOKEN
-	// For URIs with oci:// prefix, an OCI volume with image reference (https://kubernetes.io/blog/2024/08/16/kubernetes-1-31-image-volume-source/)
+	// For URIs with oci+native:// prefix, an OCI volume with image reference (https://kubernetes.io/blog/2024/08/16/kubernetes-1-31-image-volume-source/)
 	// is created and mounted with the mountPath oci-dir
 	// default:false
 	// +optional
@@ -258,7 +258,7 @@ type Routing struct {
 // ModelArtifacts describes the source of the model
 type ModelArtifacts struct {
 	// URI is the model URI
-	// Three types of URIs are support to enable models packaged as images (oci://<image-repo>/<image-name><:image-tag>),
+	// Three types of URIs are support to enable models packaged as images (oci+native://<image-repo>/<image-name><:image-tag>),
 	// models downloaded from HuggingFace (hf://<model-repo>/<model-name>)
 	// and pre-existing models loaded from a volume-mounted PVC (pvc://model-path)
 	//

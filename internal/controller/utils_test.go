@@ -49,7 +49,7 @@ var _ = Describe("Model Artifacts", func() {
 				expectedURIType:        PVC,
 				expectedModelMountPath: modelStorageRoot + pathSep + MODEL_PATH,
 			},
-			"oci://repo-with-tag::path/to/model": {
+			"oci+native://repo-with-tag::path/to/model": {
 				expectedURIType:        OCI,
 				expectedModelMountPath: modelStorageRoot + pathSep + MODEL_PATH,
 			},
@@ -62,12 +62,12 @@ var _ = Describe("Model Artifacts", func() {
 				expectedModelMountPath: "",
 			},
 			// invalid OCI
-			"oci://": {
+			"oci+native://": {
 				expectedURIType:        OCI,
 				expectedModelMountPath: "",
 			},
 			// valid OCI
-			"oci://::": {
+			"oci+native://::": {
 				expectedURIType:        OCI,
 				expectedModelMountPath: modelStorageRoot + pathSep,
 			},
@@ -91,7 +91,7 @@ var _ = Describe("Model Artifacts", func() {
 				expectedURIType:        UnknownURI,
 				expectedModelMountPath: "",
 			},
-			"OCI://": {
+			"oci+other://": {
 				expectedURIType:        UnknownURI,
 				expectedModelMountPath: "",
 			},
@@ -248,7 +248,7 @@ var _ = Describe("Model Artifacts", func() {
 
 		pullPolicy := corev1.PullAlways
 		modelArtifact := msv1alpha1.ModelArtifacts{
-			URI:        fmt.Sprintf("oci://%s::%s", OCI_IMAGE, modelPath),
+			URI:        fmt.Sprintf("oci+native://%s::%s", OCI_IMAGE, modelPath),
 			PullPolicy: pullPolicy,
 		}
 
@@ -292,7 +292,7 @@ var _ = Describe("Model Artifacts", func() {
 
 		It("should produce a valid volumes list if pull policy is not declared", func() {
 			modelService.Spec.ModelArtifacts = msv1alpha1.ModelArtifacts{
-				URI: fmt.Sprintf("oci://%s::%s", OCI_IMAGE, modelPath),
+				URI: fmt.Sprintf("oci+native://%s::%s", OCI_IMAGE, modelPath),
 			}
 
 			volumes := getVolumeForPDDeployment(ctx, &modelService)

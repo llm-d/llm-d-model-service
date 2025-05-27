@@ -664,7 +664,7 @@ More info: <a href="https://kubernetes.io/docs/concepts/configuration/manage-res
 For URIs with pvc:// prefix, a model-storage volume is created and mounted with the mountPath: /cache<br>
 For URIs with hf:// prefix, modelArtifact.authSecretName is used as the secret key reference,<br>
 and the value is mounted to an environment variable called HF_TOKEN<br>
-For URIs with oci:// prefix, an OCI volume with image reference (<a href="https://kubernetes.io/blog/2024/08/16/kubernetes-1-31-image-volume-source/" class="bare">https://kubernetes.io/blog/2024/08/16/kubernetes-1-31-image-volume-source/</a>)<br>
+For URIs with oci+native:// prefix, an OCI volume with image reference (<a href="https://kubernetes.io/blog/2024/08/16/kubernetes-1-31-image-volume-source/" class="bare">https://kubernetes.io/blog/2024/08/16/kubernetes-1-31-image-volume-source/</a>)<br>
 is created and mounted with the mountPath oci-dir<br>
 default:false<br></p>
 </div></div></td>
@@ -713,7 +713,7 @@ default:false<br></p>
 </div></div></td>
 <td class="tableblock halign-left valign-top"><div class="content"><div class="paragraph">
 <p>URI is the model URI<br>
-Three types of URIs are support to enable models packaged as images (oci://&lt;image-repo&gt;/&lt;image-name&gt;&lt;:image-tag&gt;),<br>
+Three types of URIs are support to enable models packaged as images (oci+native://&lt;image-repo&gt;/&lt;image-name&gt;&lt;:image-tag&gt;),<br>
 models downloaded from HuggingFace (hf://&lt;model-repo&gt;/&lt;model-name&gt;)<br>
 and pre-existing models loaded from a volume-mounted PVC (pvc://model-path)<br></p>
 </div></div></td>
