@@ -854,9 +854,6 @@ func (childResources *BaseConfig) mergeHTTPRoute(ctx context.Context, msvc *msv1
 	// Get dest HTTPRoute
 	dest := *childResources.HTTPRoute
 
-	group := gatewayv1.Group("inference.networking.x-k8s.io")
-	kind := gatewayv1.Kind("InferencePool")
-
 	// At this point, we are going to create the desired HTTPRoute
 	// with the parentRefs supplied by the user and
 	// with InferencePool being a backendRef (we are adding this)
@@ -873,22 +870,6 @@ func (childResources *BaseConfig) mergeHTTPRoute(ctx context.Context, msvc *msv1
 		Spec: gatewayv1.HTTPRouteSpec{
 			CommonRouteSpec: gatewayv1.CommonRouteSpec{
 				ParentRefs: msvc.Spec.Routing.GatewayRefs,
-			},
-			Rules: []gatewayv1.HTTPRouteRule{
-				{
-					BackendRefs: []gatewayv1.HTTPBackendRef{
-						{
-							// InferencePool is added as a backendRef
-							BackendRef: gatewayv1.BackendRef{
-								BackendObjectReference: gatewayv1.BackendObjectReference{
-									Group: &group,
-									Kind:  &kind,
-									Name:  gatewayv1.ObjectName(infPoolName(msvc)),
-								},
-							},
-						},
-					},
-				},
 			},
 		},
 	}
