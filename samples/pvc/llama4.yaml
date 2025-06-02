@@ -30,9 +30,11 @@ spec:
     - name: "vllm"
       args:
       # Comes from model-storage volume, which is a PVC created by MSVC controller
-      # The mountPath is /cache
+      # The first argument is where the downloaded model files can be found
+      # The mountPath is /model-cache
+      # See baseConfig.decodeDeployment for the mountPath
       # {{ .ModelPath }} == /path/to/llama4
-      - '/cache/{{ .ModelPath }}'
+      - '/model-cache/{{ .ModelPath }}'
       
       # Other args come from https://blog.vllm.ai/2025/04/05/llama4.html
       # This is for reference only
@@ -57,7 +59,8 @@ spec:
     containers:
     - name: "vllm"
       args:
-      - '/cache/{{ .ModelPath }}'
+      # See baseConfig.prefillDeployment for the mountPath
+      - '/model-cache/{{ .ModelPath }}'
       - "--tensor-parallel-size"
       - "8"
       - "--max-model-len" 

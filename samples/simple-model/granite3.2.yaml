@@ -9,6 +9,7 @@ spec:
     name: simple-base-config
 
   routing: 
+    # TODO: Verify if we need a token for this
     modelName: ibm-granite/granite-3.3-2b-base
     ports:
     - name: app_port
@@ -20,10 +21,6 @@ spec:
   # describe decode pods
   decode:
     replicas: 1
-    # acceleratorTypes:
-    #   labelKey: nvidia.com/gpu.product
-    #   labelValues:
-    #     - NVIDIA-A100-SXM4-80GB
     containers:
     - name: "vllm"
       args:

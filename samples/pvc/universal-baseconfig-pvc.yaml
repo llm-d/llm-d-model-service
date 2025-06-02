@@ -1,4 +1,4 @@
-# Based on: https://github.com/llm-d/llm-d-routing-sidecar/tree/dev/test/config/nixl
+# A universal baseconfig for models stored on PVCs
 #
 # Requirements:
 # Any consuming ModelService should define ports labeled:
@@ -7,7 +7,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: universal-base-config
+  name: universal-base-config-pvc
 immutable: true
 data:
   decodeDeployment: |
@@ -19,6 +19,7 @@ data:
           initContainers:
             - name: routing-proxy
               image: ghcr.io/llm-d/llm-d-routing-sidecar:0.0.6
+              imagePullPolicy: Always
               securityContext:
                 allowPrivilegeEscalation: false
                 runAsNonRoot: true
@@ -26,14 +27,16 @@ data:
                 # Note: this port has to match the prefill port
                 - "--port={{ "app_port" | getPort }}"
                 - "--vllm-port={{ "internal_port" | getPort }}"
-                - "--connector=nixl"
+                - "--connector=nixlv2"
+                - "-v=6"
               ports:
                 - containerPort: {{ "app_port" | getPort }}
                   protocol: TCP
               restartPolicy: Always
+              imagePullPolicy: Always
           containers:
             - name: vllm
-              image: grcr.io/llm-d/llm-d:0.0.8
+              image: ghcr.io/llm-d/llm-d:0.0.8
               command:
                 - vllm
                 - serve
@@ -44,22 +47,28 @@ data:
                 - "{{ "internal_port" | getPort }}"
                 - "--enforce-eager"
                 - "--kv-transfer-config"
-                - '{"kv_connector":"NixlConnector","kv_role":"kv_both"}'
+                - '{"kv_connector":"NixlConnector", "kv_role":"kv_both"}'
               env:
                 - name: CUDA_VISIBLE_DEVICES
                   value: "0"
                 - name: UCX_TLS
                   value: "cuda_ipc,cuda_copy,tcp"
-                - name: NIXL_ROLE
-                  value: RECVER
                 - name: HF_HUB_CACHE
-                  value: /vllm-workspace/models
+                  value: /model-cache/{{ .ModelPath }}
+                - name: VLLM_NIXL_SIDE_CHANNEL_HOST
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: status.podIP
+                - name: VLLM_NIXL_SIDE_CHANNEL_PORT
+                  value: "5557"
+                - name: VLLM_LOGGING_LEVEL
+                  value: DEBUG
               ports:
-                - containerPort: 55555
+                - containerPort: 5557
                   protocol: TCP
               volumeMounts:
-                - name: model-cache
-                  mountPath: /vllm-workspace/models
+                - name: model-storage
+                  mountPath: /model-cache
               resources:
                 limits:
                   nvidia.com/gpu: 1
@@ -67,10 +76,10 @@ data:
                   cpu: "16"
                   memory: 16Gi
                   nvidia.com/gpu: 1
-          volumes:
-            - name: model-cache
-              emptyDir:
-                sizeLimit: 20Gi
+          # MSVC controller will add a volume with name model-storage
+          # which is the persistentVolumeClaim specified in the modelArtifacts.URI
+          # for pvc:// prefixes
+          # volumes:
 
   prefillDeployment: |
     apiVersion: apps/v1
@@ -92,7 +101,7 @@ data:
                 - "{{ "app_port" | getPort }}"
                 - "--enforce-eager"
                 - "--kv-transfer-config"
-                - '{"kv_connector":"NixlConnector","kv_role":"kv_both"}'
+                - '{"kv_connector":"NixlConnector", "kv_role":"kv_both"}'
               env:
                 - name: CUDA_VISIBLE_DEVICES
                   value: "0"
@@ -107,15 +116,15 @@ data:
                 - name: VLLM_LOGGING_LEVEL
                   value: DEBUG
                 - name: HF_HUB_CACHE
-                  value: /vllm-workspace/models
+                  value: /model-cache/{{ .ModelPath }}
               ports:
                 - containerPort: {{ "app_port" | getPort }}
                   protocol: TCP
                 - containerPort: 5557
                   protocol: TCP
               volumeMounts:
-                - name: model-cache
-                  mountPath: /vllm-workspace/models
+                - name: model-storage
+                  mountPath: /model-cache
               resources:
                 limits:
                   nvidia.com/gpu: 1
@@ -123,19 +132,22 @@ data:
                   cpu: "16"
                   memory: 16Gi
                   nvidia.com/gpu: 1
-          volumes:
-            - name: model-cache
-              emptyDir:
-                sizeLimit: 20Gi
+          # MSVC controller will add a volume with name model-storage
+          # which is the persistentVolumeClaim specified in the modelArtifacts.URI
+          # for pvc:// prefixes
+          # volumes:
   
   eppService: |
     apiVersion: v1
     kind: Service
     spec:
       ports:
-        - port: 9002    # Needs to match the port of the eppDeployment
+        # Needs to match the port of the eppDeployment
+        - port: 9002    
           protocol: TCP
-      type: NodePort
+          targetPort: 9002 
+          appProtocol: http2
+      type: ClusterIP
   
   eppDeployment: |
     apiVersion: apps/v1
@@ -150,6 +162,7 @@ data:
                 - {{ .InferencePoolName }}
                 - -poolNamespace
                 - {{ .ModelServiceNamespace }}
+                - serverless-workstream
                 - -v
                 - "4"
                 - --zap-encoder
@@ -164,16 +177,13 @@ data:
                 - name: PD_PROMPT_LEN_THRESHOLD
                   value: "10"
               image: ghcr.io/llm-d/llm-d-inference-scheduler:0.0.3
-              imagePullPolicy: Always
               livenessProbe:
                 failureThreshold: 3
                 grpc:
                   port: 9003
-                  service: {{ .EPPServiceName }}
+                  service: envoy.service.ext_proc.v3.ExternalProcessor
                 initialDelaySeconds: 5
                 periodSeconds: 10
-                successThreshold: 1
-                timeoutSeconds: 1
               ports:
                 - containerPort: 9002
                   protocol: TCP
@@ -186,11 +196,9 @@ data:
                 failureThreshold: 3
                 grpc:
                   port: 9003
-                  service: {{ .EPPServiceName }}
+                  service: envoy.service.ext_proc.v3.ExternalProcessor
                 initialDelaySeconds: 5
                 periodSeconds: 10
-                successThreshold: 1
-                timeoutSeconds: 1
   
   inferencePool: |
     apiVersion: inference.networking.x-k8s.io/v1alpha2
@@ -201,3 +209,14 @@ data:
   inferenceModel: |
     apiVersion: inference.networking.x-k8s.io/v1alpha2
     kind: InferenceModel
+
+  httpRoute: |
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+    spec:
+      rules:
+      - backendRefs:
+        - group: inference.networking.x-k8s.io
+          kind: InferencePool
+          name: {{ .InferencePoolName }}
+          port: {{ "app_port" | getPort }}
