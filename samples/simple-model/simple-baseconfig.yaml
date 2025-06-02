@@ -19,7 +19,7 @@ data:
         spec:
           containers:
             - name: vllm
-              image: vllm/vllm-openai:v0.8.5
+              image: ghcr.io/llm-d/llm-d:0.0.8
               command:
                 - vllm
                 - serve
@@ -27,13 +27,9 @@ data:
                 allowPrivilegeEscalation: false
               args:
                 - "--port"
-                - "{{ "app_port" | getPort }"
+                - "{{ "app_port" | getPort }}"
               env:
-                - name: CUDA_VISIBLE_DEVICES
-                  value: "0"
-                - name: UCX_TLS
-                  value: "cuda_ipc,cuda_copy,tcp"
-                - name: HF_HUB_CACHE
+                - name: HF_HOME
                   value: /cache
               volumeMounts:
                 - name: model-cache
@@ -58,6 +54,6 @@ data:
       clusterIP: None
       ports:
       - name: vllm
-        port: {{ "app_port" | getPort }
+        port: {{ "app_port" | getPort }}
         protocol: TCP
   
