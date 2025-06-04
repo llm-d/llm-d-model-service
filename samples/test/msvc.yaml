@@ -20,7 +20,8 @@ spec:
       port: 1112
 
   modelArtifacts:
-    uri: pvc://llama-of-the-future/path/to/llama-2075
+    # uri: pvc://llama-of-the-future/path/to/llama-2075
+    uri: oci+native://redhat/granite-7b-lab-gguf:1.0::/
 
   # describe decode pods
   decode:

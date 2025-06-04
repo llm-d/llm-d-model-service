@@ -66,6 +66,14 @@ var _ = BeforeSuite(func() {
 		// if someone runs tests from a subfolder, these may not run
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases"), filepath.Join("..", "..", "test", "inferenceCRDs")},
 		ErrorIfCRDPathMissing: true,
+		ControlPlane: envtest.ControlPlane{
+			APIServer: &envtest.APIServer{
+				Args: []string{
+					// ImageSource feature gate is required for OCI URIs
+					"--feature-gates=ImageVolume=true",
+				},
+			},
+		},
 	}
 
 	// Retrieve the first found binary directory to allow running tests from IDEs

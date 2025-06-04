@@ -101,10 +101,10 @@ func mountedModelPath(modelService *msv1alpha1.ModelService) (string, error) {
 	uri := modelService.Spec.ModelArtifacts.URI
 	switch UriType(uri) {
 	case PVC:
-		if parts, err := parsePVCURI(&modelService.Spec.ModelArtifacts); err == nil {
-			modelPath := strings.Join(parts[1:], pathSep)
+		if _, modelPathSlice, err := parsePVCURI(&modelService.Spec.ModelArtifacts); err == nil {
+			modelPath := strings.Join(modelPathSlice, pathSep)
 			// if uri is pvc://pvc-name/path/to/model
-			// output is /cache/path/to/model
+			// output is /model-cache/path/to/model
 			mountedModelPath = modelStorageRoot + pathSep + modelPath
 		}
 
@@ -112,8 +112,14 @@ func mountedModelPath(modelService *msv1alpha1.ModelService) (string, error) {
 		// The mountModelPath for HF is just the storage root, ie. model-cache
 		mountedModelPath = modelStorageRoot
 
-	// TODO
-	// case OCI:
+	// The mountModelPath for OCI is what comes after :: in the URI
+	case OCI:
+		if _, modelPathSlice, err := parseOCIURI(&modelService.Spec.ModelArtifacts); err == nil {
+			// if uri is oci+native://image-with-tag:0.0.1::path/to/model
+			// output is /model-cache/path/to/model
+			joinedModelPath := strings.Join(modelPathSlice, pathSep)
+			mountedModelPath = modelStorageRoot + pathSep + joinedModelPath
+		}
 
 	case UnknownURI:
 		err = fmt.Errorf("unknown uri type, cannot compute the mountedModelPath")
@@ -132,7 +138,7 @@ func isPVCURI(uri string) bool {
 	return strings.HasPrefix(uri, MODEL_ARTIFACT_URI_PVC_PREFIX)
 }
 
-// isOCIURI returns True if the URI begins with oci://
+// isOCIURI returns True if the URI begins with oci+native://
 func isOCIURI(uri string) bool {
 	return strings.HasPrefix(uri, MODEL_ARTIFACT_URI_OCI_PREFIX)
 }
@@ -154,24 +160,32 @@ func UriType(uri string) URIType {
 	return UnknownURI
 }
 
-// parsePVCURI returns parts from a valid pvc URI, or
-// returns an error if the PVC URI is invalid
-func parsePVCURI(modelArtifact *msv1alpha1.ModelArtifacts) ([]string, error) {
+// parsePVCURI returns parts from a valid pvc URI
+// Returns:
+// first string is the pvc name
+// second string slice is the path to the model
+// error if uri format is invalid
+func parsePVCURI(modelArtifact *msv1alpha1.ModelArtifacts) (string, []string, error) {
+	var pvcName string
+	modelPath := []string{}
 	if modelArtifact == nil {
-		return nil, fmt.Errorf("modelArtifact is nil")
+		return pvcName, modelPath, fmt.Errorf("modelArtifact is nil")
 	}
 
 	uri := modelArtifact.URI
 	if !isPVCURI(uri) {
-		return nil, fmt.Errorf("URI does not have pvc prefix: %s", uri)
+		return pvcName, modelPath, fmt.Errorf("URI does not have pvc prefix: %s", uri)
 	}
 
 	parts := strings.Split(strings.TrimPrefix(uri, MODEL_ARTIFACT_URI_PVC_PREFIX), pathSep)
 	if len(parts) < 2 {
-		return nil, fmt.Errorf("invalid pvc URI format: %s; need pvc://<pvc-name>/model/path", uri)
+		return pvcName, modelPath, fmt.Errorf("invalid pvc URI format: %s; need pvc://<pvc-name>/model/path", uri)
 	}
 
-	return parts, nil
+	pvcName = parts[0]
+	modelPath = parts[1:]
+
+	return pvcName, modelPath, nil
 }
 
 // parseHFURI returns parts from a valid hf URI, or
@@ -199,6 +213,36 @@ func parseHFURI(modelArtifact *msv1alpha1.ModelArtifacts) (string, string, error
 	return parts[0], parts[1], nil
 }
 
+// parseOCIURI returns parts from a valid oci URI, or
+// returns an error if the OCI URI is invalid
+// returns two strings
+// First string is the complete image identifier including tag
+// Second string is the path to the model
+func parseOCIURI(modelArtifact *msv1alpha1.ModelArtifacts) (string, []string, error) {
+	var imageIdentifier string
+	pathToModel := []string{}
+	if modelArtifact == nil {
+		return imageIdentifier, pathToModel, fmt.Errorf("modelArtifact is nil")
+	}
+
+	uri := modelArtifact.URI
+	if !isOCIURI(uri) {
+		return imageIdentifier, pathToModel, fmt.Errorf("URI does not have oci prefix: %s", uri)
+	}
+
+	// Split by ::
+	parts := strings.Split(strings.TrimPrefix(uri, MODEL_ARTIFACT_URI_OCI_PREFIX), ociPathToModelSep)
+	if len(parts) != 2 {
+		return imageIdentifier, pathToModel, fmt.Errorf("invalid oci URI format: %s; need oci+native://<image identifier with tag>::/path/to/model. Please double check if you are missing %s which did not result in exactly two segments", uri, ociPathToModelSep)
+	}
+
+	imageIdentifier = parts[0]
+	// Split by /
+	pathToModel = strings.Split(strings.TrimPrefix(parts[1], pathSep), pathSep)
+
+	return imageIdentifier, pathToModel, nil
+}
+
 // getVolumeMountForContainer returns a VolumeMount for a container where MountModelVolume: true
 func getVolumeMountsForContainer(ctx context.Context, msvc *msv1alpha1.ModelService) []corev1.VolumeMount {
 
@@ -208,24 +252,24 @@ func getVolumeMountsForContainer(ctx context.Context, msvc *msv1alpha1.ModelServ
 
 	switch uriType {
 
-	// The volume mount for HF and PVC is the same
-	// except that HF volume is not readOnly
+	// The volume mount for PVC and OCI is the same
 	// volumeMounts:
-	// - mountPath: /model-cache
-	//   name: model-storage
-	case PVC:
+	// - name: model-storage
+	//   mountPath: /model-cache
+	//   readOnly: true
+	case PVC, OCI:
 		desiredVolumeMount = &corev1.VolumeMount{
 			Name:      modelStorageVolumeName,
 			MountPath: modelStorageRoot,
 			ReadOnly:  true,
 		}
+	// Volume mount is the same, except that HF volume is not readOnly
+	// so that models can be downloaded into the mountPath
 	case HF:
 		desiredVolumeMount = &corev1.VolumeMount{
 			Name:      modelStorageVolumeName,
 			MountPath: modelStorageRoot,
 		}
-	// TODO
-	// case OCI:
 	case UnknownURI:
 		// do nothing
 		log.FromContext(ctx).V(1).Error(fmt.Errorf("uri type is unknown, cannot populate volume mounts"), "uri type: "+msvc.Spec.ModelArtifacts.URI)
@@ -246,9 +290,11 @@ func getVolumeForPDDeployment(ctx context.Context, msvc *msv1alpha1.ModelService
 	uriType := UriType(msvc.Spec.ModelArtifacts.URI)
 
 	switch uriType {
+	// Return a volume with persistentVolumeClaim
 	case PVC:
-		if parts, err := parsePVCURI(&msvc.Spec.ModelArtifacts); err == nil {
-			pvcName := parts[0]
+		if pvcName, _, err := parsePVCURI(&msvc.Spec.ModelArtifacts); err != nil {
+			log.FromContext(ctx).V(1).Error(err, "uri: "+msvc.Spec.ModelArtifacts.URI)
+		} else {
 			desiredVolume = &corev1.Volume{
 				Name: modelStorageVolumeName,
 				VolumeSource: corev1.VolumeSource{
@@ -258,12 +304,12 @@ func getVolumeForPDDeployment(ctx context.Context, msvc *msv1alpha1.ModelService
 					},
 				},
 			}
-		} else {
-			log.FromContext(ctx).V(1).Error(err, "uri: "+msvc.Spec.ModelArtifacts.URI)
 		}
 	// Return an emptyDir volume with ModelArtifacts.Size
 	case HF:
-		if _, _, err := parseHFURI(&msvc.Spec.ModelArtifacts); err == nil {
+		if _, _, err := parseHFURI(&msvc.Spec.ModelArtifacts); err != nil {
+			log.FromContext(ctx).V(1).Error(err, "uri: "+msvc.Spec.ModelArtifacts.URI)
+		} else {
 			desiredVolume = &corev1.Volume{
 				Name: modelStorageVolumeName,
 				VolumeSource: corev1.VolumeSource{
@@ -272,12 +318,23 @@ func getVolumeForPDDeployment(ctx context.Context, msvc *msv1alpha1.ModelService
 					},
 				},
 			}
-		} else {
-			log.FromContext(ctx).V(1).Error(err, "uri: "+msvc.Spec.ModelArtifacts.URI)
 		}
 
-	// TODO
-	// case OCI:
+	// Return a volume with image reference
+	case OCI:
+		if image, _, err := parseOCIURI(&msvc.Spec.ModelArtifacts); err != nil {
+			log.FromContext(ctx).V(1).Error(err, "uri: "+msvc.Spec.ModelArtifacts.URI)
+		} else {
+			desiredVolume = &corev1.Volume{
+				Name: modelStorageVolumeName,
+				VolumeSource: corev1.VolumeSource{
+					Image: &corev1.ImageVolumeSource{
+						Reference:  image,
+						PullPolicy: msvc.Spec.ModelArtifacts.PullPolicy,
+					},
+				},
+			}
+		}
 	case UnknownURI:
 		// do nothing
 		log.FromContext(ctx).V(1).Error(fmt.Errorf("uri type is unknown, cannot populate volumes"), "uri type: "+msvc.Spec.ModelArtifacts.URI)
