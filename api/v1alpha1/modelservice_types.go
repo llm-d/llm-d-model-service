@@ -330,6 +330,16 @@ type Parallelism struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
 	Tensor *int32 `json:"tensor,omitempty"`
+	// +optional
+	// +nullable
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=1
+	Data *int32 `json:"data,omitempty"`
+	// +optional
+	// +nullable
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=1
+	DataLocal *int32 `json:"dataLocal,omitempty"`
 }
 
 // AcceleratorTypes specifies set of accelerators for scheduling.

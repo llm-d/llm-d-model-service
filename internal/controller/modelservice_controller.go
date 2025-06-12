@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
 
 	msv1alpha1 "github.com/llm-d/llm-d-model-service/api/v1alpha1"
 	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
@@ -56,22 +57,26 @@ type ModelServiceReconciler struct {
 // Context is intended to be use for interpolating template variables
 // in BaseConfig
 type TemplateVars struct {
-	ModelServiceName      string `json:"modelServiceName,omitempty"`
-	ModelServiceNamespace string `json:"modelServiceNamespace,omitempty"`
-	ModelName             string `json:"modelName,omitempty"`
-	HFModelName           string `json:"hfModelName,omitempty"`
-	SanitizedModelName    string `json:"sanitizedModelName,omitempty"`
-	ModelPath             string `json:"modelPath,omitempty"`
-	MountedModelPath      string `json:"mountedModelPath,omitempty"`
-	AuthSecretName        string `json:"authSecretName,omitempty"`
-	EPPServiceName        string `json:"eppServiceName,omitempty"`
-	EPPDeploymentName     string `json:"eppDeploymentName,omitempty"`
-	PrefillDeploymentName string `json:"prefillDeploymentName,omitempty"`
-	DecodeDeploymentName  string `json:"decodeDeploymentName,omitempty"`
-	PrefillServiceName    string `json:"prefillServiceName,omitempty"`
-	DecodeServiceName     string `json:"decodeServiceName,omitempty"`
-	InferencePoolName     string `json:"inferencePoolName,omitempty"`
-	InferenceModelName    string `json:"inferenceModelName,omitempty"`
+	ModelServiceName         string `json:"modelServiceName,omitempty"`
+	ModelServiceNamespace    string `json:"modelServiceNamespace,omitempty"`
+	ModelName                string `json:"modelName,omitempty"`
+	HFModelName              string `json:"hfModelName,omitempty"`
+	SanitizedModelName       string `json:"sanitizedModelName,omitempty"`
+	ModelPath                string `json:"modelPath,omitempty"`
+	MountedModelPath         string `json:"mountedModelPath,omitempty"`
+	AuthSecretName           string `json:"authSecretName,omitempty"`
+	EPPServiceName           string `json:"eppServiceName,omitempty"`
+	EPPDeploymentName        string `json:"eppDeploymentName,omitempty"`
+	PrefillDeploymentName    string `json:"prefillDeploymentName,omitempty"`
+	DecodeDeploymentName     string `json:"decodeDeploymentName,omitempty"`
+	PrefillServiceName       string `json:"prefillServiceName,omitempty"`
+	DecodeServiceName        string `json:"decodeServiceName,omitempty"`
+	InferencePoolName        string `json:"inferencePoolName,omitempty"`
+	InferenceModelName       string `json:"inferenceModelName,omitempty"`
+	DecodeTensorParallelism  string `json:"decodeTensorParallelSize,omitempty"`
+	DecodeDataParallelism    string `json:"decodeDataParallelSize,omitempty"`
+	PrefillTensorParallelism string `json:"prefillTensorParallelSize,omitempty"`
+	PrefillDataParallelism   string `json:"prefillDataParallelSize,omitempty"`
 }
 
 // from populates the field values for TemplateVars from the model service
@@ -99,6 +104,26 @@ func (t *TemplateVars) from(ctx context.Context, msvc *msv1alpha1.ModelService) 
 	t.InferenceModelName = infModelName(msvc)
 	t.ModelName = msvc.Spec.Routing.ModelName
 	t.SanitizedModelName = sanitizeModelName(msvc)
+
+	t.DecodeTensorParallelism = "1"
+	if msvc.Spec.Decode != nil && msvc.Spec.Decode.Parallelism != nil {
+		t.DecodeTensorParallelism = fmt.Sprintf("%d", *msvc.Spec.Decode.Parallelism.Tensor)
+	}
+
+	t.DecodeDataParallelism = "1"
+	if msvc.Spec.Decode != nil && msvc.Spec.Decode.Parallelism != nil {
+		t.DecodeDataParallelism = fmt.Sprintf("%d", *msvc.Spec.Decode.Parallelism.Data)
+	}
+
+	t.PrefillTensorParallelism = "1"
+	if msvc.Spec.Prefill != nil && msvc.Spec.Prefill.Parallelism != nil {
+		t.PrefillTensorParallelism = fmt.Sprintf("%d", *msvc.Spec.Prefill.Parallelism.Tensor)
+	}
+
+	t.PrefillDataParallelism = "1"
+	if msvc.Spec.Prefill != nil && msvc.Spec.Prefill.Parallelism != nil {
+		t.PrefillDataParallelism = fmt.Sprintf("%d", *msvc.Spec.Prefill.Parallelism.Data)
+	}
 
 	if msvc.Spec.ModelArtifacts.AuthSecretName != nil {
 		t.AuthSecretName = *msvc.Spec.ModelArtifacts.AuthSecretName
@@ -164,6 +189,7 @@ func (t *TemplateFuncs) from(ctx context.Context, msvc *msv1alpha1.ModelService)
 // +kubebuilder:rbac:groups="",resources=services,verbs=list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="leaderworkerset.x-k8s.io",resources=leaderworkersets,verbs=get;list;watch;create;update;patch;delete
 
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
@@ -243,6 +269,7 @@ func (r *ModelServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&giev1alpha2.InferenceModel{}, handler.EnqueueRequestsFromMapFunc(r.inferenceModelMapFunc)).
 		Watches(&giev1alpha2.InferencePool{}, handler.EnqueueRequestsFromMapFunc(r.inferencePoolMapFunc)).
 		Watches(&corev1.ServiceAccount{}, handler.EnqueueRequestsFromMapFunc(r.serviceAccountMapFunc)).
+		Watches(&lwsv1.LeaderWorkerSet{}, handler.EnqueueRequestsFromMapFunc(r.lwsMapFunc)).
 		Complete(r)
 }
 
@@ -509,6 +536,19 @@ func (r *ModelServiceReconciler) inferenceModelMapFunc(ctx context.Context, obj 
 		return nil
 	}
 	shouldReturn, result := requeueMsvcReq(ctx, im)
+	if shouldReturn {
+		return result
+	}
+	return nil
+}
+
+// lwsMapFunc maps leaderworkersets to ModelService owner
+func (r *ModelServiceReconciler) lwsMapFunc(ctx context.Context, obj client.Object) []reconcile.Request {
+	lws, ok := obj.(*lwsv1.LeaderWorkerSet)
+	if !ok {
+		return nil
+	}
+	shouldReturn, result := requeueMsvcReq(ctx, lws)
 	if shouldReturn {
 		return result
 	}

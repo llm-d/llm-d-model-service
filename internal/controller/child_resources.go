@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	giev1alpha2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+	lwsv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
 	"sigs.k8s.io/yaml"
 )
 
@@ -28,19 +29,21 @@ import (
 
 // BaseConfig holds information read from the base configmap
 type BaseConfig struct {
-	ConfigMaps        []corev1.ConfigMap          `json:"configMaps,omitempty"`
-	PrefillDeployment *appsv1.Deployment          `json:"prefillDeployment,omitempty"`
-	DecodeDeployment  *appsv1.Deployment          `json:"decodeDeployment,omitempty"`
-	PrefillService    *corev1.Service             `json:"prefillService,omitempty"`
-	DecodeService     *corev1.Service             `json:"decodeService,omitempty"`
-	HTTPRoute         *gatewayv1.HTTPRoute        `json:"httpRoute,omitempty"`
-	InferencePool     *giev1alpha2.InferencePool  `json:"inferencePool,omitempty"`
-	InferenceModel    *giev1alpha2.InferenceModel `json:"inferenceModel,omitempty"`
-	EPPDeployment     *appsv1.Deployment          `json:"eppDeployment,omitempty"`
-	EPPService        *corev1.Service             `json:"eppService,omitempty"`
-	EPPServiceAccount *corev1.ServiceAccount      `json:"eppServiceAccount,omitempty"`
-	PDServiceAccount  *corev1.ServiceAccount      `json:"pdServiceAccount,omitempty"`
-	EPPRoleBinding    *rbacv1.RoleBinding         `json:"eppRoleBinding,omitempty"`
+	ConfigMaps             []corev1.ConfigMap          `json:"configMaps,omitempty"`
+	PrefillDeployment      *appsv1.Deployment          `json:"prefillDeployment,omitempty"`
+	DecodeDeployment       *appsv1.Deployment          `json:"decodeDeployment,omitempty"`
+	PrefillLeaderWorkerSet *lwsv1.LeaderWorkerSet      `json:"prefillLeaderWorkerSet,omitempty"`
+	DecodeLeaderWorkerSet  *lwsv1.LeaderWorkerSet      `json:"decodeLeaderWorkerSet,omitempty"`
+	PrefillService         *corev1.Service             `json:"prefillService,omitempty"`
+	DecodeService          *corev1.Service             `json:"decodeService,omitempty"`
+	HTTPRoute              *gatewayv1.HTTPRoute        `json:"httpRoute,omitempty"`
+	InferencePool          *giev1alpha2.InferencePool  `json:"inferencePool,omitempty"`
+	InferenceModel         *giev1alpha2.InferenceModel `json:"inferenceModel,omitempty"`
+	EPPDeployment          *appsv1.Deployment          `json:"eppDeployment,omitempty"`
+	EPPService             *corev1.Service             `json:"eppService,omitempty"`
+	EPPServiceAccount      *corev1.ServiceAccount      `json:"eppServiceAccount,omitempty"`
+	PDServiceAccount       *corev1.ServiceAccount      `json:"pdServiceAccount,omitempty"`
+	EPPRoleBinding         *rbacv1.RoleBinding         `json:"eppRoleBinding,omitempty"`
 }
 
 // shouldCreateConfigMaps returns True if there is at least one ConfigMap to be created
@@ -53,6 +56,10 @@ func (childResource *BaseConfig) shouldCreatePrefillDeployment() bool {
 	return childResource.PrefillDeployment != nil
 }
 
+func (childResource *BaseConfig) shouldCreatePrefillLeaderWorkerSet() bool {
+	return childResource.PrefillLeaderWorkerSet != nil
+}
+
 // shouldCreatePrefillService returns True if the prefill deployment needs to be created
 func (childResource *BaseConfig) shouldCreatePrefillService() bool {
 	return childResource.shouldCreatePrefillDeployment() && childResource.PrefillService != nil
@@ -61,6 +68,10 @@ func (childResource *BaseConfig) shouldCreatePrefillService() bool {
 // shouldCreateDecodeDeployment returns True if the decode deployment needs to be created
 func (childResource *BaseConfig) shouldCreateDecodeDeployment() bool {
 	return childResource.DecodeDeployment != nil
+}
+
+func (childResource *BaseConfig) shouldCreateDecodeLeaderWorkerSet() bool {
+	return childResource.DecodeLeaderWorkerSet != nil
 }
 
 // shouldCreateDecodeService returns True if the decode deployment needs to be created
@@ -278,6 +289,12 @@ func BaseConfigFromCM(cm *corev1.ConfigMap) (*BaseConfig, error) {
 	if err := deserialize("decodeDeployment", &bc.DecodeDeployment); err != nil {
 		return nil, fmt.Errorf("failed to decode decodeDeployment: %w", err)
 	}
+	if err := deserialize("decodeLeaderWorkerSet", &bc.DecodeLeaderWorkerSet); err != nil {
+		return nil, fmt.Errorf("failed to decode decodeLeaderWorkerSet: %w", err)
+	}
+	if err := deserialize("prefillLeaderWorkerSet", &bc.PrefillLeaderWorkerSet); err != nil {
+		return nil, fmt.Errorf("failed to decode decodeLeaderWorkerSet: %w", err)
+	}
 	if err := deserialize("prefillService", &bc.PrefillService); err != nil {
 		return nil, fmt.Errorf("failed to decode prefillService: %w", err)
 	}
@@ -316,20 +333,25 @@ func (interpolatedBaseConfig *BaseConfig) MergeChildResources(ctx context.Contex
 	// Step 3: update the child resources
 	// Idea: updates do the mergo merge
 	if modelService.Spec.Prefill != nil || interpolatedBaseConfig.PrefillDeployment != nil {
-		interpolatedBaseConfig.mergePDDeployment(ctx, modelService, PREFILL_ROLE, scheme)
+		// interpolatedBaseConfig.mergePDDeployment(ctx, modelService, PREFILL_ROLE, scheme)
+		interpolatedBaseConfig.mergePDLeaderWorkerSet(ctx, modelService, PREFILL_ROLE, scheme)
 		if interpolatedBaseConfig.PrefillService != nil {
 			interpolatedBaseConfig.mergePDService(ctx, modelService, PREFILL_ROLE, scheme)
 		}
 	}
 	log.FromContext(ctx).V(1).Info("attempting to update decode deployment")
 	if modelService.Spec.Decode != nil || interpolatedBaseConfig.DecodeDeployment != nil {
-		interpolatedBaseConfig.mergePDDeployment(ctx, modelService, DECODE_ROLE, scheme)
+		// interpolatedBaseConfig.mergePDDeployment(ctx, modelService, DECODE_ROLE, scheme)
+		interpolatedBaseConfig.mergePDLeaderWorkerSet(ctx, modelService, DECODE_ROLE, scheme)
 		if interpolatedBaseConfig.DecodeService != nil {
 			interpolatedBaseConfig.mergePDService(ctx, modelService, DECODE_ROLE, scheme)
 		}
 	}
 
-	if interpolatedBaseConfig.PrefillDeployment != nil || interpolatedBaseConfig.DecodeDeployment != nil {
+	if interpolatedBaseConfig.PrefillDeployment != nil ||
+		interpolatedBaseConfig.DecodeDeployment != nil ||
+		interpolatedBaseConfig.PrefillLeaderWorkerSet != nil ||
+		interpolatedBaseConfig.DecodeLeaderWorkerSet != nil {
 		// some pd pods are getting created; set SA and RB here
 		interpolatedBaseConfig.setPDServiceAccount(ctx, modelService, scheme, rbacOptions)
 	}
@@ -372,12 +394,12 @@ func (childResource *BaseConfig) mergeConfigMaps(ctx context.Context, msvc *msv1
 		if strings.TrimSpace(childResource.ConfigMaps[i].Namespace) == "" {
 			childResource.ConfigMaps[i].Namespace = msvc.Namespace
 		}
-		// Note: there seems to be a controllerutil bug here ...
-		// Setting owner ref before setting namespace seems problematic
-		err := controllerutil.SetOwnerReference(msvc, &childResource.ConfigMaps[i], scheme)
-		if err != nil {
-			log.FromContext(ctx).V(1).Error(err, "unable to set owner reference")
-		}
+		// // Note: there seems to be a controllerutil bug here ...
+		// // Setting owner ref before setting namespace seems problematic
+		// err := controllerutil.SetOwnerReference(msvc, &childResource.ConfigMaps[i], scheme)
+		// if err != nil {
+		// 	log.FromContext(ctx).V(1).Error(err, "unable to set owner reference")
+		// }
 	}
 	return childResource
 }
@@ -422,11 +444,11 @@ func (childResources *BaseConfig) mergeInferenceModel(ctx context.Context, msvc 
 	im.Spec.ModelName = msvc.Spec.Routing.ModelName
 	im.Spec.PoolRef.Name = giev1alpha2.ObjectName(infPoolName(msvc))
 
-	// Set owner reference for the merged service
-	if err := controllerutil.SetOwnerReference(msvc, im, scheme); err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for inferencepool")
-		return childResources
-	}
+	// // Set owner reference for the merged service
+	// if err := controllerutil.SetOwnerReference(msvc, im, scheme); err != nil {
+	// 	log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for inferencepool")
+	// 	return childResources
+	// }
 
 	return childResources
 }
@@ -500,11 +522,11 @@ func (childResource *BaseConfig) mergePDService(ctx context.Context, msvc *msv1a
 		return childResource
 	}
 
-	// Set owner reference for the merged service
-	if err := controllerutil.SetOwnerReference(msvc, &destService, scheme); err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for service "+role)
-		return childResource
-	}
+	// // Set owner reference for the merged service
+	// if err := controllerutil.SetOwnerReference(msvc, &destService, scheme); err != nil {
+	// 	log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for service "+role)
+	// 	return childResource
+	// }
 
 	// Set the merged service for child resource
 	if role == PREFILL_ROLE {
@@ -601,11 +623,11 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 		},
 	}
 
-	// Finally, set owner references
-	err = controllerutil.SetOwnerReference(msvc, desiredDeployment, scheme)
-	if err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to set owner reference")
-	}
+	// // Finally, set owner references
+	// err = controllerutil.SetOwnerReference(msvc, desiredDeployment, scheme)
+	// if err != nil {
+	// 	log.FromContext(ctx).V(1).Error(err, "unable to set owner reference")
+	// }
 
 	// Finally, in Mergo merge...
 	// We create a destination deployment object from baseconfig
@@ -649,6 +671,156 @@ func (childResource *BaseConfig) mergePDDeployment(ctx context.Context, msvc *ms
 	return childResource
 }
 
+// mergePDLeaderWorkerSet uses msvc fields to update childResource prefill deployment
+func (childResource *BaseConfig) mergePDLeaderWorkerSet(ctx context.Context, msvc *msv1alpha1.ModelService, role string, scheme *runtime.Scheme) *BaseConfig {
+	pdSpec := &msv1alpha1.PDSpec{}
+	if role == PREFILL_ROLE {
+		if msvc.Spec.Prefill != nil {
+			pdSpec = msvc.Spec.Prefill
+		}
+		if childResource.PrefillLeaderWorkerSet == nil {
+			childResource.PrefillLeaderWorkerSet = &lwsv1.LeaderWorkerSet{}
+		}
+	}
+	if role == DECODE_ROLE {
+		if msvc.Spec.Decode != nil {
+			pdSpec = msvc.Spec.Decode
+		}
+		if childResource.DecodeLeaderWorkerSet == nil {
+			childResource.DecodeLeaderWorkerSet = &lwsv1.LeaderWorkerSet{}
+		}
+	}
+
+	var err error
+
+	// Compute fields needed
+	podLabels := getPodLabels(ctx, msvc, role)
+	var nodeAffinity *corev1.Affinity
+
+	// AcceleratorTypes maybe nil... TODO: check
+	na, err := AcceleratorTypesToNodeAffinity(pdSpec.AcceleratorTypes)
+	if err == nil {
+		nodeAffinity = &corev1.Affinity{
+			NodeAffinity: na,
+		}
+	} else {
+		log.FromContext(ctx).V(1).Error(err, "unable to get node affinity")
+	}
+
+	// Step 1: Create an empty deployment
+	desiredLeaderWorkerSet := &lwsv1.LeaderWorkerSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "LeaderWorkerSet",
+			APIVersion: "leaderworkerset.x-k8s.io/v1",
+		},
+
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deploymentName(msvc, role),
+			Namespace: msvc.Namespace,
+
+			// Define the labels for this PD deployment
+			// Same as pod labels
+			Labels: podLabels,
+		},
+		Spec: lwsv1.LeaderWorkerSetSpec{
+			// Define replicas
+			// Decouple scaling will be handled in the merge
+			Replicas: pdSpec.Replicas,
+
+			LeaderWorkerTemplate: lwsv1.LeaderWorkerTemplate{
+
+				LeaderTemplate: &corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						// Define pod labels, must match selector labels
+						Labels: podLabels,
+					},
+					Spec: corev1.PodSpec{
+						// populate containers
+						InitContainers: convertToContainerSliceWithURIInfo(ctx, pdSpec.InitContainers, msvc),
+						Containers:     convertToContainerSliceWithURIInfo(ctx, pdSpec.Containers, msvc),
+
+						// populate node affinity
+						Affinity: nodeAffinity,
+
+						// populate service account for PD pods
+						ServiceAccountName: pdServiceAccountName(msvc),
+
+						// // populate volumes based on URI
+						// Volumes: getVolumeForPDDeployment(ctx, msvc),
+					},
+				},
+
+				WorkerTemplate: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						// Define pod labels, must match selector labels
+						Labels: podLabels,
+					},
+					Spec: corev1.PodSpec{
+						// populate containers
+						Containers: convertToContainerSliceWithURIInfo(ctx, pdSpec.Containers, msvc),
+
+						// populate node affinity
+						Affinity: nodeAffinity,
+
+						// populate service account for PD pods
+						ServiceAccountName: pdServiceAccountName(msvc),
+
+						// // populate volumes based on URI
+						// Volumes: getVolumeForPDDeployment(ctx, msvc),
+					},
+				},
+			},
+		},
+	}
+
+	// // Finally, set owner references
+	// err = controllerutil.SetOwnerReference(msvc, desiredLeaderWorkerSet, scheme)
+	// if err != nil {
+	// 	log.FromContext(ctx).V(1).Error(err, "unable to set owner reference")
+	// }
+
+	// Finally, in Mergo merge...
+	// We create a destination deployment object from baseconfig
+	// We create a source deployment object from model service
+	// We merge source into destination
+	// We apply the merged destination
+
+	var originalLeaderWorkerSet *lwsv1.LeaderWorkerSet
+
+	log.FromContext(ctx).V(1).Info("merging PD LeaderWorkerSet", "role", role, "desiredLeaderWorkerSet (src)", desiredLeaderWorkerSet)
+	if role == PREFILL_ROLE {
+		originalLeaderWorkerSet = childResource.PrefillLeaderWorkerSet
+	}
+	if role == DECODE_ROLE {
+		originalLeaderWorkerSet = childResource.DecodeLeaderWorkerSet
+	}
+
+	// Mergo merge
+	log.FromContext(ctx).V(1).Info("merging PD LeaderWorkerSet", "desiredLeaderWorkerSet (dst)", originalLeaderWorkerSet)
+	if err = mergo.Merge(
+		originalLeaderWorkerSet,
+		desiredLeaderWorkerSet,
+		mergo.WithOverride,
+		mergo.WithAppendSlice,
+		mergo.WithTransformers(containerSliceTransformer{})); err != nil {
+		log.FromContext(ctx).V(1).Error(err, "mergo error")
+	} else {
+
+		// Log errors
+		// technically we can log using originalDeployment here, but be safe
+		// and log what's directly stored in childResources.<ROLE>Deployment
+		var mergedLeaderWorkerSet *lwsv1.LeaderWorkerSet
+		if role == DECODE_ROLE {
+			mergedLeaderWorkerSet = childResource.PrefillLeaderWorkerSet
+		} else {
+			mergedLeaderWorkerSet = childResource.DecodeLeaderWorkerSet
+		}
+		log.FromContext(ctx).V(1).Info("merging was succesful", "merged leaderWorkerSet", mergedLeaderWorkerSet)
+	}
+
+	return childResource
+}
+
 // setPDServiceAccount defines a servicd account for the P and D deployments
 func (childResource *BaseConfig) setPDServiceAccount(ctx context.Context, msvc *msv1alpha1.ModelService, scheme *runtime.Scheme, rbacOptions *RBACOptions) *BaseConfig {
 	sa := &corev1.ServiceAccount{
@@ -666,12 +838,12 @@ func (childResource *BaseConfig) setPDServiceAccount(ctx context.Context, msvc *
 		sa.ImagePullSecrets = append(sa.ImagePullSecrets, corev1.LocalObjectReference{Name: name})
 	}
 
-	// Set owner reference for service account
-	// TODO: should childresource be returned when owner ref is not set?
-	if err := controllerutil.SetOwnerReference(msvc, sa, scheme); err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for service account")
-		return childResource
-	}
+	// // Set owner reference for service account
+	// // TODO: should childresource be returned when owner ref is not set?
+	// if err := controllerutil.SetOwnerReference(msvc, sa, scheme); err != nil {
+	// 	log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for service account")
+	// 	return childResource
+	// }
 
 	childResource.PDServiceAccount = sa
 
@@ -696,10 +868,10 @@ func (childResource *BaseConfig) setEPPServiceAccount(ctx context.Context, msvc 
 
 	childResource.EPPServiceAccount = eppServiceAccount
 
-	// TODO: should childresource be returned when owner ref is not set?
-	if err := controllerutil.SetOwnerReference(msvc, eppServiceAccount, scheme); err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for service account")
-	}
+	// // TODO: should childresource be returned when owner ref is not set?
+	// if err := controllerutil.SetOwnerReference(msvc, eppServiceAccount, scheme); err != nil {
+	// 	log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for service account")
+	// }
 }
 
 func (childResource *BaseConfig) setEPPRoleBinding(ctx context.Context, msvc *msv1alpha1.ModelService, rbacOptions *RBACOptions, scheme *runtime.Scheme) {
@@ -728,10 +900,10 @@ func (childResource *BaseConfig) setEPPRoleBinding(ctx context.Context, msvc *ms
 		},
 	}
 
-	// Set owner reference for EPPRoleBinding
-	if err := controllerutil.SetOwnerReference(msvc, childResource.EPPRoleBinding, scheme); err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for epp rolebinding")
-	}
+	// // Set owner reference for EPPRoleBinding
+	// if err := controllerutil.SetOwnerReference(msvc, childResource.EPPRoleBinding, scheme); err != nil {
+	// 	log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for epp rolebinding")
+	// }
 
 }
 
@@ -793,11 +965,11 @@ func (childResources *BaseConfig) mergeEppDeployment(ctx context.Context, msvc *
 		return childResources
 	}
 
-	// Set owner reference for the merged service
-	if err := controllerutil.SetOwnerReference(msvc, &dest, scheme); err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for inferencepool")
-		return childResources
-	}
+	// // Set owner reference for the merged service
+	// if err := controllerutil.SetOwnerReference(msvc, &dest, scheme); err != nil {
+	// 	log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for inferencepool")
+	// 	return childResources
+	// }
 	log.FromContext(ctx).V(1).Info("deployment", "post-merge-label", dest.Labels, "post-merge-spec", dest.Spec)
 	// Set the merged epp deployment in the child resource
 	childResources.EPPDeployment = &dest
@@ -830,10 +1002,10 @@ func (childResources *BaseConfig) mergeEppService(ctx context.Context, msvc *msv
 		log.FromContext(ctx).V(1).Error(err, "problem with epp service merge")
 		return childResources
 	}
-	if err := controllerutil.SetOwnerReference(msvc, &dest, scheme); err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for inferencepool")
-		return childResources
-	}
+	// if err := controllerutil.SetOwnerReference(msvc, &dest, scheme); err != nil {
+	// 	log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for inferencepool")
+	// 	return childResources
+	// }
 
 	// Set the merged epp service in the child resource
 	childResources.EPPService = &dest
@@ -891,11 +1063,11 @@ func (childResources *BaseConfig) mergeHTTPRoute(ctx context.Context, msvc *msv1
 		return childResources
 	}
 
-	// Set owner reference for the merged service
-	if err := controllerutil.SetOwnerReference(msvc, &dest, scheme); err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for httproute")
-		return childResources
-	}
+	// // Set owner reference for the merged service
+	// if err := controllerutil.SetOwnerReference(msvc, &dest, scheme); err != nil {
+	// 	log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for httproute")
+	// 	return childResources
+	// }
 
 	// Set the merged inferncepool in the child resource
 	childResources.HTTPRoute = &dest
@@ -943,11 +1115,11 @@ func (childResources *BaseConfig) mergeInferencePool(ctx context.Context, msvc *
 		return childResources
 	}
 
-	// Set owner reference for the merged service
-	if err := controllerutil.SetOwnerReference(msvc, &dest, scheme); err != nil {
-		log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for inferencepool")
-		return childResources
-	}
+	// // Set owner reference for the merged service
+	// if err := controllerutil.SetOwnerReference(msvc, &dest, scheme); err != nil {
+	// 	log.FromContext(ctx).V(1).Error(err, "unable to set owner ref for inferencepool")
+	// 	return childResources
+	// }
 
 	// Set the merged inferncepool in the child resource
 	childResources.InferencePool = &dest
@@ -970,12 +1142,20 @@ func (childResource *BaseConfig) invokeCreateOrUpdate(ctx context.Context, r *Mo
 		results = append(results, createOrUpdatePDDeployment(ctx, r, childResource.PrefillDeployment, msvc.Spec.DecoupleScaling))
 	}
 
+	if childResource.shouldCreatePrefillLeaderWorkerSet() {
+		results = append(results, createOrUpdatePDLeaderWorkerSet(ctx, r, childResource.PrefillLeaderWorkerSet, msvc.Spec.DecoupleScaling))
+	}
+
 	if childResource.shouldCreatePrefillService() {
 		results = append(results, createOrUpdateService(ctx, r, childResource.PrefillService))
 	}
 
 	if childResource.shouldCreateDecodeDeployment() {
 		results = append(results, createOrUpdatePDDeployment(ctx, r, childResource.DecodeDeployment, msvc.Spec.DecoupleScaling))
+	}
+
+	if childResource.shouldCreateDecodeLeaderWorkerSet() {
+		results = append(results, createOrUpdatePDLeaderWorkerSet(ctx, r, childResource.DecodeLeaderWorkerSet, msvc.Spec.DecoupleScaling))
 	}
 
 	if childResource.shouldCreateDecodeService() {
@@ -1115,6 +1295,50 @@ func createOrUpdatePDDeploymentInCluster(ctx context.Context, r *ModelServiceRec
 	return err
 }
 
+func createOrUpdatePDLeaderWorkerSetInCluster(ctx context.Context, r *ModelServiceReconciler, desiredObjectState lwsv1.LeaderWorkerSet, emptyObject *lwsv1.LeaderWorkerSet, decoupleScaling bool) error {
+	var err error
+
+	desiredObjName := desiredObjectState.GetName()
+	desiredObjNamespace := desiredObjectState.GetNamespace()
+
+	// emptyObject is the object to look for in the cluster
+	log.FromContext(ctx).V(1).Info("looking to createOrUpdate object in cluster: ", "obj name", desiredObjName, "obj namespace", desiredObjNamespace, "obj kind", desiredObjectState.GetObjectKind())
+
+	// Set the empty object with the name and namespace so we can look it up in the cluster
+	// and populate emptyObject with the current state of the object
+	emptyObject.SetName(desiredObjName)
+	emptyObject.SetNamespace(desiredObjNamespace)
+
+	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, emptyObject, func() error {
+		log.FromContext(ctx).V(1).Info("initial replica count", "replica", emptyObject.Spec.Replicas)
+
+		// We should only update replica if decoupleScaling is False
+		if !emptyObject.GetCreationTimestamp().Time.IsZero() && decoupleScaling {
+			log.FromContext(ctx).V(1).Info("scaling is decoupled, setting deployment replica value to incluster replica count")
+			desiredObjectState.Spec.Replicas = nil
+		}
+
+		// Mergo merge with override means labels, annotations (maps) key-value pairs are preseved
+		// while other fields are overriden if not nil in desiredObjectState
+		mergeErr := mergo.Merge(emptyObject, desiredObjectState, mergo.WithOverride)
+		if mergeErr != nil {
+			log.FromContext(ctx).V(1).Error(err, "attemping to merge inside createOrUpdate, but failed for object "+emptyObject.GetName())
+		} else {
+			log.FromContext(ctx).V(1).Info("successfully merged PD deployment in cluster" + emptyObject.GetName())
+			log.FromContext(ctx).V(1).Info("successfully merged PD deployment in cluster", "replica", emptyObject.Spec.Replicas)
+		}
+
+		return mergeErr
+	})
+
+	log.FromContext(ctx).V(1).Info("performed createOrUpdate", "obj name", emptyObject.GetName(), "operation", op)
+	if err != nil {
+		log.FromContext(ctx).V(1).Error(err, "createOrUpdate failed", "obj name", emptyObject.GetName())
+	}
+
+	return err
+}
+
 // createOrUpdateConfigMaps creates or updates multiple of ConfigMaps in the cluster
 func createOrUpdateConfigMaps(ctx context.Context, r *ModelServiceReconciler, desiredConfigMaps []corev1.ConfigMap) []error {
 	var errors []error
@@ -1136,6 +1360,11 @@ func createOrUpdateDeployment(ctx context.Context, r *ModelServiceReconciler, de
 func createOrUpdatePDDeployment(ctx context.Context, r *ModelServiceReconciler, desiredDeployment *appsv1.Deployment, decoupleScaling bool) error {
 	emptyDeployment := appsv1.Deployment{}
 	return createOrUpdatePDDeploymentInCluster(ctx, r, *desiredDeployment, &emptyDeployment, decoupleScaling)
+}
+
+func createOrUpdatePDLeaderWorkerSet(ctx context.Context, r *ModelServiceReconciler, desiredLeaderWorkerSet *lwsv1.LeaderWorkerSet, decoupleScaling bool) error {
+	emptyLeaderWorkerSet := lwsv1.LeaderWorkerSet{}
+	return createOrUpdatePDLeaderWorkerSetInCluster(ctx, r, *desiredLeaderWorkerSet, &emptyLeaderWorkerSet, decoupleScaling)
 }
 
 // createOrUpdateService creates or updates a service object in the cluster
