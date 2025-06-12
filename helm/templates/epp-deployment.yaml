@@ -1,0 +1,108 @@
+apiVersion: apps/v1 
+kind: Deployment 
+metadata: 
+  name: {{ .Values.modelServiceName }}-epp
+  labels: 
+    llm-d.ai/epp: {{ .Values.modelServiceName }}-epp
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      llm-d.ai/epp: {{ .Values.modelServiceName }}-epp
+  template:
+    metadata:
+      labels:
+        llm-d.ai/epp: {{ .Values.modelServiceName }}-epp
+    spec:
+      containers:
+      - name: epp 
+        imagePullPolicy: Always 
+        {{- if .Values.endpointPicker.image }}
+        image: {{ .Values.endpointPicker.image }}
+        {{- else }}
+        image: ghcr.io/llm-d/llm-d-inference-scheduler:0.0.3
+        {{- end }}
+        imagePullPolicy: Always
+        args:
+        - --poolName
+        - {{ .Values.modelServiceName }}-inference-pool
+        - --poolNamespace
+        - {{ .Release.Namespace }}
+        - -v
+        - "4"
+        - --zap-encoder
+        - json
+        - --grpcPort
+        - "9002"
+        - --grpcHealthPort
+        - "9003"
+        env:
+        - name: ENABLE_KVCACHE_AWARE_SCORER
+          value: "false"
+        - name: ENABLE_LOAD_AWARE_SCORER
+          value: "true"
+        - name: ENABLE_PREFIX_AWARE_SCORER
+          value: "true"
+        - name: ENABLE_SESSION_AWARE_SCORER
+          value: "false"
+        - name: KVCACHE_AWARE_SCORER_WEIGHT
+          value: "1"
+        - name: KVCACHE_INDEXER_REDIS_ADDR
+        - name: LOAD_AWARE_SCORER_WEIGHT
+          value: "1"
+        - name: PD_ENABLED
+          value: "false"
+        - name: PD_PROMPT_LEN_THRESHOLD
+          value: "10"
+        - name: PREFILL_ENABLE_KVCACHE_AWARE_SCORER
+          value: "false"
+        - name: PREFILL_ENABLE_LOAD_AWARE_SCORER
+          value: "false"
+        - name: PREFILL_ENABLE_PREFIX_AWARE_SCORER
+          value: "false"
+        - name: PREFILL_ENABLE_SESSION_AWARE_SCORER
+          value: "false"
+        - name: PREFILL_KVCACHE_AWARE_SCORER_WEIGHT
+          value: "1"
+        - name: PREFILL_KVCACHE_INDEXER_REDIS_ADDR
+        - name: PREFILL_LOAD_AWARE_SCORER_WEIGHT
+          value: "1"
+        - name: PREFILL_PREFIX_AWARE_SCORER_WEIGHT
+          value: "1"
+        - name: PREFILL_SESSION_AWARE_SCORER_WEIGHT
+          value: "1"
+        - name: PREFIX_AWARE_SCORER_WEIGHT
+          value: "2"
+        - name: SESSION_AWARE_SCORER_WEIGHT
+          value: "1"
+        ports:
+        - containerPort: 9002
+          name: grpc
+          protocol: TCP
+        - containerPort: 9003
+          name: grpc-health
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+      serviceAccount: {{ .Values.modelServiceName }}-sa
+      serviceAccountName: {{ .Values.modelServiceName }}-sa
+      readinessProbe:
+        grpc:
+          port: 9003
+          service: envoy.service.ext_proc.v3.ExternalProcessor
+        initialDelaySeconds: 5
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
+      livenessProbe:
+        grpc:
+          port: 9003
+          service: envoy.service.ext_proc.v3.ExternalProcessor
+        initialDelaySeconds: 5
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3

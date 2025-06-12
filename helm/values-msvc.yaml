@@ -1,11 +1,11 @@
 # TODO
 # decoupleScaling: false
 
+modelServiceName: facebook-opt-125m       # DNS compliant
 lws: false  # If true, creates LWS instead of deployments  
 inferencePool: true 
 inferenceModel: true 
 httpRoute: true 
-
 routing: 
   # This is the model name for the OpenAI request
   modelName: facebook/opt-125m
@@ -22,6 +22,10 @@ modelArtifacts:
   artficat: facebook/opt-125m
   authSecretName: "hf-secret"
   size: 5Mi 
+  gatewayRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: inference-gateway-kgateway
 
 # describe decode pods
 decode:
