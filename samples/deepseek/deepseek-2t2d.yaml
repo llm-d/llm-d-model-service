@@ -1,0 +1,47 @@
+apiVersion: llm-d.ai/v1alpha1
+kind: ModelService
+metadata:
+  name: deepsk-ai-deepsk-coder-v2-lite-instruct
+spec:
+  decoupleScaling: false
+
+  baseConfigMapRef:
+    name: lws-baseconfig
+
+  routing: 
+    modelName: deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct
+    ports:
+    - name: app_port
+      port: 8080
+    - name: internal_port
+      port: 8200
+
+  modelArtifacts:
+    uri: hf://deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct
+    authSecretName: hf-secret
+
+  # describe decode pods
+  decode:
+    replicas: 1
+    parallelism:  
+      tensor: 2
+      # tensor: 2
+      data: 2
+      # data: 4
+    acceleratorTypes:
+      labelKey: gpu.nvidia.com/model
+      labelValues:
+        - H200
+
+  # describe the prefill pods 
+  prefill:
+    replicas: 1
+    parallelism:  
+      tensor: 2
+      # tensor: 2
+      data: 2
+      # data: 4
+    acceleratorTypes:
+      labelKey: gpu.nvidia.com/model
+      labelValues:
+        - H200
