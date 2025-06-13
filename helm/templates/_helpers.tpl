@@ -90,13 +90,34 @@ affinity:
             {{- end }}
 {{- end }}
 
+{{/* Routing proxy -- sidecar for decode pods */}}
+{{- define "llm-d-modelservice.routingProxy" -}}
+initContainers:
+  - name: routing-proxy
+    args:
+      - --port={{ default 8080 .servicePort }}
+      - --vllm-port={{ default 8200 .proxy.targetPort }}
+      - --connector=nixlv2
+      - -v={{ default 5 .proxy.debugLevel }}
+    image: {{ .image }}
+    imagePullPolicy: Always
+    ports:
+      - containerPort: {{ default 8080 .servicePort }}
+    protocol: TCP
+    resources: {}
+    restartPolicy: Always
+    securityContext:
+    allowPrivilegeEscalation: false
+    runAsNonRoot: true
+{{- end }}
+
 {{/* P/D service account name */}}
 {{- define "llm-d-modelservice.pdServiceAccountName" -}}
 {{ include "llm-d-modelservice.sanitizedModelName" . }}-sa
 {{- end }}
 
 {{/* EPP service account name */}}
-{{- define "llm-d-modelservice.pdServiceAccountName" -}}
+{{- define "llm-d-modelservice.eppServiceAccountName" -}}
 {{ include "llm-d-modelservice.sanitizedModelName" . }}-epp-sa
 {{- end }}
 
