@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "llm-d-modelservice.fullname" . }}-epp
+  labels:
+    {{- include "llm-d-modelservice.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.endpointPicker.autoscaling.enabled }}
+  replicas: {{ .Values.endpointPicker.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "llm-d-modelservice.eppSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "llm-d-modelservice.labels" . | nindent 8 }}
+    spec:
+      {{- with .Values.endpointPicker.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "llm-d-modelservice.eppServiceAccountName" . }}
+      {{- with .Values.endpointPicker.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- range $.Values.endpointPicker.containers }}
+      containers:
+        - name: {{ .name }}
+          {{- with $.Values.endpointPicker.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .image }}"
+          {{- with .imagePullPolicy }}
+          imagePullPolicy: {{ . }}
+          {{- end }}
+          {{- with .command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          args:
+            - poolName
+            - POOLNAME
+            - poolNamespace
+            - {{ $.Release.Namespace }}
+          {{- with .args }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http2
+              containerPort: {{ $.Values.endpointPicker.service.port }}
+              protocol: TCP
+          {{- with .livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- end }} {{/* range $.Values.endpointPicker.containers */}}
+      {{- with .Values.endpointPicker.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.endpointPicker.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.endpointPicker.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.endpointPicker.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

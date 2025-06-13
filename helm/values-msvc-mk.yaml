@@ -1,0 +1,152 @@
+# TODO
+# decoupleScaling: false
+
+lws: false  # If true, creates LWS instead of deployments  
+inferencePool: true 
+inferenceModel: true 
+httpRoute: true 
+
+routing: 
+  # This is the model name for the OpenAI request
+  modelName: facebook/opt-125m
+  ports:
+    servicePort: 8000   # Sidecar listens on this port for requests. If there's no sidecar, the request goes here
+    internalPort: 8200  # Sidecar forwards request to vllm container on this port 
+
+modelArtifacts:
+  # When specfying the URI with `hf` prefix, the <repo-id>/<model-id> string
+  # is extracted and exposed as a template variable that can be used as {{ .HFModelName }}
+  
+  # uri: hf://facebook/opt-125m
+  type: hf                # oneOf ["hf", "oci", "pvc"]
+  artficat: facebook/opt-125m
+  authSecretName: "hf-secret"
+  size: 5Mi 
+
+# describe decode pods
+decode:
+  enableService: false
+  replicas: 1
+  
+  # for LWS
+  parallelism:  
+    tensor: 8
+    data: 16
+    dataLocal: 1 
+  
+  acceleratorTypes:
+    labelKey: nvidia.com/gpu.product
+    labelValues:
+      # According to the blog, Scout requires H100s
+      - NVIDIA-H100
+  # initContainers:
+  containers:
+  - name: "vllm"
+    image: "vllm-ai/vllm:latest"  
+    args:
+      - "HFModelName"
+    env:
+    - name: "VLLM_LOG_LEVEL"
+      value: "DEBUG"  # Set to DEBUG for more detailed logs, or INFO for less verbose logs
+    envFrom:
+      - configMapRef:
+          name: vllm-config
+    resources:
+      requests:
+        cpu: "1"          # Request 1 CPU core
+        memory: "4Gi"    # Request 4 GiB of memory
+      limits:
+        cpu: "2"          # Limit to 2 CPU cores
+        memory: "8Gi"     # Limit to 8 GiB of memory
+    mountModelVolume: true
+
+# describe the prefill pods (looks the same as above)
+prefill:
+  replicas: 1
+  containers:
+    - name: "vllm"
+      args:
+        - "HFModelName"
+    
+endpointPicker:
+  # This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
+  service:
+    # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+    type: ClusterIP
+    # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
+    port: 9002
+    targetPort: 9002
+    appProtocol: http2
+
+  # enableService: true
+
+  autoscaling:
+    enabled: false
+  replicas: 1
+  
+  containers:
+  - name: "epp"
+    image: "ghcr.io/llm-d/llm-d-inference-scheduler:0.0.3"  
+    # command: 
+    args:
+      # - -poolName
+      # - InferencePoolName
+      # - -poolNamespace
+      # - llmd-kalantar
+      - -v
+      - "5"
+      - --zap-encoder
+      - json
+      - -grpcPort
+      - "9002"
+      - -grpcHealthPort
+      - "9003"
+    env:
+      - name: PD_ENABLED
+        value: "true"
+      - name: PD_PROMPT_LEN_THRESHOLD
+        value: "10"
+    ports:
+      - containerPort: 9002
+        protocol: TCP
+      - containerPort: 9003
+        protocol: TCP
+      - containerPort: 9090
+        name: metrics
+        protocol: TCP
+    livenessProbe:
+      failureThreshold: 3
+      grpc:
+        port: 9003
+        service: envoy.service.ext_proc.v3.ExternalProcessor
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    readinessProbe:
+      failureThreshold: 3
+      grpc:
+        port: 9003
+        service: envoy.service.ext_proc.v3.ExternalProcessor
+      initialDelaySeconds: 5
+      periodSeconds: 10
+
+
+
+
+# This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
+  # Annotations to add to the service account
+  annotations: {}
+
+# This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
+eppServiceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
+  # Annotations to add to the service account
+  annotations: {}
+
