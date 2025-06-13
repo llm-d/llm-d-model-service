@@ -42,6 +42,64 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
+{{/* Sanitized model name (DNS compliant) */}}
+{{- define "llm-d-modelservice.sanitizedModelName" -}}
+  {{- $name := .Release.Name | lower | trim -}}
+  {{- $name = regexReplaceAll "[^a-z0-9_.-]" $name "-" -}}
+  {{- $name = regexReplaceAll "^[\\-._]+" $name "" -}}
+  {{- $name = regexReplaceAll "[\\-._]+$" $name "" -}}
+  {{- $name = regexReplaceAll "\\." $name "-" -}}
+
+  {{- if gt (len $name) 63 -}}
+    {{- $name = substr 0 63 $name -}}
+  {{- end -}}
+
+{{- $name -}}
+{{- end }}
+
+{{/* Common P/D labels */}}
+{{- define "llm-d-modelservice.pdlabels" -}}
+llm-d.ai/inferenceServing: "true"
+llm-d.ai/model: {{ (include "llm-d-modelservice.sanitizedModelName" .) -}}
+{{- end }}
+
+{{/* prefill labels */}}
+{{- define "llm-d-modelservice.prefilllabels" -}}
+{{ include "llm-d-modelservice.pdlabels" . }}
+llm-d.ai/role: prefill
+{{- end }}
+
+{{/* decode labels */}}
+{{- define "llm-d-modelservice.decodelabels" -}}
+{{ include "llm-d-modelservice.pdlabels" . }}
+llm-d.ai/role: decode
+{{- end }}
+
+{{/* affinity from acceleratorTypes */}}
+{{- define "llm-d-modelservice.acceleratorTypes" -}}
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+          - key: {{ .labelKey }}
+            operator: In
+            {{- with .labelValues }}
+            values:
+            {{- toYaml . | nindent 14 }}
+            {{- end }}
+{{- end }}
+
+{{/* P/D service account name */}}
+{{- define "llm-d-modelservice.pdServiceAccountName" -}}
+{{ include "llm-d-modelservice.sanitizedModelName" . }}-sa
+{{- end }}
+
+{{/* EPP service account name */}}
+{{- define "llm-d-modelservice.pdServiceAccountName" -}}
+{{ include "llm-d-modelservice.sanitizedModelName" . }}-epp-sa
+{{- end }}
+
 {{/*
 EPP selector labels
 */}}
@@ -49,26 +107,4 @@ EPP selector labels
 app.kubernetes.io/name: {{ include "llm-d-modelservice.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 llm-d.ai/epp: {{ include "llm-d-modelservice.fullname" . }}-epp
-{{- end }}
-
-{{/*
-Create the name of the service account to use
-*/}}
-{{- define "llm-d-modelservice.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- (include "llm-d-modelservice.fullname" .) -}}-sa
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
-{{- end }}
-{{- end }}
-
-{{/*
-Create the name of the EPP service account to use
-*/}}
-{{- define "llm-d-modelservice.eppServiceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- (include "llm-d-modelservice.fullname" .) -}}-epp-sa
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
-{{- end }}
 {{- end }}
