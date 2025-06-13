@@ -35,7 +35,7 @@ Common labels
 */}}
 {{- define "llm-d-modelservice.labels" -}}
 helm.sh/chart: {{ include "llm-d-modelservice.chart" . }}
-{{ include "llm-d-modelservice.selectorLabels" . }}
+{{ include "llm-d-modelservice.eppSelectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -43,11 +43,12 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
-Selector labels
+EPP selector labels
 */}}
-{{- define "llm-d-modelservice.selectorLabels" -}}
+{{- define "llm-d-modelservice.eppSelectorLabels" -}}
 app.kubernetes.io/name: {{ include "llm-d-modelservice.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
+llm-d.ai/epp: {{ include "llm-d-modelservice.fullname" . }}-epp
 {{- end }}
 
 {{/*
@@ -55,7 +56,18 @@ Create the name of the service account to use
 */}}
 {{- define "llm-d-modelservice.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "llm-d-modelservice.fullname" .) .Values.serviceAccount.name }}
+{{- (include "llm-d-modelservice.fullname" .) -}}-sa
+{{- else }}
+{{- default "default" .Values.serviceAccount.name }}
+{{- end }}
+{{- end }}
+
+{{/*
+Create the name of the EPP service account to use
+*/}}
+{{- define "llm-d-modelservice.eppServiceAccountName" -}}
+{{- if .Values.serviceAccount.create }}
+{{- (include "llm-d-modelservice.fullname" .) -}}-epp-sa
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
