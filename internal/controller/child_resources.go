@@ -392,6 +392,21 @@ func sanitizeModelName(msvc *msv1alpha1.ModelService) string {
 	return sanitizedModelName
 }
 
+// pickLoadFormat returns the arg following "--load-format"
+func pickLoadFormat(pd *msv1alpha1.PDSpec) string {
+	if pd == nil {
+		return ""
+	}
+	for _, c := range append(pd.Containers, pd.InitContainers...) {
+		for i := 0; i+1 < len(c.Args); i++ {
+			if c.Args[i] == "--load-format" {
+				return c.Args[i+1]
+			}
+		}
+	}
+	return ""
+}
+
 // mergePDService uses msvc fields to update childResource P/D Service
 func (childResource *BaseConfig) mergePDService(ctx context.Context, msvc *msv1alpha1.ModelService, role string, scheme *runtime.Scheme) *BaseConfig {
 

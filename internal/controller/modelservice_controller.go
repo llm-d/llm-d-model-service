@@ -86,6 +86,7 @@ type TemplateVars struct {
 	DecodeServiceName     string `json:"decodeServiceName,omitempty"`
 	InferencePoolName     string `json:"inferencePoolName,omitempty"`
 	InferenceModelName    string `json:"inferenceModelName,omitempty"`
+	LoadFormat            string `json:"loadFormat,omitempty"`
 }
 
 // from populates the field values for TemplateVars from the model service
@@ -113,6 +114,10 @@ func (t *TemplateVars) from(ctx context.Context, msvc *msv1alpha1.ModelService) 
 	t.InferenceModelName = infModelName(msvc)
 	t.ModelName = msvc.Spec.Routing.ModelName
 	t.SanitizedModelName = sanitizeModelName(msvc)
+	t.LoadFormat = pickLoadFormat(msvc.Spec.Decode)
+	if t.LoadFormat == "" {
+		t.LoadFormat = pickLoadFormat(msvc.Spec.Prefill)
+	}
 
 	if msvc.Spec.ModelArtifacts.AuthSecretName != nil {
 		t.AuthSecretName = *msvc.Spec.ModelArtifacts.AuthSecretName
