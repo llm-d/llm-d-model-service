@@ -111,6 +111,17 @@ initContainers:
     runAsNonRoot: true
 {{- end }}
 
+{{- define "llm-d-modelservice.parallelism" -}}
+{{- $parallelism := dict "tensor" 1 "data" 1 -}}
+{{- if and . .tensor }}
+{{- $parallelism = mergeOverwrite $parallelism (dict "tensor" .tensor) -}}
+{{- end }}
+{{- if and . .data }}
+{{- $parallelism = mergeOverwrite $parallelism (dict "data" .data) -}}
+{{- end }}
+{{- $parallelism | toYaml | nindent 0 }}
+{{- end }}
+
 {{/* P/D service account name */}}
 {{- define "llm-d-modelservice.pdServiceAccountName" -}}
 {{ include "llm-d-modelservice.sanitizedModelName" . }}-sa

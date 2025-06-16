@@ -1,3 +1,4 @@
+{{- $parallelism := (include "llm-d-modelservice.parallelism" .Values.decode.parallelism) | fromYaml -}}
 {{- if .Values.decode }}
 apiVersion: apps/v1
 kind: Deployment
@@ -31,8 +32,8 @@ spec:
       {{- with .Values.decode.containers }}
       containers:
       {{- range . }}
-        - name: {{ .name }}
-          image: {{ .image }}
+        - name: {{ default "vllm" .name }}
+          image: {{ required "image of container is required" .image }}
           {{- with .securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
@@ -75,17 +76,24 @@ spec:
           readinessProbe:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .resources }}
           resources:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+            limits:
+              {{- if and .resources .resources.limits }}
+              {{- omit .resources.limits "nvidia.com/gpu"  | toYaml | nindent 14 }}
+              {{- end }}
+              nvidia.com/gpu: {{ $parallelism.tensor }}
+            requests:
+              {{- if and .resources .resources.limits }}
+              {{- omit .resources.requests "nvidia.com/gpu" | toYaml | nindent 14 }}
+              {{- end }}
+              nvidia.com/gpu: {{ $parallelism.tensor }}
           {{- /* volumeMount */}}
           {{- if or .volumeMounts .mountModelVolume }}
           volumeMounts:
           {{- end -}}
           {{- /* user supplied volume mount in values */}}
           {{- with .volumeMounts }}
-            {{- toYaml . | nindent 14 }}
+            {{- toYaml . | nindent 12 }}
           {{- end }}
           {{- /* what we add if mounModelVolume is true */}}
           {{- if .mountModelVolume }}
