@@ -78,6 +78,7 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
+          protocol: TCP
           resources: {}
           restartPolicy: Always
           securityContext:
@@ -94,6 +95,12 @@ spec:
         env:
           - name: HF_HOME
             value: /model-cache
+        resources:
+          limits:
+            nvidia.com/gpu: "1"
+          requests:
+            nvidia.com/gpu: "1"
+        
         volumeMounts:
           - name: model-storage
             mountPath: /model-cache
@@ -188,6 +195,24 @@ spec:
           protocol: TCP
       serviceAccount: facebook-sim-test-llm-d-modelservice-epp-sa
       serviceAccountName: facebook-sim-test-llm-d-modelservice-epp-sa
+      readinessProbe:
+        grpc:
+          port: 9003
+          service: envoy.service.ext_proc.v3.ExternalProcessor
+        initialDelaySeconds: 5
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
+      livenessProbe:
+        grpc:
+          port: 9003
+          service: envoy.service.ext_proc.v3.ExternalProcessor
+        initialDelaySeconds: 5
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
 ---
 # Source: llm-d-modelservice/templates/prefill-deployment.yaml
 apiVersion: apps/v1
@@ -224,6 +249,12 @@ spec:
         env:
           - name: HF_HOME
             value: /model-cache
+        resources:
+          limits:
+            nvidia.com/gpu: "1"
+          requests:
+            nvidia.com/gpu: "1"
+        
         volumeMounts:
           - name: model-storage
             mountPath: /model-cache
