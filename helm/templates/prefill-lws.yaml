@@ -1,36 +1,36 @@
-{{- if .Values.decode }}
-{{- $parallelism := (include "llm-d-modelservice.parallelism" .Values.decode.parallelism) | fromYaml -}}
+{{- if .Values.prefill }}
+{{- $parallelism := (include "llm-d-modelservice.parallelism" .Values.prefill.parallelism) | fromYaml -}}
 {{- if and $parallelism.data (gt (int $parallelism.data) 1) }}
 apiVersion: leaderworkerset.x-k8s.io/v1
 kind: LeaderWorkerSet
 metadata:
-  name: {{ include "llm-d-modelservice.fullname" . }}-decode
+  name: {{ include "llm-d-modelservice.fullname" . }}-prefill
   labels:
     {{- include "llm-d-modelservice.labels" . | nindent 4 }}
-    {{- include "llm-d-modelservice.decodelabels" . | nindent 4 }}
+    {{- include "llm-d-modelservice.prefilllabels" . | nindent 4 }}
 spec:
-  {{- if not .Values.decode.autoscaling.enabled }}
-  replicas: {{ default 1 .Values.decode.replicas }}
+  {{- if not .Values.prefill.autoscaling.enabled }}
+  replicas: {{ default 1 .Values.prefill.replicas }}
   {{- end }}
   leaderWorkerTemplate:
-    size: {{ .Values.decode.parallelism.data }}
+    size: {{ .Values.prefill.parallelism.data }}
     leaderTemplate:
       metadata:
         labels:
-          {{- include "llm-d-modelservice.decodelabels" . | nindent 10 }}
+          {{- include "llm-d-modelservice.prefilllabels" . | nindent 10 }}
       spec:
         {{- with .Values.routing }}
         {{ (include "llm-d-modelservice.routingProxy" .) | nindent 8 }}
         {{- end }}
         {{- (include "llm-d-modelservice.modelPod" .) | nindent 6 }}
-        {{- with .Values.decode.containers }}
+        {{- with .Values.prefill.containers }}
         containers:
           {{- range . }}
           {{- (include "llm-d-modelservice.container" (dict "container" . "authSecretName" $.Values.modelArtifacts.authSecretName "parallelism" $parallelism)) | nindent 10 }}
           {{- end }}
         {{- end }}
       volumes:
-      {{- with .Values.decode.volumes }}
+      {{- with .Values.prefill.volumes }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
       {{- include "llm-d-modelservice.mountModelVolumeVolumes" . | nindent 10 }} 
@@ -38,16 +38,16 @@ spec:
     workerTemplate:
       metadata:
         labels:
-          {{- include "llm-d-modelservice.decodelabels" . | nindent 10 }}
+          {{- include "llm-d-modelservice.prefilllabels" . | nindent 10 }}
       spec:
-        {{- with .Values.decode.containers }}
+        {{- with .Values.prefill.containers }}
         containers:
           {{- range . }}
           {{- (include "llm-d-modelservice.container" (dict "container" . "authSecretName" $.Values.modelArtifacts.authSecretName "parallelism" $parallelism)) | nindent 10 }}
           {{- end }}
         {{- end }}
       volumes:
-      {{- with .Values.decode.volumes }}
+      {{- with .Values.prefill.volumes }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
       {{- include "llm-d-modelservice.mountModelVolumeVolumes" . | nindent 10 }} 

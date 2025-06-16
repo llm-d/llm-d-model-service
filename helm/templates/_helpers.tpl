@@ -201,3 +201,88 @@ volumeMounts:
     mountPath: /model-cache
 {{- end }}
 {{- end }}
+
+{{- define "llm-d-modelservice.modelPod" -}}
+  {{- with .Values.decode.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 2 }}
+  {{- end }}
+  serviceAccountName: {{ include "llm-d-modelservice.pdServiceAccountName" . }}
+  {{- with .Values.podSecurityContext }}
+  securityContext:
+    {{- toYaml . | nindent 2 }}
+  {{- end }}
+  {{- with .Values.decode.acceleratorTypes }}
+  {{- include "llm-d-modelservice.acceleratorTypes" . | nindent 2 }}
+  {{- end }}
+{{- end }} {{- /* define "llm-d-modelservice.modelPod" */}}
+
+{{- define "llm-d-modelservice.container" -}}
+- name: {{ default "vllm" .container.name }}
+  image: {{ required "image of container is required" .container.image }}
+  {{- with .container.securityContext }}
+  securityContext:
+    {{- toYaml . | nindent 2 }}
+  {{- end }}
+  {{- with .container.imagePullPolicy }}
+  imagePullPolicy: {{ . }}
+  {{- end }}
+  {{- with .container.command }}
+  command:
+    {{- toYaml . | nindent 2 }}
+  {{- end }}
+  {{- with .container.args }}
+  args:
+    {{- toYaml . | nindent 2 }}
+  {{- end }}
+  {{- /* insert user's env for this container */}}
+  {{- if or .container.env .container.mountModelVolume}}
+  env:
+  {{- end }}
+  {{- with .container.env }}
+    {{- toYaml . | nindent 2 }}
+  {{- end }}
+  {{- /* insert envs based on what modelArtifact prefix */}}
+  {{- if .container.mountModelVolume }}
+  - name: HF_HOME
+    value: /model-cache
+  {{- with .authSecretName }}
+  - name: HF_TOKEN
+    valueFrom:
+    secretKeyRef:
+      name: {{ . }}
+      key: HF_TOKEN
+  {{- end }}
+  {{- end }}
+  {{- with .container.livenessProbe }}
+  livenessProbe:
+    {{- toYaml . | nindent 2 }}
+  {{- end }}
+  {{- with .container.readinessProbe }}
+  readinessProbe:
+    {{- toYaml . | nindent 2 }}
+  {{- end }}
+  {{- (include "llm-d-modelservice.resources" (dict "resources" .resources "parallelism" .parallelism)) | nindent 2 }}
+  {{- /* volumeMount */}}
+  {{- if or .container.volumeMounts .container.mountModelVolume }}
+  volumeMounts:
+  {{- end -}}
+  {{- /* user supplied volume mount in values */}}
+  {{- with .container.volumeMounts }}
+    {{- toYaml . | nindent 2 }}
+  {{- end }}
+  {{- /* what we add if mounModelVolume is true */}}
+  {{- if .container.mountModelVolume }}
+  - name: model-storage
+    mountPath: /model-cache
+  {{- end }}
+  {{- with .container.workingDir }}
+  workingDir: {{ . }}
+  {{- end }}
+  {{- with .container.stdin }}
+  stdin: {{ . }}
+  {{- end }}
+  {{- with .container.tty }}
+  tty: {{ . }}
+  {{- end }}
+{{- end }} {{- /* define "llm-d-modelservice.container" */}}
