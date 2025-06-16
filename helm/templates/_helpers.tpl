@@ -121,6 +121,28 @@ initContainers:
 {{- $parallelism | toYaml | nindent 0 }}
 {{- end }}
 
+{{- define "llm-d-modelservice.resources" -}}
+resources:
+  limits:
+    {{- $limits := dict -}}
+    {{- if and .resources .resources.limits -}}
+    {{- $limits = omit .resources.limits "nvidia.com/gpu" }}
+    {{- if gt (len $limits) 0 }}
+    {{- toYaml $limits | nindent 4 }}
+    {{- end }}
+    {{- end }}
+    nvidia.com/gpu: {{ .parallelism.tensor }}
+  requests:
+    {{- $requests := dict -}}
+    {{- if and .resources .resources.requests -}}
+    {{- $requests = omit .resources.requests "nvidia.com/gpu" }}
+    {{- end }}
+    {{- if gt (len $requests) 0 }}
+    {{- toYaml $requests | nindent 4 }}
+    {{- end }}
+    nvidia.com/gpu: {{ .parallelism.tensor }}
+{{- end }}
+
 {{/* P/D service account name */}}
 {{- define "llm-d-modelservice.pdServiceAccountName" -}}
 {{ include "llm-d-modelservice.sanitizedModelName" . }}-sa
