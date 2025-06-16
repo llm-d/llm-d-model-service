@@ -1,19 +1,19 @@
 apiVersion: apps/v1 
 kind: Deployment 
 metadata: 
-  name: {{ .Values.modelServiceName }}-epp
+  name: {{ include "llm-d-modelservice.fullname" . }}-epp
   labels: 
-    llm-d.ai/epp: {{ .Values.modelServiceName }}-epp
+    llm-d.ai/epp: {{ include "llm-d-modelservice.fullname" . }}-epp
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      llm-d.ai/epp: {{ .Values.modelServiceName }}-epp
+      llm-d.ai/epp: {{ include "llm-d-modelservice.fullname" . }}-epp
   template:
     metadata:
       labels:
-        llm-d.ai/epp: {{ .Values.modelServiceName }}-epp
+        llm-d.ai/epp: {{ include "llm-d-modelservice.fullname" . }}-epp
     spec:
       containers:
       - name: epp 
@@ -23,10 +23,9 @@ spec:
         {{- else }}
         image: ghcr.io/llm-d/llm-d-inference-scheduler:0.0.3
         {{- end }}
-        imagePullPolicy: Always
         args:
         - --poolName
-        - {{ .Values.modelServiceName }}-inference-pool
+        - {{ include "llm-d-modelservice.fullname" . }}-inference-pool
         - --poolNamespace
         - {{ .Release.Namespace }}
         - -v
@@ -86,8 +85,8 @@ spec:
         - containerPort: 9090
           name: metrics
           protocol: TCP
-      serviceAccount: {{ .Values.modelServiceName }}-sa
-      serviceAccountName: {{ .Values.modelServiceName }}-sa
+      serviceAccount: {{ include "llm-d-modelservice.eppServiceAccountName" . }}
+      serviceAccountName: {{ include "llm-d-modelservice.eppServiceAccountName" . }}
       readinessProbe:
         grpc:
           port: 9003

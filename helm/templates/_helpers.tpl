@@ -140,3 +140,43 @@ app.kubernetes.io/name: {{ include "llm-d-modelservice.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 llm-d.ai/epp: {{ include "llm-d-modelservice.fullname" . }}-epp
 {{- end }}
+
+{{/*
+Volumes for PD containers based on model artifact prefix
+*/}}
+{{- define "llm-d-modelservice.mountModelVolumeVolumes" -}}
+{{- if eq .Values.modelArtifacts.prefix "hf" }}
+- name: model-storage
+  emptyDir: 
+    sizeLimit: {{ default "0" .Values.modelArtifacts.size }}
+{{- else if eq .Values.modelArtifacts.prefix "pvc" }}
+- name: model-storage
+  persistentVolumeClaim:
+    claimName: {{ .Values.modelArtifacts.artifact }}
+    readOnly: true
+{{- else if eq .Values.modelArtifacts.prefix "oci" }}
+- name: model-storage
+  image:
+    reference: {{ .Values.modelArtifacts.artifact }}
+    pullPolicy: {{ default "Always" .Values.modelArtifacts.imagePullPolicy }}
+{{- end }}
+{{- end }}
+
+{{/*
+VolumeMount for a PD container
+Supplies model-storage mount if mountModelVolume: true for the container
+*/}}
+{{- define "llm-d-modelservice.mountModelVolumeVolumeMounts" -}}
+{{- if or .volumeMounts .mountModelVolume }}
+volumeMounts:
+{{- end }}
+{{- /* user supplied volume mount in values */}}
+{{- with .volumeMounts }}
+  {{- toYaml . | nindent 8 }}
+{{- end }}
+{{- /* what we add if mounModelVolume is true */}}
+{{- if .mountModelVolume }}
+  - name: model-storage
+    mountPath: /model-cache
+{{- end }}
+{{- end }}

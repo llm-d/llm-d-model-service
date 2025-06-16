@@ -7,7 +7,7 @@ metadata:
   labels:
     {{- include "llm-d-modelservice.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.decode.replicas }}
+  replicas: {{ default 1 .Values.decode.replicas }}
   selector:
     matchLabels:
       {{- include "llm-d-modelservice.decodelabels" . | nindent 6 }}
@@ -81,46 +81,19 @@ spec:
               {{- if and .resources .resources.limits }}
               {{- omit .resources.limits "nvidia.com/gpu"  | toYaml | nindent 14 }}
               {{- end }}
-              nvidia.com/gpu: {{ $parallelism.tensor }}
+              nvidia.com/gpu: "{{ $parallelism.tensor }}"
             requests:
               {{- if and .resources .resources.limits }}
               {{- omit .resources.requests "nvidia.com/gpu" | toYaml | nindent 14 }}
               {{- end }}
-              nvidia.com/gpu: {{ $parallelism.tensor }}
+              nvidia.com/gpu: "{{ $parallelism.tensor }}"
           {{- /* volumeMount */}}
-          {{- if or .volumeMounts .mountModelVolume }}
-          volumeMounts:
-          {{- end -}}
-          {{- /* user supplied volume mount in values */}}
-          {{- with .volumeMounts }}
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- /* what we add if mounModelVolume is true */}}
-          {{- if .mountModelVolume }}
-            - name: model-storage
-              mountPath: /model-cache
-          {{- end }}
+          {{- include "llm-d-modelservice.mountModelVolumeVolumeMounts" . | nindent 10 }}
         {{- end }}
       {{- end }}
       volumes:
       {{- with .Values.decode.volumes }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- if eq .Values.modelArtifacts.prefix "hf" }}
-        - name: model-storage
-          emptyDir: 
-            sizeLimit: {{ default "0" .Values.modelArtifacts.size }}
-      {{- else if eq .Values.modelArtifacts.prefix "pvc" }}
-        - name: model-storage
-          persistentVolumeClaim:
-            claimName: {{ .Values.modelArtifacts.artifact }}
-            readOnly: true
-      {{- else if eq .Values.modelArtifacts.prefix "oci" }}
-        - name: model-storage
-          image:
-            reference: {{ .Values.modelArtifacts.artifact }}
-            {{- with .Values.modelArtifacts.imagePullPolicy }} 
-            pullPolicy: {{ . }}
-            {{- end }}
-      {{- end }}
+      {{- end -}}
+      {{- include "llm-d-modelservice.mountModelVolumeVolumes" . | nindent 8 }}
 {{- end }}

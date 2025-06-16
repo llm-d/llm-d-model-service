@@ -2,15 +2,14 @@
 apiVersion: inference.networking.x-k8s.io/v1alpha2
 kind: InferenceModel
 metadata:
-  labels:
-    llm-d.ai/inferenceServing: "true"
-    llm-d.ai/model: {{ .Values.modelServiceName }}
-  name: {{ .Values.modelServiceName }}
+  name: {{ include "llm-d-modelservice.fullname" . }}-inference-model
   namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "llm-d-modelservice.pdlabels" . | nindent 4 }}
 spec:
-  modelName: ibm-granite/granite-3.3-2b-base
+  modelName: {{ .Values.routing.modelName }}
   poolRef:
     group: inference.networking.x-k8s.io
     kind: InferencePool
-    name: {{ .Values.modelServiceName }}-inference-pool
+    name: {{ include "llm-d-modelservice.fullname" . }}-inference-pool
 {{- end }}

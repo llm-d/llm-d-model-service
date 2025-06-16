@@ -6,7 +6,7 @@ metadata:
     {{- include "llm-d-modelservice.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.endpointPicker.autoscaling.enabled }}
-  replicas: {{ .Values.endpointPicker.replicaCount }}
+  replicas: {{ default 1 .Values.decode.replicas }}
   {{- end }}
   selector:
     matchLabels:

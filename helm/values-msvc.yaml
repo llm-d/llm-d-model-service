@@ -32,7 +32,7 @@ decode:
   # for LWS
   parallelism:  
     tensor: 8
-    data: 16
+    data: 1
     dataLocal: 1 
   
   acceleratorTypes:
@@ -59,30 +59,32 @@ decode:
       limits:
         cpu: "2"          # Limit to 2 CPU cores
         memory: "8Gi"     # Limit to 8 GiB of memory
-    mountModelVolume: false 
+    mountModelVolume: true 
 
-# # describe the prefill pods (looks the same as above)
-# prefill:
-#   replicas: 1
-#   containers:
-#     - name: "vllm"
-#       image: "vllm-ai/vllm:latest"  
-#       args:
-#         - "HFModelName"
-#       env: 
-#         - name: ok 
-#           value: ok 
-#       mountModelVolume: true
-#     - name: "v2"
-#       image: "vllm-ai/vllm:latest"  
-#       volumeMounts: 
-#         - name: whatever 
-#           mountPath: something 
-          
-#   volumes: 
-#     - name: ok 
-#       emptyDir:
-#         sizeLimit: 5Gi 
+# describe the prefill pods (looks the same as above)
+prefill:
+  replicas: 1
+  containers:
+    - name: "vllm"
+      image: "vllm-ai/vllm:latest"  
+      args:
+        - "HFModelName"
+      env: 
+        - name: ok 
+          value: ok 
+      mountModelVolume: true
+    - name: "v2"
+      image: "vllm-ai/vllm:latest"  
+      volumeMounts: 
+        - name: whatever 
+          mountPath: something 
+  volumes: 
+    - name: ok 
+      emptyDir:
+        sizeLimit: 5Gi 
+    - name: ok2
+      emptyDir:
+        sizeLimit: 5Gi 
     
 endpointPicker:
   # This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
