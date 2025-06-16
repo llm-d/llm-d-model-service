@@ -50,7 +50,7 @@ spec:
     - group: inference.networking.x-k8s.io
       kind: InferencePool
       name: {{ include "llm-d-modelservice.fullname" . }}-inference-pool
-      port: {{ .Values.routing.ports.servicePort  }}
+      port: {{ .Values.routing.servicePort  }}
       weight: 1
     matches:
     - headers:

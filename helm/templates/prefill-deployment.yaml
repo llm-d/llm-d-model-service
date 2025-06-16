@@ -81,19 +81,25 @@ spec:
         readinessProbe:
           {{- toYaml . | nindent 10 }}
         {{- end }}
-        {{- with .resources }}
         resources:
           limits:
-            {{- if .limits -}}
-            {{- omit .limits "nvidia.com/gpu"  | toYaml | nindent 12 }}
+            {{- $limits := dict -}}
+            {{- if and .resources .resources.limits -}}
+            {{- $limits = omit .resources.limits "nvidia.com/gpu" }}
+            {{- if gt (len $limits) 0 }}
+            {{- toYaml $limits | nindent 12 }}
             {{- end }}
-            {{- /* nvidia.com/gpu: "{{ $parallelism.tensor }}" */}}
+            {{- end }}
+            nvidia.com/gpu: {{ $parallelism.tensor }}
           requests:
-            {{- if .limits -}}
-            {{- omit .requests "nvidia.com/gpu" | toYaml | nindent 12 }}
+            {{- $requests := dict -}}
+            {{- if and .resources .resources.requests -}}
+            {{- $requests = omit .resources.requests "nvidia.com/gpu" }}
             {{- end }}
-            {{- /* nvidia.com/gpu: "{{ $parallelism.tensor }}" */}}
-        {{- end }}
+            {{- if gt (len $requests) 0 }}
+            {{- toYaml $requests | nindent 12 }}
+            {{- end }}
+            nvidia.com/gpu: {{ $parallelism.tensor }}
         {{- /* volumeMount */}}
         {{- include "llm-d-modelservice.mountModelVolumeVolumeMounts" . | nindent 8 }}
         {{- end }}

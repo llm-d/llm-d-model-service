@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: facebook-epp-sa
+  name: facebook-llm-d-modelservice-epp-sa
   labels:
     helm.sh/chart: llm-d-modelservice-0.0.1
     app.kubernetes.io/version: "0.0.1"
@@ -14,7 +14,7 @@ automountServiceAccountToken: true
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: facebook-sa
+  name: facebook-llm-d-modelservice-sa
   labels:
     helm.sh/chart: llm-d-modelservice-0.0.1
     app.kubernetes.io/version: "0.0.1"
@@ -65,21 +65,23 @@ spec:
         llm-d.ai/model: facebook
         llm-d.ai/role: decode
     spec:
-      serviceAccountName: facebook-sa
+      serviceAccountName: facebook-llm-d-modelservice-sa
+        
       initContainers:
-      - args:
-        - --port=8000
-        - --vllm-port=8200
-        - --connector=nixlv2
-        - -v=6
-        image: ghcr.io/llm-d/llm-d-routing-sidecar:0.0.6
-        imagePullPolicy: Always
-        name: routing-proxy
-        ports:
-        - containerPort: 8000
+        - name: routing-proxy
+          args:
+            - --port=8000
+            - --vllm-port=8200
+            - --connector=nixlv2
+            - -v=5
+          image: 
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
           protocol: TCP
-        restartPolicy: Always
-        securityContext:
+          resources: {}
+          restartPolicy: Always
+          securityContext:
           allowPrivilegeEscalation: false
           runAsNonRoot: true
       containers:
@@ -113,10 +115,11 @@ spec:
             value: /model-cache
         resources:
           limits:
-            {}
+            nvidia.com/gpu: 1
           requests:
             cpu: "16"
             memory: 16Gi
+            nvidia.com/gpu: 1
         
         volumeMounts:
           - name: model-storage
@@ -149,7 +152,7 @@ spec:
         app.kubernetes.io/version: "0.0.1"
         app.kubernetes.io/managed-by: Helm
     spec:
-      serviceAccountName: facebook-epp-sa
+      serviceAccountName: facebook-llm-d-modelservice-epp-sa
 ---
 # Source: llm-d-modelservice/templates/epp-deployment.yaml
 apiVersion: apps/v1 
@@ -235,8 +238,8 @@ spec:
         - containerPort: 9090
           name: metrics
           protocol: TCP
-      serviceAccount: facebook-epp-sa
-      serviceAccountName: facebook-epp-sa
+      serviceAccount: facebook-llm-d-modelservice-epp-sa
+      serviceAccountName: facebook-llm-d-modelservice-epp-sa
       readinessProbe:
         grpc:
           port: 9003
@@ -279,7 +282,7 @@ spec:
         llm-d.ai/model: facebook
         llm-d.ai/role: prefill
     spec:
-      serviceAccountName: facebook-sa
+      serviceAccountName: facebook-llm-d-modelservice-sa
       containers:
       - name: vllm
         image: ghcr.io/llm-d/llm-d:0.0.8
@@ -307,10 +310,11 @@ spec:
             value: DEBUG
         resources:
           limits:
-            {}
+            nvidia.com/gpu: 1
           requests:
             cpu: "16"
             memory: 16Gi
+            nvidia.com/gpu: 1
         
       volumes:
         - name: model-storage
