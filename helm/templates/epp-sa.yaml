@@ -9,5 +9,5 @@ metadata:
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-automountServiceAccountToken: {{ .Values.eppServiceAccount.automount }}
+automountServiceAccountToken: {{ default true .Values.eppServiceAccount.automount }}
 {{- end }}

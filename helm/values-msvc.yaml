@@ -14,6 +14,10 @@ routing:
     internalPort: 8200  # Sidecar forwards request to vllm container on this port 
     proxy:
       targetPort: 8000
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: inference-gateway-kgateway
 
 modelArtifacts:
   # When specfying the URI with `hf` prefix, the <repo-id>/<model-id> string
@@ -25,41 +29,41 @@ modelArtifacts:
   imagePullPolicy: IfNotPresent
 
 # describe decode pods
-decode:
-  enableService: false
-  replicas: 1
+# decode:
+#   enableService: false
+#   replicas: 1
   
-  # for LWS
-  parallelism:  
-    tensor: 8
-    data: 1
-    dataLocal: 1 
+#   # for LWS
+#   parallelism:  
+#     tensor: 8
+#     data: 1
+#     dataLocal: 1 
   
-  acceleratorTypes:
-    labelKey: nvidia.com/gpu.product
-    labelValues:
-      # According to the blog, Scout requires H100s
-      - NVIDIA-H100
-  # initContainers:
-  containers:
-  - name: "vllm"
-    image: "vllm-ai/vllm:latest"  
-    args:
-      - "HFModelName"
-    env:
-    - name: "VLLM_LOG_LEVEL"
-      value: "DEBUG"  # Set to DEBUG for more detailed logs, or INFO for less verbose logs
-    envFrom:
-      - configMapRef:
-          name: vllm-config
-    resources:
-      requests:
-        cpu: "1"          # Request 1 CPU core
-        memory: "4Gi"    # Request 4 GiB of memory
-      limits:
-        cpu: "2"          # Limit to 2 CPU cores
-        memory: "8Gi"     # Limit to 8 GiB of memory
-    mountModelVolume: true 
+#   acceleratorTypes:
+#     labelKey: nvidia.com/gpu.product
+#     labelValues:
+#       # According to the blog, Scout requires H100s
+#       - NVIDIA-H100
+#   # initContainers:
+#   containers:
+#   - name: "vllm"
+#     image: "vllm-ai/vllm:latest"  
+#     args:
+#       - "HFModelName"
+#     env:
+#     - name: "VLLM_LOG_LEVEL"
+#       value: "DEBUG"  # Set to DEBUG for more detailed logs, or INFO for less verbose logs
+#     envFrom:
+#       - configMapRef:
+#           name: vllm-config
+#     resources:
+#       requests:
+#         cpu: "1"          # Request 1 CPU core
+#         memory: "4Gi"    # Request 4 GiB of memory
+#       limits:
+#         cpu: "2"          # Limit to 2 CPU cores
+#         memory: "8Gi"     # Limit to 8 GiB of memory
+#     mountModelVolume: true 
 
 # describe the prefill pods (looks the same as above)
 prefill:

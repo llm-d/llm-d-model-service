@@ -1,4 +1,4 @@
-{{- $parallelism := (include "llm-d-modelservice.parallelism" .Values.decode.parallelism) | fromYaml -}}
+{{- $parallelism := (include "llm-d-modelservice.parallelism" .Values.prefill.parallelism) | fromYaml -}}
 {{- if .Values.prefill }}
 apiVersion: apps/v1
 kind: Deployment
@@ -28,75 +28,79 @@ spec:
       {{- with .Values.prefill.acceleratorTypes }}
       {{- include "llm-d-modelservice.acceleratorTypes" . | nindent 6 }}
       {{- end }}
+      {{- /* initContainers */}}
+      {{- with .Values.prefill.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 6 }}
+      {{- end }}     
       {{- /* range $.Values.prefill.containers */}}
       {{- with .Values.prefill.containers }}
       containers:
       {{- range . }}
-        - name: {{ .name }}
-          image: {{ .image }}
-          {{- with .securityContext }}
-          securityContext:
-            {{- toYaml . | nindent 12 }}
+      - name: {{ default "vllm" .name }}
+        image: {{ required "image of container is required" .image }}
+        {{- with .securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .imagePullPolicy }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
+        {{- with .command }}
+        command:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .args }}
+        args:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- /* insert user's env for this container */}}
+        {{- if or .env .mountModelVolume }}
+        env:
+        {{- end }}
+        {{- with .env }}
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- /* insert envs based on what modelArtifact prefix */}}
+        {{- if .mountModelVolume }}
+          - name: HF_HOME
+            value: /model-cache
+          {{- with $.Values.modelArtifacts.authSecretName }}
+          - name: HF_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: {{ . }}
+                key: HF_TOKEN
           {{- end }}
-          {{- with .imagePullPolicy }}
-          imagePullPolicy: {{ . }}
-          {{- end }}
-          {{- with .command }}
-          command:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- with .args }}
-          args:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- /* insert user's env for this container */}}
-          {{- if or .env .mountModelVolume}}
-          env:
-          {{- end }}
-          {{- with .env }}
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- /* insert envs based on what modelArtifact prefix */}}
-          {{- if .mountModelVolume }}
-            - name: HF_HOME
-              value: /model-cache
-            {{- with $.Values.modelArtifacts.authSecretName }}
-            - name: HF_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ . }}
-                  key: HF_TOKEN
+        {{- end }}
+        {{- with .livenessProbe }}
+        livenessProbe:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .readinessProbe }}
+        readinessProbe:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .resources }}
+        resources:
+          limits:
+            {{- if .limits -}}
+            {{- omit .limits "nvidia.com/gpu"  | toYaml | nindent 12 }}
             {{- end }}
-          {{- end }}
-          {{- with .livenessProbe }}
-          livenessProbe:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- with .readinessProbe }}
-          readinessProbe:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- with .resources }}
-          resources:
-            limits:
-              {{- if and .resources .resources.limits }}
-              {{- omit .resources.limits "nvidia.com/gpu"  | toYaml | nindent 14 }}
-              {{- end }}
-              nvidia.com/gpu: "{{ $parallelism.tensor }}"
-            requests:
-              {{- if and .resources .resources.limits }}
-              {{- omit .resources.requests "nvidia.com/gpu" | toYaml | nindent 14 }}
-              {{- end }}
-              nvidia.com/gpu: "{{ $parallelism.tensor }}"
-          {{- end }}
-          {{- /* volumeMount */}}
-          {{- include "llm-d-modelservice.mountModelVolumeVolumeMounts" . | nindent 10 }}
+            {{- /* nvidia.com/gpu: "{{ $parallelism.tensor }}" */}}
+          requests:
+            {{- if .limits -}}
+            {{- omit .requests "nvidia.com/gpu" | toYaml | nindent 12 }}
+            {{- end }}
+            {{- /* nvidia.com/gpu: "{{ $parallelism.tensor }}" */}}
+        {{- end }}
+        {{- /* volumeMount */}}
+        {{- include "llm-d-modelservice.mountModelVolumeVolumeMounts" . | nindent 8 }}
         {{- end }}
       {{- end }}
-      {{- /* insert volumes for this deployment */}}
       volumes:
       {{- with .Values.prefill.volumes }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- include "llm-d-modelservice.mountModelVolumeVolumes" . | nindent 8 }}
+      {{- end -}}
+      {{- include "llm-d-modelservice.mountModelVolumeVolumes" . | nindent 8 }} 
 {{- end }}

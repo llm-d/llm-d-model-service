@@ -35,7 +35,6 @@ Common labels
 */}}
 {{- define "llm-d-modelservice.labels" -}}
 helm.sh/chart: {{ include "llm-d-modelservice.chart" . }}
-{{ include "llm-d-modelservice.eppSelectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -145,7 +144,7 @@ llm-d.ai/epp: {{ include "llm-d-modelservice.fullname" . }}-epp
 Volumes for PD containers based on model artifact prefix
 */}}
 {{- define "llm-d-modelservice.mountModelVolumeVolumes" -}}
-{{- if eq .Values.modelArtifacts.prefix "hf" }}
+{{- if eq .Values.modelArtifacts.prefix "hf" -}}
 - name: model-storage
   emptyDir: 
     sizeLimit: {{ default "0" .Values.modelArtifacts.size }}

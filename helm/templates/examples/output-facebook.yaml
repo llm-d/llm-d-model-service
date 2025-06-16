@@ -1,0 +1,382 @@
+---
+# Source: llm-d-modelservice/templates/epp-sa.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: facebook-epp-sa
+  labels:
+    helm.sh/chart: llm-d-modelservice-0.0.1
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: llm-d-modelservice/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: facebook-sa
+  labels:
+    helm.sh/chart: llm-d-modelservice-0.0.1
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: llm-d-modelservice/templates/epp-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: facebook-llm-d-modelservice-epp
+  labels:
+    helm.sh/chart: llm-d-modelservice-0.0.1
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9002
+      targetPort: 9002
+      protocol: TCP
+      appProtocol: http2
+  selector:
+    app.kubernetes.io/name: llm-d-modelservice
+    app.kubernetes.io/instance: facebook
+    llm-d.ai/epp: facebook-llm-d-modelservice-epp
+---
+# Source: llm-d-modelservice/templates/decode-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: facebook-llm-d-modelservice-decode
+  labels:
+    helm.sh/chart: llm-d-modelservice-0.0.1
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      llm-d.ai/inferenceServing: "true"
+      llm-d.ai/model: facebook
+      llm-d.ai/role: decode
+  template:
+    metadata:
+      labels:
+        llm-d.ai/inferenceServing: "true"
+        llm-d.ai/model: facebook
+        llm-d.ai/role: decode
+    spec:
+      serviceAccountName: facebook-sa
+      initContainers:
+      - args:
+        - --port=8000
+        - --vllm-port=8200
+        - --connector=nixlv2
+        - -v=6
+        image: ghcr.io/llm-d/llm-d-routing-sidecar:0.0.6
+        imagePullPolicy: Always
+        name: routing-proxy
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+        restartPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+      containers:
+      - name: vllm
+        image: ghcr.io/llm-d/llm-d:0.0.8
+        command:
+          - vllm
+          - serve
+        args:
+          - --port
+          - "8200"
+          - --enforce-eager
+          - --kv-transfer-config
+          - '{"kv_connector":"NixlConnector", "kv_role":"kv_both"}'
+        env:
+          - name: CUDA_VISIBLE_DEVICES
+            value: "0"
+          - name: UCX_TLS
+            value: cuda_ipc,cuda_copy,tcp
+          - name: HF_HOME
+            value: /model-cache
+          - name: VLLM_NIXL_SIDE_CHANNEL_HOST
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          - name: VLLM_NIXL_SIDE_CHANNEL_PORT
+            value: "5557"
+          - name: VLLM_LOGGING_LEVEL
+            value: DEBUG
+          - name: HF_HOME
+            value: /model-cache
+        resources:
+          limits:
+            {}
+          requests:
+            cpu: "16"
+            memory: 16Gi
+        
+        volumeMounts:
+          - name: model-storage
+            mountPath: /model-cache
+      volumes:
+        - name: model-storage
+          emptyDir: 
+            sizeLimit: 5Mi
+---
+# Source: llm-d-modelservice/templates/epp-deployment-mk.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: facebook-llm-d-modelservice-epp
+  labels:
+    helm.sh/chart: llm-d-modelservice-0.0.1
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: llm-d-modelservice
+      app.kubernetes.io/instance: facebook
+      llm-d.ai/epp: facebook-llm-d-modelservice-epp
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: llm-d-modelservice-0.0.1
+        app.kubernetes.io/version: "0.0.1"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      serviceAccountName: facebook-epp-sa
+---
+# Source: llm-d-modelservice/templates/epp-deployment.yaml
+apiVersion: apps/v1 
+kind: Deployment 
+metadata: 
+  name: facebook-llm-d-modelservice-epp
+  labels: 
+    llm-d.ai/epp: facebook-llm-d-modelservice-epp
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      llm-d.ai/epp: facebook-llm-d-modelservice-epp
+  template:
+    metadata:
+      labels:
+        llm-d.ai/epp: facebook-llm-d-modelservice-epp
+    spec:
+      containers:
+      - name: epp 
+        imagePullPolicy: Always 
+        image: ghcr.io/llm-d/llm-d-inference-scheduler:0.0.3
+        args:
+        - --poolName
+        - facebook-llm-d-modelservice-inference-pool
+        - --poolNamespace
+        - default
+        - -v
+        - "4"
+        - --zap-encoder
+        - json
+        - --grpcPort
+        - "9002"
+        - --grpcHealthPort
+        - "9003"
+        env:
+        - name: ENABLE_KVCACHE_AWARE_SCORER
+          value: "false"
+        - name: ENABLE_LOAD_AWARE_SCORER
+          value: "true"
+        - name: ENABLE_PREFIX_AWARE_SCORER
+          value: "true"
+        - name: ENABLE_SESSION_AWARE_SCORER
+          value: "false"
+        - name: KVCACHE_AWARE_SCORER_WEIGHT
+          value: "1"
+        - name: KVCACHE_INDEXER_REDIS_ADDR
+        - name: LOAD_AWARE_SCORER_WEIGHT
+          value: "1"
+        - name: PD_ENABLED
+          value: "false"
+        - name: PD_PROMPT_LEN_THRESHOLD
+          value: "10"
+        - name: PREFILL_ENABLE_KVCACHE_AWARE_SCORER
+          value: "false"
+        - name: PREFILL_ENABLE_LOAD_AWARE_SCORER
+          value: "false"
+        - name: PREFILL_ENABLE_PREFIX_AWARE_SCORER
+          value: "false"
+        - name: PREFILL_ENABLE_SESSION_AWARE_SCORER
+          value: "false"
+        - name: PREFILL_KVCACHE_AWARE_SCORER_WEIGHT
+          value: "1"
+        - name: PREFILL_KVCACHE_INDEXER_REDIS_ADDR
+        - name: PREFILL_LOAD_AWARE_SCORER_WEIGHT
+          value: "1"
+        - name: PREFILL_PREFIX_AWARE_SCORER_WEIGHT
+          value: "1"
+        - name: PREFILL_SESSION_AWARE_SCORER_WEIGHT
+          value: "1"
+        - name: PREFIX_AWARE_SCORER_WEIGHT
+          value: "2"
+        - name: SESSION_AWARE_SCORER_WEIGHT
+          value: "1"
+        ports:
+        - containerPort: 9002
+          name: grpc
+          protocol: TCP
+        - containerPort: 9003
+          name: grpc-health
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+      serviceAccount: facebook-epp-sa
+      serviceAccountName: facebook-epp-sa
+      readinessProbe:
+        grpc:
+          port: 9003
+          service: envoy.service.ext_proc.v3.ExternalProcessor
+        initialDelaySeconds: 5
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
+      livenessProbe:
+        grpc:
+          port: 9003
+          service: envoy.service.ext_proc.v3.ExternalProcessor
+        initialDelaySeconds: 5
+        timeoutSeconds: 1
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
+---
+# Source: llm-d-modelservice/templates/prefill-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: facebook-llm-d-modelservice-prefill
+  labels:
+    helm.sh/chart: llm-d-modelservice-0.0.1
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      llm-d.ai/inferenceServing: "true"
+      llm-d.ai/model: facebook
+      llm-d.ai/role: prefill
+  template:
+    metadata:
+      labels:
+        llm-d.ai/inferenceServing: "true"
+        llm-d.ai/model: facebook
+        llm-d.ai/role: prefill
+    spec:
+      serviceAccountName: facebook-sa
+      containers:
+      - name: vllm
+        image: ghcr.io/llm-d/llm-d:0.0.8
+        command:
+          - vllm
+          - serve
+        args:
+          - --port
+          - "8000"
+          - --enforce-eager
+          - --kv-transfer-config
+          - '{"kv_connector":"NixlConnector", "kv_role":"kv_both"}'
+        env:
+          - name: CUDA_VISIBLE_DEVICES
+            value: "0"
+          - name: UCX_TLS
+            value: cuda_ipc,cuda_copy,tcp
+          - name: VLLM_NIXL_SIDE_CHANNEL_PORT
+            value: "5557"
+          - name: VLLM_NIXL_SIDE_CHANNEL_HOST
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          - name: VLLM_LOGGING_LEVEL
+            value: DEBUG
+        resources:
+          limits:
+            {}
+          requests:
+            cpu: "16"
+            memory: 16Gi
+        
+      volumes:
+        - name: model-storage
+          emptyDir: 
+            sizeLimit: 5Mi
+---
+# Source: llm-d-modelservice/templates/routing.yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: facebook-llm-d-modelservice-http-route
+  namespace: default
+  labels:
+    helm.sh/chart: llm-d-modelservice-0.0.1
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Istio
+    name: inference-gateway
+  rules:
+  - backendRefs:
+    - group: inference.networking.x-k8s.io
+      kind: InferencePool
+      name: facebook-llm-d-modelservice-inference-pool
+      port: 8000
+      weight: 1
+    matches:
+    - headers:
+      - name: x-model-name
+        type: Exact
+        value: facebook/opt-125m
+      path:
+        type: PathPrefix
+        value: /
+---
+# Source: llm-d-modelservice/templates/routing.yaml
+apiVersion: inference.networking.x-k8s.io/v1alpha2
+kind: InferenceModel
+metadata:
+  name: facebook-llm-d-modelservice-inference-model
+  namespace: default
+  labels:
+    llm-d.ai/inferenceServing: "true"
+    llm-d.ai/model: facebook
+spec:
+  modelName: facebook/opt-125m
+  poolRef:
+    group: inference.networking.x-k8s.io
+    kind: InferencePool
+    name: facebook-llm-d-modelservice-inference-pool
+---
+# Source: llm-d-modelservice/templates/routing.yaml
+apiVersion: inference.networking.x-k8s.io/v1alpha2
+kind: InferencePool
+metadata:
+  name: facebook-llm-d-modelservice-inference-pool
+  namespace: default
+spec:
+  extensionRef:
+    failureMode: FailClose
+    group: ""
+    kind: Service
+    name: facebook-llm-d-modelservice-epp-service
+  selector:
+    llm-d.ai/inferenceServing: "true"
+    llm-d.ai/model: facebook
+  targetPortNumber: 8000
