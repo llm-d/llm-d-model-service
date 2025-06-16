@@ -145,12 +145,12 @@ resources:
 
 {{/* P/D service account name */}}
 {{- define "llm-d-modelservice.pdServiceAccountName" -}}
-{{ include "llm-d-modelservice.sanitizedModelName" . }}-sa
+{{ include "llm-d-modelservice.fullname" . }}-sa
 {{- end }}
 
 {{/* EPP service account name */}}
 {{- define "llm-d-modelservice.eppServiceAccountName" -}}
-{{ include "llm-d-modelservice.sanitizedModelName" . }}-epp-sa
+{{ include "llm-d-modelservice.fullname" . }}-epp-sa
 {{- end }}
 
 {{/*
