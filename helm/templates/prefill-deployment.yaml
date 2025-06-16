@@ -1,5 +1,5 @@
-{{- $parallelism := (include "llm-d-modelservice.parallelism" .Values.prefill.parallelism) | fromYaml -}}
 {{- if .Values.prefill }}
+{{- $parallelism := (include "llm-d-modelservice.parallelism" .Values.prefill.parallelism) | fromYaml -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -81,25 +81,7 @@ spec:
         readinessProbe:
           {{- toYaml . | nindent 10 }}
         {{- end }}
-        resources:
-          limits:
-            {{- $limits := dict -}}
-            {{- if and .resources .resources.limits -}}
-            {{- $limits = omit .resources.limits "nvidia.com/gpu" }}
-            {{- if gt (len $limits) 0 }}
-            {{- toYaml $limits | nindent 12 }}
-            {{- end }}
-            {{- end }}
-            nvidia.com/gpu: {{ $parallelism.tensor }}
-          requests:
-            {{- $requests := dict -}}
-            {{- if and .resources .resources.requests -}}
-            {{- $requests = omit .resources.requests "nvidia.com/gpu" }}
-            {{- end }}
-            {{- if gt (len $requests) 0 }}
-            {{- toYaml $requests | nindent 12 }}
-            {{- end }}
-            nvidia.com/gpu: {{ $parallelism.tensor }}
+        {{- include "llm-d-modelservice.resources" (dict "resources" .resources "parallelism" $parallelism) | nindent 8 }}
         {{- /* volumeMount */}}
         {{- include "llm-d-modelservice.mountModelVolumeVolumeMounts" . | nindent 8 }}
         {{- end }}

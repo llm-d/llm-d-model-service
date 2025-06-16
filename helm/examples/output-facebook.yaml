@@ -74,7 +74,7 @@ spec:
             - --vllm-port=8200
             - --connector=nixlv2
             - -v=5
-          image: 
+          image: ghcr.io/llm-d/llm-d-routing-sidecar:0.0.6
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
@@ -82,8 +82,8 @@ spec:
           resources: {}
           restartPolicy: Always
           securityContext:
-          allowPrivilegeEscalation: false
-          runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
       containers:
       - name: vllm
         image: ghcr.io/llm-d/llm-d:0.0.8
@@ -91,6 +91,7 @@ spec:
           - vllm
           - serve
         args:
+          - facebook/opt-125m
           - --port
           - "8200"
           - --enforce-eager
@@ -115,11 +116,13 @@ spec:
             value: /model-cache
         resources:
           limits:
-            nvidia.com/gpu: 1
+            cpu: "16"
+            memory: 16Gi
+            nvidia.com/gpu: "1"
           requests:
             cpu: "16"
             memory: 16Gi
-            nvidia.com/gpu: 1
+            nvidia.com/gpu: "1"
         
         volumeMounts:
           - name: model-storage
@@ -129,31 +132,6 @@ spec:
           emptyDir: 
             sizeLimit: 5Mi
 ---
-# Source: llm-d-modelservice/templates/epp-deployment-mk.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: facebook-llm-d-modelservice-epp
-  labels:
-    helm.sh/chart: llm-d-modelservice-0.0.1
-    app.kubernetes.io/version: "0.0.1"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: llm-d-modelservice
-      app.kubernetes.io/instance: facebook
-      llm-d.ai/epp: facebook-llm-d-modelservice-epp
-  template:
-    metadata:
-      labels:
-        helm.sh/chart: llm-d-modelservice-0.0.1
-        app.kubernetes.io/version: "0.0.1"
-        app.kubernetes.io/managed-by: Helm
-    spec:
-      serviceAccountName: facebook-llm-d-modelservice-epp-sa
----
 # Source: llm-d-modelservice/templates/epp-deployment.yaml
 apiVersion: apps/v1 
 kind: Deployment 
@@ -161,7 +139,7 @@ metadata:
   name: facebook-llm-d-modelservice-epp
   labels: 
     llm-d.ai/epp: facebook-llm-d-modelservice-epp
-  namespace: default
+  namespace: e2e-solution
 spec:
   replicas: 1
   selector:
@@ -180,7 +158,7 @@ spec:
         - --poolName
         - facebook-llm-d-modelservice-inference-pool
         - --poolNamespace
-        - default
+        - e2e-solution
         - -v
         - "4"
         - --zap-encoder
@@ -290,6 +268,7 @@ spec:
           - vllm
           - serve
         args:
+          - facebook/opt-125m
           - --port
           - "8000"
           - --enforce-eager
@@ -310,11 +289,13 @@ spec:
             value: DEBUG
         resources:
           limits:
-            nvidia.com/gpu: 1
+            cpu: "16"
+            memory: 16Gi
+            nvidia.com/gpu: "1"
           requests:
             cpu: "16"
             memory: 16Gi
-            nvidia.com/gpu: 1
+            nvidia.com/gpu: "1"
         
       volumes:
         - name: model-storage
@@ -326,7 +307,7 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: facebook-llm-d-modelservice-http-route
-  namespace: default
+  namespace: e2e-solution
   labels:
     helm.sh/chart: llm-d-modelservice-0.0.1
     app.kubernetes.io/version: "0.0.1"
@@ -357,7 +338,7 @@ apiVersion: inference.networking.x-k8s.io/v1alpha2
 kind: InferenceModel
 metadata:
   name: facebook-llm-d-modelservice-inference-model
-  namespace: default
+  namespace: e2e-solution
   labels:
     llm-d.ai/inferenceServing: "true"
     llm-d.ai/model: facebook
@@ -373,7 +354,7 @@ apiVersion: inference.networking.x-k8s.io/v1alpha2
 kind: InferencePool
 metadata:
   name: facebook-llm-d-modelservice-inference-pool
-  namespace: default
+  namespace: e2e-solution
 spec:
   extensionRef:
     failureMode: FailClose

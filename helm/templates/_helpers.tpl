@@ -98,7 +98,7 @@ initContainers:
       - --vllm-port={{ default 8200 .proxy.targetPort }}
       - --connector=nixlv2
       - -v={{ default 5 .proxy.debugLevel }}
-    image: {{ .image }}
+    image: {{ default "ghcr.io/llm-d/llm-d-routing-sidecar:0.0.6" .proxy.image }}
     imagePullPolicy: Always
     ports:
       - containerPort: {{ default 8080 .servicePort }}
@@ -106,8 +106,8 @@ initContainers:
     resources: {}
     restartPolicy: Always
     securityContext:
-    allowPrivilegeEscalation: false
-    runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
 {{- end }}
 
 {{- define "llm-d-modelservice.parallelism" -}}
@@ -121,6 +121,7 @@ initContainers:
 {{- $parallelism | toYaml | nindent 0 }}
 {{- end }}
 
+{{/* P/D deployment container resources */}}
 {{- define "llm-d-modelservice.resources" -}}
 resources:
   limits:
@@ -131,7 +132,7 @@ resources:
     {{- toYaml $limits | nindent 4 }}
     {{- end }}
     {{- end }}
-    nvidia.com/gpu: {{ .parallelism.tensor }}
+    nvidia.com/gpu: "{{ .parallelism.tensor }}"
   requests:
     {{- $requests := dict -}}
     {{- if and .resources .resources.requests -}}
@@ -140,7 +141,7 @@ resources:
     {{- if gt (len $requests) 0 }}
     {{- toYaml $requests | nindent 4 }}
     {{- end }}
-    nvidia.com/gpu: {{ .parallelism.tensor }}
+    nvidia.com/gpu: "{{ .parallelism.tensor }}"
 {{- end }}
 
 {{/* P/D service account name */}}

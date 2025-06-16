@@ -21,8 +21,3 @@
 .idea/
 *.tmproj
 .vscode/
-# ReadMEs
-*.md
-# Rendered templates
-values-*.yaml
-output-*.yaml

@@ -1,0 +1,297 @@
+---
+# Source: llm-d-modelservice/templates/epp-sa.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: facebook-sim-test-llm-d-modelservice-epp-sa
+  labels:
+    helm.sh/chart: llm-d-modelservice-0.0.1
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: llm-d-modelservice/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: facebook-sim-test-llm-d-modelservice-sa
+  labels:
+    helm.sh/chart: llm-d-modelservice-0.0.1
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: llm-d-modelservice/templates/epp-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: facebook-sim-test-llm-d-modelservice-epp-service
+  labels:
+    helm.sh/chart: llm-d-modelservice-0.0.1
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9002
+      targetPort: 9002
+      protocol: TCP
+      appProtocol: http2
+  selector:
+    app.kubernetes.io/name: llm-d-modelservice
+    app.kubernetes.io/instance: facebook-sim-test
+    llm-d.ai/epp: facebook-sim-test-llm-d-modelservice-epp
+---
+# Source: llm-d-modelservice/templates/decode-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: facebook-sim-test-llm-d-modelservice-decode
+  labels:
+    helm.sh/chart: llm-d-modelservice-0.0.1
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      llm-d.ai/inferenceServing: "true"
+      llm-d.ai/model: facebook-sim-test
+      llm-d.ai/role: decode
+  template:
+    metadata:
+      labels:
+        llm-d.ai/inferenceServing: "true"
+        llm-d.ai/model: facebook-sim-test
+        llm-d.ai/role: decode
+    spec:
+      serviceAccountName: facebook-sim-test-llm-d-modelservice-sa
+        
+      initContainers:
+        - name: routing-proxy
+          args:
+            - --port=8000
+            - --vllm-port=8200
+            - --connector=nixlv2
+            - -v=5
+          image: ghcr.io/llm-d/llm-d-routing-sidecar:0.0.6
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          resources: {}
+          restartPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+      containers:
+      - name: vllm
+        image: ghcr.io/llm-d/llm-d-inference-sim:0.0.4
+        args:
+          - --model
+          - facebook/opt-125m
+          - --port
+          - "8200"
+        env:
+          - name: HF_HOME
+            value: /model-cache
+        volumeMounts:
+          - name: model-storage
+            mountPath: /model-cache
+      volumes:
+        - name: model-storage
+          emptyDir: 
+            sizeLimit: 5Mi
+---
+# Source: llm-d-modelservice/templates/epp-deployment.yaml
+apiVersion: apps/v1 
+kind: Deployment 
+metadata: 
+  name: facebook-sim-test-llm-d-modelservice-epp
+  labels: 
+    llm-d.ai/epp: facebook-sim-test-llm-d-modelservice-epp
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      llm-d.ai/epp: facebook-sim-test-llm-d-modelservice-epp
+  template:
+    metadata:
+      labels:
+        llm-d.ai/epp: facebook-sim-test-llm-d-modelservice-epp
+    spec:
+      containers:
+      - name: epp 
+        imagePullPolicy: Always 
+        image: ghcr.io/llm-d/llm-d-inference-scheduler:0.0.3
+        args:
+        - --poolName
+        - facebook-sim-test-llm-d-modelservice-inference-pool
+        - --poolNamespace
+        - default
+        - -v
+        - "4"
+        - --zap-encoder
+        - json
+        - --grpcPort
+        - "9002"
+        - --grpcHealthPort
+        - "9003"
+        env:
+        - name: ENABLE_KVCACHE_AWARE_SCORER
+          value: "false"
+        - name: ENABLE_LOAD_AWARE_SCORER
+          value: "true"
+        - name: ENABLE_PREFIX_AWARE_SCORER
+          value: "true"
+        - name: ENABLE_SESSION_AWARE_SCORER
+          value: "false"
+        - name: KVCACHE_AWARE_SCORER_WEIGHT
+          value: "1"
+        - name: KVCACHE_INDEXER_REDIS_ADDR
+        - name: LOAD_AWARE_SCORER_WEIGHT
+          value: "1"
+        - name: PD_ENABLED
+          value: "false"
+        - name: PD_PROMPT_LEN_THRESHOLD
+          value: "10"
+        - name: PREFILL_ENABLE_KVCACHE_AWARE_SCORER
+          value: "false"
+        - name: PREFILL_ENABLE_LOAD_AWARE_SCORER
+          value: "false"
+        - name: PREFILL_ENABLE_PREFIX_AWARE_SCORER
+          value: "false"
+        - name: PREFILL_ENABLE_SESSION_AWARE_SCORER
+          value: "false"
+        - name: PREFILL_KVCACHE_AWARE_SCORER_WEIGHT
+          value: "1"
+        - name: PREFILL_KVCACHE_INDEXER_REDIS_ADDR
+        - name: PREFILL_LOAD_AWARE_SCORER_WEIGHT
+          value: "1"
+        - name: PREFILL_PREFIX_AWARE_SCORER_WEIGHT
+          value: "1"
+        - name: PREFILL_SESSION_AWARE_SCORER_WEIGHT
+          value: "1"
+        - name: PREFIX_AWARE_SCORER_WEIGHT
+          value: "2"
+        - name: SESSION_AWARE_SCORER_WEIGHT
+          value: "1"
+        ports:
+        - containerPort: 9002
+          name: grpc
+          protocol: TCP
+        - containerPort: 9003
+          name: grpc-health
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+      serviceAccount: facebook-sim-test-llm-d-modelservice-epp-sa
+      serviceAccountName: facebook-sim-test-llm-d-modelservice-epp-sa
+---
+# Source: llm-d-modelservice/templates/prefill-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: facebook-sim-test-llm-d-modelservice-prefill
+  labels:
+    helm.sh/chart: llm-d-modelservice-0.0.1
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      llm-d.ai/inferenceServing: "true"
+      llm-d.ai/model: facebook-sim-test
+      llm-d.ai/role: prefill
+  template:
+    metadata:
+      labels:
+        llm-d.ai/inferenceServing: "true"
+        llm-d.ai/model: facebook-sim-test
+        llm-d.ai/role: prefill
+    spec:
+      serviceAccountName: facebook-sim-test-llm-d-modelservice-sa
+      containers:
+      - name: vllm
+        image: ghcr.io/llm-d/llm-d-inference-sim:0.0.4
+        args:
+          - --model
+          - facebook/opt-125m
+          - --port
+          - "8000"
+        env:
+          - name: HF_HOME
+            value: /model-cache
+        volumeMounts:
+          - name: model-storage
+            mountPath: /model-cache
+      volumes:
+        - name: model-storage
+          emptyDir: 
+            sizeLimit: 5Mi
+---
+# Source: llm-d-modelservice/templates/routing.yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: facebook-sim-test-llm-d-modelservice-http-route
+  namespace: default
+  labels:
+    helm.sh/chart: llm-d-modelservice-0.0.1
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: llm-d-inference-gateway
+  rules:
+  - backendRefs:
+    - group: inference.networking.x-k8s.io
+      kind: InferencePool
+      name: facebook-sim-test-llm-d-modelservice-inference-pool
+      port: 8000
+      weight: 1
+    matches:
+    - headers:
+      - name: x-model-name
+        type: Exact
+        value: facebook/opt-125m
+      path:
+        type: PathPrefix
+        value: /
+---
+# Source: llm-d-modelservice/templates/routing.yaml
+apiVersion: inference.networking.x-k8s.io/v1alpha2
+kind: InferenceModel
+metadata:
+  name: facebook-sim-test-llm-d-modelservice-inference-model
+  namespace: default
+  labels:
+    llm-d.ai/inferenceServing: "true"
+    llm-d.ai/model: facebook-sim-test
+spec:
+  modelName: facebook/opt-125m
+  poolRef:
+    group: inference.networking.x-k8s.io
+    kind: InferencePool
+    name: facebook-sim-test-llm-d-modelservice-inference-pool
+---
+# Source: llm-d-modelservice/templates/routing.yaml
+apiVersion: inference.networking.x-k8s.io/v1alpha2
+kind: InferencePool
+metadata:
+  name: facebook-sim-test-llm-d-modelservice-inference-pool
+  namespace: default
+spec:
+  extensionRef:
+    failureMode: FailClose
+    group: ""
+    kind: Service
+    name: facebook-sim-test-llm-d-modelservice-epp-service
+  selector:
+    llm-d.ai/inferenceServing: "true"
+    llm-d.ai/model: facebook-sim-test
+  targetPortNumber: 8000
