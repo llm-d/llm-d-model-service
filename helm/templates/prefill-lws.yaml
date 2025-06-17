@@ -1,6 +1,5 @@
-{{- if .Values.prefill }}
+{{- if and .Values.prefill .Values.multinode }}
 {{- $parallelism := (include "llm-d-modelservice.parallelism" .Values.prefill.parallelism) | fromYaml -}}
-{{- if and $parallelism.data (gt (int $parallelism.data) 1) }}
 apiVersion: leaderworkerset.x-k8s.io/v1
 kind: LeaderWorkerSet
 metadata:

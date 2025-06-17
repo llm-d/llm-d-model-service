@@ -167,19 +167,22 @@ llm-d.ai/epp: {{ include "llm-d-modelservice.fullname" . }}-epp
 Volumes for PD containers based on model artifact prefix
 */}}
 {{- define "llm-d-modelservice.mountModelVolumeVolumes" -}}
-{{- if eq .Values.modelArtifacts.prefix "hf" -}}
+{{- $parsedArtifacts := regexSplit "://" .Values.modelArtifacts.uri -1 -}}
+{{- $protocol := first | $parsedArtifacts -}}
+{{- $path := last | $parsedArtifacts -}}
+{{- if eq $protocol "hf" -}}
 - name: model-storage
   emptyDir: 
     sizeLimit: {{ default "0" .Values.modelArtifacts.size }}
-{{- else if eq .Values.modelArtifacts.prefix "pvc" }}
+{{- else if eq $protocol "pvc" }}
 - name: model-storage
   persistentVolumeClaim:
-    claimName: {{ .Values.modelArtifacts.artifact }}
+    claimName: {{ $path }}
     readOnly: true
-{{- else if eq .Values.modelArtifacts.prefix "oci" }}
+{{- else if eq $protocol "oci" }}
 - name: model-storage
   image:
-    reference: {{ .Values.modelArtifacts.artifact }}
+    reference: {{ $path }}
     pullPolicy: {{ default "Always" .Values.modelArtifacts.imagePullPolicy }}
 {{- end }}
 {{- end }}

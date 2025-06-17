@@ -1,6 +1,6 @@
 # This values.yaml file creates the resources for facebook/opt-125m 
 
-lws: false          # If true, creates LWS instead of deployments  
+multinode: false          # If true, creates LWS instead of deployments  
 inferencePool: true 
 inferenceModel: true 
 httpRoute: true 
@@ -18,8 +18,7 @@ routing:
     name: inference-gateway
 
 modelArtifacts:
-  prefix: "hf"
-  artifact: facebook/opt-125m
+  uri: "hf://facebook/opt-125m"
   size: 5Mi
 
 # describe decode pods
@@ -121,6 +120,7 @@ endpointPicker:
     port: 9002
     targetPort: 9002
     appProtocol: http2
+  debugLevel: 5
   
   autoscaling:
     enabled: false

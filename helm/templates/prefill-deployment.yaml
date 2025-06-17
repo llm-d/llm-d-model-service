@@ -1,4 +1,4 @@
-{{- if .Values.prefill }}
+{{- if and .Values.prefill (not .Values.multinode)}}
 {{- $parallelism := (include "llm-d-modelservice.parallelism" .Values.prefill.parallelism) | fromYaml -}}
 apiVersion: apps/v1
 kind: Deployment

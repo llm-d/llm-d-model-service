@@ -1,4 +1,4 @@
-{{- if .Values.decode }}
+{{- if and .Values.decode (not .Values.multinode)}}
 {{- $parallelism := (include "llm-d-modelservice.parallelism" .Values.decode.parallelism) | fromYaml -}}
 apiVersion: apps/v1
 kind: Deployment
