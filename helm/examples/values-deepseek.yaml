@@ -177,7 +177,7 @@ decode:
           add: [ "IPC_LOCK" ]
       resources:
         limits:
-          nvidia.com/gpu: "{{ .DecodeTensorParallelism }}"
+          nvidia.com/gpu: 1
           memory: 64Gi
           ephemeral-storage: 256Gi
           rdma/ib: 1
@@ -185,7 +185,7 @@ decode:
           cpu: 8
           memory: 64Gi
           ephemeral-storage: 256Gi
-          nvidia.com/gpu: "{{ .DecodeTensorParallelism }}"
+          nvidia.com/gpu: 1
           rdma/ib: 1
       volumeMounts:
         - mountPath: /dev/shm
@@ -348,7 +348,7 @@ prefill:
           add: [ "IPC_LOCK" ]
       resources:
         limits:
-          nvidia.com/gpu: "{{ .DecodeTensorParallelism }}"
+          nvidia.com/gpu: 1
           memory: 64Gi
           ephemeral-storage: 256Gi
           rdma/ib: 1
@@ -356,7 +356,7 @@ prefill:
           cpu: 8
           memory: 64Gi
           ephemeral-storage: 256Gi
-          nvidia.com/gpu: "{{ .DecodeTensorParallelism }}"
+          nvidia.com/gpu: 1
           rdma/ib: 1
       volumeMounts:
         - mountPath: /dev/shm

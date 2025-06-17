@@ -1,5 +1,4 @@
 {{- if and .Values.decode .Values.multinode }}
-{{- $parallelism := (include "llm-d-modelservice.parallelism" .Values.decode.parallelism) | fromYaml -}}
 apiVersion: leaderworkerset.x-k8s.io/v1
 kind: LeaderWorkerSet
 metadata:
@@ -12,7 +11,7 @@ spec:
   replicas: {{ default 1 .Values.decode.replicas }}
   {{- end }}
   leaderWorkerTemplate:
-    size: {{ .Values.decode.parallelism.data }}
+    size: {{ int (include "llm-d-modelservice.dataParallelism" .Values.decode.parallelism) }}
     leaderTemplate:
       metadata:
         labels:
@@ -25,7 +24,7 @@ spec:
         {{- with .Values.decode.containers }}
         containers:
           {{- range . }}
-          {{- (include "llm-d-modelservice.container" (dict "container" . "authSecretName" $.Values.modelArtifacts.authSecretName "parallelism" $parallelism)) | nindent 10 }}
+          {{- (include "llm-d-modelservice.container" (dict "container" . "authSecretName" $.Values.modelArtifacts.authSecretName "parallelism" $.Values.decode.parallelism)) | nindent 10 }}
           {{- end }}
         {{- end }}
       volumes:
@@ -42,7 +41,7 @@ spec:
         {{- with .Values.decode.containers }}
         containers:
           {{- range . }}
-          {{- (include "llm-d-modelservice.container" (dict "container" . "authSecretName" $.Values.modelArtifacts.authSecretName "parallelism" $parallelism)) | nindent 10 }}
+          {{- (include "llm-d-modelservice.container" (dict "container" . "authSecretName" $.Values.modelArtifacts.authSecretName "parallelism" $.Values.decode.parallelism)) | nindent 10 }}
           {{- end }}
         {{- end }}
       volumes:

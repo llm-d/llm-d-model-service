@@ -1,5 +1,4 @@
 {{- if and .Values.prefill (not .Values.multinode)}}
-{{- $parallelism := (include "llm-d-modelservice.parallelism" .Values.prefill.parallelism) | fromYaml -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -81,7 +80,7 @@ spec:
         readinessProbe:
           {{- toYaml . | nindent 10 }}
         {{- end }}
-        {{- include "llm-d-modelservice.resources" (dict "resources" .resources "parallelism" $parallelism) | nindent 8 }}
+        {{- include "llm-d-modelservice.resources" (dict "resources" .resources "parallelism" $.Values.prefill.parallelism) | nindent 8 }}
         {{- /* volumeMount */}}
         {{- include "llm-d-modelservice.mountModelVolumeVolumeMounts" . | nindent 8 }}
         {{- end }}
