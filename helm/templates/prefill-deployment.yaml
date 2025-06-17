@@ -1,4 +1,4 @@
-{{- if and .Values.prefill (not .Values.multinode)}}
+{{- if and .Values.prefill (not .Values.multinode) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,79 +15,16 @@ spec:
       labels:
         {{- include "llm-d-modelservice.prefilllabels" . | nindent 8 }}
     spec:
-      {{- with .Values.prefill.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      serviceAccountName: {{ include "llm-d-modelservice.pdServiceAccountName" . }}
-      {{- with .Values.podSecurityContext }}
-      securityContext:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.prefill.acceleratorTypes }}
-      {{- include "llm-d-modelservice.acceleratorTypes" . | nindent 6 }}
-      {{- end }}
-      {{- /* initContainers */}}
-      {{- with .Values.prefill.initContainers }}
-      initContainers:
-        {{- toYaml . | nindent 6 }}
-      {{- end }}     
-      {{- /* range $.Values.prefill.containers */}}
+      {{- (include "llm-d-modelservice.modelPod" .) | nindent 4 }}
       {{- with .Values.prefill.containers }}
       containers:
-      {{- range . }}
-      - name: {{ default "vllm" .name }}
-        image: {{ required "image of container is required" .image }}
-        {{- with .securityContext }}
-        securityContext:
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
-        {{- with .imagePullPolicy }}
-        imagePullPolicy: {{ . }}
-        {{- end }}
-        {{- with .command }}
-        command:
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
-        {{- with .args }}
-        args:
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
-        {{- /* insert user's env for this container */}}
-        {{- if or .env .mountModelVolume }}
-        env:
-        {{- end }}
-        {{- with .env }}
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
-        {{- /* insert envs based on what modelArtifact prefix */}}
-        {{- if .mountModelVolume }}
-          - name: HF_HOME
-            value: /model-cache
-          {{- with $.Values.modelArtifacts.authSecretName }}
-          - name: HF_TOKEN
-            valueFrom:
-              secretKeyRef:
-                name: {{ . }}
-                key: HF_TOKEN
-          {{- end }}
-        {{- end }}
-        {{- with .livenessProbe }}
-        livenessProbe:
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
-        {{- with .readinessProbe }}
-        readinessProbe:
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
-        {{- include "llm-d-modelservice.resources" (dict "resources" .resources "parallelism" $.Values.prefill.parallelism) | nindent 8 }}
-        {{- /* volumeMount */}}
-        {{- include "llm-d-modelservice.mountModelVolumeVolumeMounts" . | nindent 8 }}
+        {{- range . }}
+        {{- (include "llm-d-modelservice.container" (dict "container" . "authSecretName" $.Values.modelArtifacts.authSecretName "parallelism" $.Values.prefill.parallelism)) | nindent 8 }}
         {{- end }}
       {{- end }}
       volumes:
       {{- with .Values.prefill.volumes }}
         {{- toYaml . | nindent 8 }}
-      {{- end -}}
+      {{- end }}
       {{- include "llm-d-modelservice.mountModelVolumeVolumes" . | nindent 8 }} 
 {{- end }}

@@ -1,6 +1,6 @@
 # This values.yaml file creates the resources for facebook/opt-125m 
 
-lws: false          # If true, creates LWS instead of deployments  
+multinode: false          # If true, creates LWS instead of deployments  
 inferencePool: true 
 inferenceModel: true 
 httpRoute: true 
@@ -60,19 +60,10 @@ endpointPicker:
     port: 9002
     targetPort: 9002
     appProtocol: http2
-    livenessProbe: {}
-    readinessProbe: {}
+  debugLevel: 6
+  disableReadinessProbe: true 
+  disableLivenessProbe: true
   
   autoscaling:
     enabled: false
   replicas: 1
-
-# This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
-serviceAccount:
-  # Specifies whether a service account should be created
-  create: true
-  
-# This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
-eppServiceAccount:
-  # Specifies whether a service account should be created
-  create: true

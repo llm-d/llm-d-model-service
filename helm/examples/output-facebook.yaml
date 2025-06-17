@@ -3,29 +3,27 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: facebook-llm-d-modelservice-epp-sa
+  name: facebook-sim-test-llm-d-modelservice-epp-sa
   labels:
     helm.sh/chart: llm-d-modelservice-0.0.1
     app.kubernetes.io/version: "0.0.1"
     app.kubernetes.io/managed-by: Helm
-automountServiceAccountToken: true
 ---
 # Source: llm-d-modelservice/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: facebook-llm-d-modelservice-sa
+  name: facebook-sim-test-llm-d-modelservice-sa
   labels:
     helm.sh/chart: llm-d-modelservice-0.0.1
     app.kubernetes.io/version: "0.0.1"
     app.kubernetes.io/managed-by: Helm
-automountServiceAccountToken: true
 ---
 # Source: llm-d-modelservice/templates/epp-service.yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: facebook-llm-d-modelservice-epp
+  name: facebook-sim-test-llm-d-modelservice-epp-service
   labels:
     helm.sh/chart: llm-d-modelservice-0.0.1
     app.kubernetes.io/version: "0.0.1"
@@ -39,14 +37,14 @@ spec:
       appProtocol: http2
   selector:
     app.kubernetes.io/name: llm-d-modelservice
-    app.kubernetes.io/instance: facebook
-    llm-d.ai/epp: facebook-llm-d-modelservice-epp
+    app.kubernetes.io/instance: facebook-sim-test
+    llm-d.ai/epp: facebook-sim-test-llm-d-modelservice-epp
 ---
 # Source: llm-d-modelservice/templates/decode-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: facebook-llm-d-modelservice-decode
+  name: facebook-sim-test-llm-d-modelservice-decode
   labels:
     helm.sh/chart: llm-d-modelservice-0.0.1
     app.kubernetes.io/version: "0.0.1"
@@ -56,17 +54,15 @@ spec:
   selector:
     matchLabels:
       llm-d.ai/inferenceServing: "true"
-      llm-d.ai/model: facebook
+      llm-d.ai/model: facebook-sim-test
       llm-d.ai/role: decode
   template:
     metadata:
       labels:
         llm-d.ai/inferenceServing: "true"
-        llm-d.ai/model: facebook
+        llm-d.ai/model: facebook-sim-test
         llm-d.ai/role: decode
     spec:
-      serviceAccountName: facebook-llm-d-modelservice-sa
-        
       initContainers:
         - name: routing-proxy
           args:
@@ -78,26 +74,27 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
-          protocol: TCP
           resources: {}
           restartPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
+    
+      serviceAccountName: facebook-sim-test-llm-d-modelservice-sa
       containers:
-      - name: vllm
-        image: ghcr.io/llm-d/llm-d:0.0.8
-        command:
+        - name: vllm
+          image: ghcr.io/llm-d/llm-d:0.0.8
+          command:
           - vllm
           - serve
-        args:
+          args:
           - facebook/opt-125m
           - --port
           - "8200"
           - --enforce-eager
           - --kv-transfer-config
           - '{"kv_connector":"NixlConnector", "kv_role":"kv_both"}'
-        env:
+          env:
           - name: CUDA_VISIBLE_DEVICES
             value: "0"
           - name: UCX_TLS
@@ -114,17 +111,12 @@ spec:
             value: DEBUG
           - name: HF_HOME
             value: /model-cache
-        resources:
-          limits:
-            cpu: "16"
-            memory: 16Gi
-            nvidia.com/gpu: "1"
-          requests:
-            cpu: "16"
-            memory: 16Gi
-            nvidia.com/gpu: "1"
-        
-        volumeMounts:
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+            requests:
+              nvidia.com/gpu: "1"
+          volumeMounts:
           - name: model-storage
             mountPath: /model-cache
       volumes:
@@ -136,19 +128,19 @@ spec:
 apiVersion: apps/v1 
 kind: Deployment 
 metadata: 
-  name: facebook-llm-d-modelservice-epp
+  name: facebook-sim-test-llm-d-modelservice-epp
   labels: 
-    llm-d.ai/epp: facebook-llm-d-modelservice-epp
-  namespace: e2e-solution
+    llm-d.ai/epp: facebook-sim-test-llm-d-modelservice-epp
+  namespace: default
 spec:
   replicas: 1
   selector:
     matchLabels:
-      llm-d.ai/epp: facebook-llm-d-modelservice-epp
+      llm-d.ai/epp: facebook-sim-test-llm-d-modelservice-epp
   template:
     metadata:
       labels:
-        llm-d.ai/epp: facebook-llm-d-modelservice-epp
+        llm-d.ai/epp: facebook-sim-test-llm-d-modelservice-epp
     spec:
       containers:
       - name: epp 
@@ -156,9 +148,9 @@ spec:
         image: ghcr.io/llm-d/llm-d-inference-scheduler:0.0.3
         args:
         - --poolName
-        - facebook-llm-d-modelservice-inference-pool
+        - facebook-sim-test-llm-d-modelservice-inference-pool
         - --poolNamespace
-        - e2e-solution
+        - default
         - -v
         - "4"
         - --zap-encoder
@@ -216,8 +208,8 @@ spec:
         - containerPort: 9090
           name: metrics
           protocol: TCP
-      serviceAccount: facebook-llm-d-modelservice-epp-sa
-      serviceAccountName: facebook-llm-d-modelservice-epp-sa
+      serviceAccount: facebook-sim-test-llm-d-modelservice-epp-sa
+      serviceAccountName: facebook-sim-test-llm-d-modelservice-epp-sa
       readinessProbe:
         grpc:
           port: 9003
@@ -241,7 +233,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: facebook-llm-d-modelservice-prefill
+  name: facebook-sim-test-llm-d-modelservice-prefill
   labels:
     helm.sh/chart: llm-d-modelservice-0.0.1
     app.kubernetes.io/version: "0.0.1"
@@ -251,30 +243,31 @@ spec:
   selector:
     matchLabels:
       llm-d.ai/inferenceServing: "true"
-      llm-d.ai/model: facebook
+      llm-d.ai/model: facebook-sim-test
       llm-d.ai/role: prefill
   template:
     metadata:
       labels:
         llm-d.ai/inferenceServing: "true"
-        llm-d.ai/model: facebook
+        llm-d.ai/model: facebook-sim-test
         llm-d.ai/role: prefill
     spec:
-      serviceAccountName: facebook-llm-d-modelservice-sa
+    
+      serviceAccountName: facebook-sim-test-llm-d-modelservice-sa
       containers:
-      - name: vllm
-        image: ghcr.io/llm-d/llm-d:0.0.8
-        command:
+        - name: vllm
+          image: ghcr.io/llm-d/llm-d:0.0.8
+          command:
           - vllm
           - serve
-        args:
+          args:
           - facebook/opt-125m
           - --port
           - "8000"
           - --enforce-eager
           - --kv-transfer-config
           - '{"kv_connector":"NixlConnector", "kv_role":"kv_both"}'
-        env:
+          env:
           - name: CUDA_VISIBLE_DEVICES
             value: "0"
           - name: UCX_TLS
@@ -287,16 +280,11 @@ spec:
                 fieldPath: status.podIP
           - name: VLLM_LOGGING_LEVEL
             value: DEBUG
-        resources:
-          limits:
-            cpu: "16"
-            memory: 16Gi
-            nvidia.com/gpu: "1"
-          requests:
-            cpu: "16"
-            memory: 16Gi
-            nvidia.com/gpu: "1"
-        
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+            requests:
+              nvidia.com/gpu: "1"
       volumes:
         - name: model-storage
           emptyDir: 
@@ -306,8 +294,8 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: facebook-llm-d-modelservice-http-route
-  namespace: e2e-solution
+  name: facebook-sim-test-llm-d-modelservice-http-route
+  namespace: default
   labels:
     helm.sh/chart: llm-d-modelservice-0.0.1
     app.kubernetes.io/version: "0.0.1"
@@ -315,13 +303,13 @@ metadata:
 spec:
   parentRefs:
   - group: gateway.networking.k8s.io
-    kind: Istio
+    kind: Gateway
     name: inference-gateway
   rules:
   - backendRefs:
     - group: inference.networking.x-k8s.io
       kind: InferencePool
-      name: facebook-llm-d-modelservice-inference-pool
+      name: facebook-sim-test-llm-d-modelservice-inference-pool
       port: 8000
       weight: 1
     matches:
@@ -337,31 +325,31 @@ spec:
 apiVersion: inference.networking.x-k8s.io/v1alpha2
 kind: InferenceModel
 metadata:
-  name: facebook-llm-d-modelservice-inference-model
-  namespace: e2e-solution
+  name: facebook-sim-test-llm-d-modelservice-inference-model
+  namespace: default
   labels:
     llm-d.ai/inferenceServing: "true"
-    llm-d.ai/model: facebook
+    llm-d.ai/model: facebook-sim-test
 spec:
   modelName: facebook/opt-125m
   poolRef:
     group: inference.networking.x-k8s.io
     kind: InferencePool
-    name: facebook-llm-d-modelservice-inference-pool
+    name: facebook-sim-test-llm-d-modelservice-inference-pool
 ---
 # Source: llm-d-modelservice/templates/routing.yaml
 apiVersion: inference.networking.x-k8s.io/v1alpha2
 kind: InferencePool
 metadata:
-  name: facebook-llm-d-modelservice-inference-pool
-  namespace: e2e-solution
+  name: facebook-sim-test-llm-d-modelservice-inference-pool
+  namespace: default
 spec:
   extensionRef:
     failureMode: FailClose
     group: ""
     kind: Service
-    name: facebook-llm-d-modelservice-epp-service
+    name: facebook-sim-test-llm-d-modelservice-epp-service
   selector:
     llm-d.ai/inferenceServing: "true"
-    llm-d.ai/model: facebook
+    llm-d.ai/model: facebook-sim-test
   targetPortNumber: 8000
