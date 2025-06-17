@@ -168,8 +168,8 @@ Volumes for PD containers based on model artifact prefix
 */}}
 {{- define "llm-d-modelservice.mountModelVolumeVolumes" -}}
 {{- $parsedArtifacts := regexSplit "://" .Values.modelArtifacts.uri -1 -}}
-{{- $protocol := first | $parsedArtifacts -}}
-{{- $path := last | $parsedArtifacts -}}
+{{- $protocol := first $parsedArtifacts -}}
+{{- $path := last $parsedArtifacts -}}
 {{- if eq $protocol "hf" -}}
 - name: model-storage
   emptyDir: 

@@ -52,4 +52,3 @@ spec:
       {{- include "llm-d-modelservice.mountModelVolumeVolumes" . | nindent 10 }} 
 
 {{- end }}
-{{- end }}
