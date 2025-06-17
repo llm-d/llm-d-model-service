@@ -1,13 +1,8 @@
-{{- if .Values.serviceAccount.create -}}
+{{- if .Values.endpointPicker -}}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: {{ include "llm-d-modelservice.eppServiceAccountName" . }}
   labels:
     {{- include "llm-d-modelservice.labels" . | nindent 4 }}
-  {{- with .Values.eppServiceAccount.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-automountServiceAccountToken: {{ default true .Values.eppServiceAccount.automount }}
 {{- end }}

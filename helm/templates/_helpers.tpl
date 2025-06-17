@@ -102,7 +102,6 @@ initContainers:
     imagePullPolicy: Always
     ports:
       - containerPort: {{ default 8080 .servicePort }}
-    protocol: TCP
     resources: {}
     restartPolicy: Always
     securityContext:

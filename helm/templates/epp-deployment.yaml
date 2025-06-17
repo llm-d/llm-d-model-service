@@ -25,7 +25,7 @@ spec:
         - --poolNamespace
         - {{ .Release.Namespace }}
         - -v
-        - "4"
+        - "{{ default 4 .Values.endpointPicker.debugLevel }}"
         - --zap-encoder
         - json
         - --grpcPort
@@ -83,6 +83,7 @@ spec:
           protocol: TCP
       serviceAccount: {{ include "llm-d-modelservice.eppServiceAccountName" . }}
       serviceAccountName: {{ include "llm-d-modelservice.eppServiceAccountName" . }}
+      {{- if (not .Values.endpointPicker.disableReadinessProbe) }}
       readinessProbe:
         grpc:
           port: 9003
@@ -92,6 +93,8 @@ spec:
         periodSeconds: 10
         successThreshold: 1
         failureThreshold: 3
+      {{- end }}
+      {{- if (not .Values.endpointPicker.disableLivenessProbe) }}
       livenessProbe:
         grpc:
           port: 9003
@@ -101,3 +104,4 @@ spec:
         periodSeconds: 10
         successThreshold: 1
         failureThreshold: 3
+      {{- end }}

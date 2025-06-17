@@ -1,6 +1,6 @@
 # This values.yaml file creates the resources for deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct
 
-lws: true  # If true, creates LWS instead of deployments  
+multinodetrue  # If true, creates LWS instead of deployments  
 inferencePool: true 
 inferenceModel: true 
 httpRoute: true 
