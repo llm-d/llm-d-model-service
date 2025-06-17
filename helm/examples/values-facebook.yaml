@@ -19,7 +19,6 @@ routing:
 
 modelArtifacts:
   uri: "hf://facebook/opt-125m"
-  size: 5Mi
 
 # describe decode pods
 decode:

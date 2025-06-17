@@ -92,13 +92,16 @@ spec:
           env:
           - name: HF_HOME
             value: /model-cache
+          
+          resources:
+            limits:
+              {}
+            requests:
+              {}
           volumeMounts:
           - name: model-storage
             mountPath: /model-cache
       volumes:
-        - name: model-storage
-          emptyDir: 
-            sizeLimit: 5Mi
 ---
 # Source: llm-d-modelservice/templates/epp-deployment.yaml
 apiVersion: apps/v1 
@@ -223,13 +226,16 @@ spec:
           env:
           - name: HF_HOME
             value: /model-cache
+          
+          resources:
+            limits:
+              {}
+            requests:
+              {}
           volumeMounts:
           - name: model-storage
             mountPath: /model-cache
       volumes:
-        - name: model-storage
-          emptyDir: 
-            sizeLimit: 5Mi
 ---
 # Source: llm-d-modelservice/templates/routing.yaml
 apiVersion: gateway.networking.k8s.io/v1

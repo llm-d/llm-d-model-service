@@ -111,10 +111,15 @@ spec:
             value: DEBUG
           - name: HF_HOME
             value: /model-cache
+          
           resources:
             limits:
+              cpu: "16"
+              memory: 16Gi
               nvidia.com/gpu: "1"
             requests:
+              cpu: "16"
+              memory: 16Gi
               nvidia.com/gpu: "1"
           volumeMounts:
           - name: model-storage
@@ -280,10 +285,15 @@ spec:
                 fieldPath: status.podIP
           - name: VLLM_LOGGING_LEVEL
             value: DEBUG
+          
           resources:
             limits:
+              cpu: "16"
+              memory: 16Gi
               nvidia.com/gpu: "1"
             requests:
+              cpu: "16"
+              memory: 16Gi
               nvidia.com/gpu: "1"
       volumes:
         - name: model-storage
