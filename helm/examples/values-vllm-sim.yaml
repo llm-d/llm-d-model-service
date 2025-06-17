@@ -18,8 +18,7 @@ routing:
     name: llm-d-inference-gateway
 
 modelArtifacts:
-  prefix: "hf"
-  artifact: facebook/opt-125m
+  uri: "ht://facebook/opt-125m"
   size: 5Mi
 
 # describe decode pods

@@ -1,6 +1,4 @@
-{{- if .Values.prefill }}
-{{- $parallelism := (include "llm-d-modelservice.parallelism" .Values.prefill.parallelism) | fromYaml -}}
-{{- if and $parallelism.data (gt (int $parallelism.data) 1) }}
+{{- if and .Values.prefill .Values.multinode }}
 apiVersion: leaderworkerset.x-k8s.io/v1
 kind: LeaderWorkerSet
 metadata:
@@ -13,20 +11,17 @@ spec:
   replicas: {{ default 1 .Values.prefill.replicas }}
   {{- end }}
   leaderWorkerTemplate:
-    size: {{ .Values.prefill.parallelism.data }}
+    size: {{ int (include "llm-d-modelservice.dataParallelism" .Values.prefill.parallelism) }}
     leaderTemplate:
       metadata:
         labels:
           {{- include "llm-d-modelservice.prefilllabels" . | nindent 10 }}
       spec:
-        {{- with .Values.routing }}
-        {{ (include "llm-d-modelservice.routingProxy" .) | nindent 8 }}
-        {{- end }}
         {{- (include "llm-d-modelservice.modelPod" .) | nindent 6 }}
         {{- with .Values.prefill.containers }}
         containers:
           {{- range . }}
-          {{- (include "llm-d-modelservice.container" (dict "container" . "authSecretName" $.Values.modelArtifacts.authSecretName "parallelism" $parallelism)) | nindent 10 }}
+          {{- (include "llm-d-modelservice.container" (dict "container" . "authSecretName" $.Values.modelArtifacts.authSecretName "parallelism" $.Values.prefill.parallelism)) | nindent 10 }}
           {{- end }}
         {{- end }}
       volumes:
@@ -43,7 +38,7 @@ spec:
         {{- with .Values.prefill.containers }}
         containers:
           {{- range . }}
-          {{- (include "llm-d-modelservice.container" (dict "container" . "authSecretName" $.Values.modelArtifacts.authSecretName "parallelism" $parallelism)) | nindent 10 }}
+          {{- (include "llm-d-modelservice.container" (dict "container" . "authSecretName" $.Values.modelArtifacts.authSecretName "parallelism" $.Values.prefill.parallelism)) | nindent 10 }}
           {{- end }}
         {{- end }}
       volumes:
@@ -52,5 +47,4 @@ spec:
       {{- end }}
       {{- include "llm-d-modelservice.mountModelVolumeVolumes" . | nindent 10 }} 
 
-{{- end }}
 {{- end }}

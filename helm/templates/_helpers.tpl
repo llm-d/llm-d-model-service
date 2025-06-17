@@ -109,38 +109,38 @@ initContainers:
       runAsNonRoot: true
 {{- end }}
 
-{{- define "llm-d-modelservice.parallelism" -}}
-{{- $parallelism := dict "tensor" 1 "data" 1 -}}
-{{- if and . .tensor }}
-{{- $parallelism = mergeOverwrite $parallelism (dict "tensor" .tensor) -}}
+{{/* Desired P/d tensor parallelism -- user set or defaults to 1 */}}
+{{- define "llm-d-modelservice.tensorParallelism" -}}
+{{- if and . .tensor }}{{ .tensor }}{{ else }}1{{ end }}
 {{- end }}
-{{- if and . .data }}
-{{- $parallelism = mergeOverwrite $parallelism (dict "data" .data) -}}
-{{- end }}
-{{- $parallelism | toYaml | nindent 0 }}
+
+{{/* Desired P/D data parallelism -- user set or defaults to 1 */}}
+{{- define "llm-d-modelservice.dataParallelism" -}}
+{{- if and . .data }}{{ .data }}{{ else }}10{{ end }}
 {{- end }}
 
 {{/* P/D deployment container resources */}}
 {{- define "llm-d-modelservice.resources" -}}
+{{- $tensorParallelism := int (include "llm-d-modelservice.tensorParallelism" .parallelism) -}}
+{{- $limits := dict }}
+{{- if and .resources .resources.limits }}
+{{- $limits = deepCopy .resources.limits }}
+{{- end }}
+{{- if gt (int $tensorParallelism) 1 }}
+{{- $limits = mergeOverwrite $limits (dict "nvidia.com/gpu" $tensorParallelism) }}
+{{- end }}
+{{- $requests := dict }}
+{{- if and .resources .resources.requests }}
+{{- $requests = deepCopy .resources.requests }}
+{{- end }}
+{{- if gt (int $tensorParallelism) 1 }}
+{{- $requests = mergeOverwrite $requests (dict "nvidia.com/gpu" $tensorParallelism) }}
+{{- end }}
 resources:
   limits:
-    {{- $limits := dict -}}
-    {{- if and .resources .resources.limits -}}
-    {{- $limits = omit .resources.limits "nvidia.com/gpu" }}
-    {{- if gt (len $limits) 0 }}
     {{- toYaml $limits | nindent 4 }}
-    {{- end }}
-    {{- end }}
-    nvidia.com/gpu: "{{ .parallelism.tensor }}"
   requests:
-    {{- $requests := dict -}}
-    {{- if and .resources .resources.requests -}}
-    {{- $requests = omit .resources.requests "nvidia.com/gpu" }}
-    {{- end }}
-    {{- if gt (len $requests) 0 }}
     {{- toYaml $requests | nindent 4 }}
-    {{- end }}
-    nvidia.com/gpu: "{{ .parallelism.tensor }}"
 {{- end }}
 
 {{/* P/D service account name */}}
@@ -166,19 +166,22 @@ llm-d.ai/epp: {{ include "llm-d-modelservice.fullname" . }}-epp
 Volumes for PD containers based on model artifact prefix
 */}}
 {{- define "llm-d-modelservice.mountModelVolumeVolumes" -}}
-{{- if eq .Values.modelArtifacts.prefix "hf" -}}
+{{- $parsedArtifacts := regexSplit "://" .Values.modelArtifacts.uri -1 -}}
+{{- $protocol := first $parsedArtifacts -}}
+{{- $path := last $parsedArtifacts -}}
+{{- if eq $protocol "hf" -}}
 - name: model-storage
   emptyDir: 
     sizeLimit: {{ default "0" .Values.modelArtifacts.size }}
-{{- else if eq .Values.modelArtifacts.prefix "pvc" }}
+{{- else if eq $protocol "pvc" }}
 - name: model-storage
   persistentVolumeClaim:
-    claimName: {{ .Values.modelArtifacts.artifact }}
+    claimName: {{ $path }}
     readOnly: true
-{{- else if eq .Values.modelArtifacts.prefix "oci" }}
+{{- else if eq $protocol "oci" }}
 - name: model-storage
   image:
-    reference: {{ .Values.modelArtifacts.artifact }}
+    reference: {{ $path }}
     pullPolicy: {{ default "Always" .Values.modelArtifacts.imagePullPolicy }}
 {{- end }}
 {{- end }}
@@ -262,7 +265,7 @@ volumeMounts:
   readinessProbe:
     {{- toYaml . | nindent 2 }}
   {{- end }}
-  {{- (include "llm-d-modelservice.resources" (dict "resources" .resources "parallelism" .parallelism)) | nindent 2 }}
+  {{- (include "llm-d-modelservice.resources" (dict "resources" .container.resources "parallelism" .parallelism)) | nindent 2 }}
   {{- /* volumeMount */}}
   {{- if or .container.volumeMounts .container.mountModelVolume }}
   volumeMounts:
