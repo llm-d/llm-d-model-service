@@ -345,7 +345,7 @@ func (r *ModelServiceReconciler) populateStatus(ctx context.Context, msvc *msv1a
 		decodeDeploymentFromCluster := &appsv1.Deployment{}
 		err := r.Get(ctx, client.ObjectKey{Name: decodeDeploymentName, Namespace: msvc.Namespace}, decodeDeploymentFromCluster)
 		if err != nil {
-			log.FromContext(ctx).Error(err, "unable to get prefill deployment")
+			log.FromContext(ctx).Error(err, "unable to get decode deployment")
 			conditions = append(conditions, metav1.Condition{
 				Type:               "DecodeDeploymentAvailable",
 				Status:             metav1.ConditionFalse,
