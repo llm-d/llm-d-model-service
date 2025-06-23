@@ -1,0 +1,882 @@
+---
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  creationTimestamp: null
+  labels:
+    llm-d.ai/inferenceServing: "true"
+    llm-d.ai/model: deepseek-ai-deepseek-coder-v2-lite-instruct
+    llm-d.ai/role: decode
+  name: deepsk-ai-deepsk-coder-v2-lite-instruct-decode
+spec:
+  leaderWorkerTemplate:
+    leaderTemplate:
+      metadata:
+        creationTimestamp: null
+        labels:
+          llm-d.ai/inferenceServing: "true"
+          llm-d.ai/model: deepseek-ai-deepseek-coder-v2-lite-instruct
+          llm-d.ai/role: decode
+      spec:
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: gpu.nvidia.com/model
+                  operator: In
+                  values:
+                  - H200
+        containers:
+        - args:
+          - |
+            # Squash a warning.
+            rm /etc/libibverbs.d/vmw_pvrdma.driver
+            #################
+            # Install vLLM
+            #################
+            /init-scripts/init-vllm.sh
+            #################
+            # RUN vLLM
+            #################
+            START_RANK=$(( ${LWS_WORKER_INDEX:-0} * DP_SIZE_LOCAL ))
+            if [ "${LWS_WORKER_INDEX:-0}" -eq 0 ]; then
+              #################
+              # Leader-only launch
+              #################
+              exec /app/venv/bin/vllm serve \
+                deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct \
+                --port 8200 \
+                --disable-log-requests \
+                --enable-expert-parallel \
+                --tensor-parallel-size $TP_SIZE \
+                --data-parallel-size $DP_SIZE \
+                --data-parallel-size-local $DP_SIZE_LOCAL \
+                --data-parallel-address $(LWS_LEADER_ADDRESS) \
+                --data-parallel-rpc-port 5555 \
+                --data-parallel-start-rank $START_RANK \
+                --trust-remote-code \
+                --kv-transfer-config \
+                  '{"kv_connector":"NixlConnector","kv_role":"kv_both"}' \
+                --enforce-eager
+            else
+              #################
+              # Worker-only launch
+              #################
+              exec /app/venv/bin/vllm serve \
+                deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct \
+                --port 8200 \
+                --disable-log-requests \
+                --enable-expert-parallel \
+                --tensor-parallel-size $TP_SIZE \
+                --data-parallel-size $DP_SIZE \
+                --data-parallel-size-local $DP_SIZE_LOCAL \
+                --data-parallel-address $(LWS_LEADER_ADDRESS) \
+                --data-parallel-rpc-port 5555 \
+                --data-parallel-start-rank $START_RANK \
+                --trust-remote-code \
+                --kv-transfer-config \
+                  '{"kv_connector":"NixlConnector","kv_role":"kv_both"}' \
+                --enforce-eager \
+                --headless
+            fi
+          command:
+          - /bin/sh
+          - -c
+          env:
+          - name: DP_SIZE
+            value: "2"
+          - name: TP_SIZE
+            value: "1"
+          - name: DP_SIZE_LOCAL
+            value: "1"
+          - name: VLLM_REPO_URL
+            value: https://github.com/vllm-project/vllm.git
+          - name: VLLM_BRANCH
+            value: main
+          - name: VLLM_ALL2ALL_BACKEND
+            value: pplx
+          - name: NVIDIA_GDRCOPY
+            value: enabled
+          - name: NCCL_DEBUG
+            value: INFO
+          - name: NVSHMEM_DEBUG
+            value: TRACE
+          - name: NVSHMEM_DEBUG_SUBSYS
+            value: TRANSPORT,INIT,MEM,COLL,BOOTSTRAP
+          - name: NVSHMEM_REMOTE_TRANSPORT
+            value: ibrc
+          - name: NVSHMEM_IB_ENABLE_IBGDA
+            value: "true"
+          - name: NVSHMEM_ENABLE_NIC_PE_MAPPING
+            value: "true"
+          - name: NVSHMEM_HCA_LIST
+            value: ibp0:1,ibp1:1,ibp2:1,ibp3:1,ibp4:1,ibp5:1,ibp6:1,ibp7:1
+          - name: NVSHMEM_BOOTSTRAP_UID_SOCK_IFNAME
+            value: eth0
+          - name: GLOO_SOCKET_IFNAME
+            value: eth0
+          - name: NCCL_SOCKET_IFNAME
+            value: eth0
+          - name: NCCL_IB_HCA
+            value: ibp
+          - name: VLLM_LOGGING_LEVEL
+            value: DEBUG
+          - name: HF_TOKEN
+            valueFrom:
+              secretKeyRef:
+                key: HF_TOKEN
+                name: hf-secret
+                optional: true
+          - name: GH_TOKEN_FROM_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: GH_TOKEN
+                name: gh-token-secret
+                optional: true
+          - name: VLLM_NIXL_SIDE_CHANNEL_PORT
+            value: "6555"
+          - name: VLLM_NIXL_SIDE_CHANNEL_HOST
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          image: quay.io/tms/vllm-dev-base:0.0.15
+          imagePullPolicy: Always
+          name: vllm-worker
+          resources:
+            limits:
+              ephemeral-storage: 256Gi
+              memory: 64Gi
+              nvidia.com/gpu: "1"
+              rdma/ib: "1"
+            requests:
+              cpu: "8"
+              ephemeral-storage: 256Gi
+              memory: 64Gi
+              nvidia.com/gpu: "1"
+              rdma/ib: "1"
+          securityContext:
+            capabilities:
+              add:
+              - IPC_LOCK
+          stdin: true
+          tty: true
+          volumeMounts:
+          - mountPath: /dev/shm
+            name: dshm
+          - mountPath: /init-scripts
+            name: init-scripts-volume
+          workingDir: /app
+        initContainers:
+        - args:
+          - --port=8080
+          - --vllm-port=8200
+          - --connector=nixlv2
+          - -v=6
+          image: ghcr.io/llm-d/llm-d-routing-sidecar:0.0.6
+          imagePullPolicy: Always
+          name: routing-proxy
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          resources: {}
+          restartPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+        serviceAccountName: deepsk-ai-deepsk-coder-v2-lite-instruct-sa
+        volumes:
+        - configMap:
+            defaultMode: 493
+            name: vllm-init-scripts-config
+          name: init-scripts-volume
+        - emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+          name: dshm
+    restartPolicy: RecreateGroupOnPodRestart
+    size: 2
+    workerTemplate:
+      metadata:
+        creationTimestamp: null
+        labels:
+          llm-d.ai/inferenceServing: "true"
+          llm-d.ai/model: deepseek-ai-deepseek-coder-v2-lite-instruct
+          llm-d.ai/role: decode
+      spec:
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: gpu.nvidia.com/model
+                  operator: In
+                  values:
+                  - H200
+        containers:
+        - args:
+          - |
+            # Squash a warning.
+            rm /etc/libibverbs.d/vmw_pvrdma.driver
+            #################
+            # Install vLLM
+            #################
+            /init-scripts/init-vllm.sh
+            #################
+            # RUN vLLM
+            #################
+            START_RANK=$(( ${LWS_WORKER_INDEX:-0} * DP_SIZE_LOCAL ))
+            if [ "${LWS_WORKER_INDEX:-0}" -eq 0 ]; then
+              #################
+              # Leader-only launch
+              #################
+              exec /app/venv/bin/vllm serve \
+                deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct \
+                --port 8200 \
+                --disable-log-requests \
+                --enable-expert-parallel \
+                --tensor-parallel-size $TP_SIZE \
+                --data-parallel-size $DP_SIZE \
+                --data-parallel-size-local $DP_SIZE_LOCAL \
+                --data-parallel-address $(LWS_LEADER_ADDRESS) \
+                --data-parallel-rpc-port 5555 \
+                --data-parallel-start-rank $START_RANK \
+                --trust-remote-code \
+                --kv-transfer-config \
+                  '{"kv_connector":"NixlConnector","kv_role":"kv_both"}' \
+                --enforce-eager
+            else
+              #################
+              # Worker-only launch
+              #################
+              exec /app/venv/bin/vllm serve \
+                deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct \
+                --port 8200 \
+                --disable-log-requests \
+                --enable-expert-parallel \
+                --tensor-parallel-size $TP_SIZE \
+                --data-parallel-size $DP_SIZE \
+                --data-parallel-size-local $DP_SIZE_LOCAL \
+                --data-parallel-address $(LWS_LEADER_ADDRESS) \
+                --data-parallel-rpc-port 5555 \
+                --data-parallel-start-rank $START_RANK \
+                --trust-remote-code \
+                --kv-transfer-config \
+                  '{"kv_connector":"NixlConnector","kv_role":"kv_both"}' \
+                --enforce-eager \
+                --headless
+            fi
+          command:
+          - /bin/sh
+          - -c
+          env:
+          - name: DP_SIZE
+            value: "2"
+          - name: TP_SIZE
+            value: "1"
+          - name: DP_SIZE_LOCAL
+            value: "1"
+          - name: VLLM_REPO_URL
+            value: https://github.com/vllm-project/vllm.git
+          - name: VLLM_BRANCH
+            value: main
+          - name: VLLM_ALL2ALL_BACKEND
+            value: pplx
+          - name: NVIDIA_GDRCOPY
+            value: enabled
+          - name: NCCL_DEBUG
+            value: INFO
+          - name: NVSHMEM_DEBUG
+            value: TRACE
+          - name: NVSHMEM_DEBUG_SUBSYS
+            value: TRANSPORT,INIT,MEM,COLL,BOOTSTRAP
+          - name: NVSHMEM_REMOTE_TRANSPORT
+            value: ibrc
+          - name: NVSHMEM_IB_ENABLE_IBGDA
+            value: "true"
+          - name: NVSHMEM_ENABLE_NIC_PE_MAPPING
+            value: "true"
+          - name: NVSHMEM_HCA_LIST
+            value: ibp0:1,ibp1:1,ibp2:1,ibp3:1,ibp4:1,ibp5:1,ibp6:1,ibp7:1
+          - name: NVSHMEM_BOOTSTRAP_UID_SOCK_IFNAME
+            value: eth0
+          - name: GLOO_SOCKET_IFNAME
+            value: eth0
+          - name: NCCL_SOCKET_IFNAME
+            value: eth0
+          - name: NCCL_IB_HCA
+            value: ibp
+          - name: VLLM_LOGGING_LEVEL
+            value: DEBUG
+          - name: HF_TOKEN
+            valueFrom:
+              secretKeyRef:
+                key: HF_TOKEN
+                name: hf-secret
+                optional: true
+          - name: GH_TOKEN_FROM_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: GH_TOKEN
+                name: gh-token-secret
+                optional: true
+          - name: VLLM_NIXL_SIDE_CHANNEL_PORT
+            value: "6555"
+          - name: VLLM_NIXL_SIDE_CHANNEL_HOST
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          image: quay.io/tms/vllm-dev-base:0.0.15
+          imagePullPolicy: Always
+          name: vllm-worker
+          resources:
+            limits:
+              ephemeral-storage: 256Gi
+              memory: 64Gi
+              nvidia.com/gpu: "1"
+              rdma/ib: "1"
+            requests:
+              cpu: "8"
+              ephemeral-storage: 256Gi
+              memory: 64Gi
+              nvidia.com/gpu: "1"
+              rdma/ib: "1"
+          securityContext:
+            capabilities:
+              add:
+              - IPC_LOCK
+          stdin: true
+          tty: true
+          volumeMounts:
+          - mountPath: /dev/shm
+            name: dshm
+          - mountPath: /init-scripts
+            name: init-scripts-volume
+          workingDir: /app
+        serviceAccountName: deepsk-ai-deepsk-coder-v2-lite-instruct-sa
+        volumes:
+        - configMap:
+            defaultMode: 493
+            name: vllm-init-scripts-config
+          name: init-scripts-volume
+        - emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+          name: dshm
+  replicas: 1
+  rolloutStrategy:
+    type: ""
+  startupPolicy: LeaderCreated
+status: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    llm-d.ai/epp: deepsk-ai-deepsk-coder-v2-lite-instruct-epp
+  name: deepsk-ai-deepsk-coder-v2-lite-instruct-epp
+spec:
+  selector:
+    matchLabels:
+      llm-d.ai/epp: deepsk-ai-deepsk-coder-v2-lite-instruct-epp
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        llm-d.ai/epp: deepsk-ai-deepsk-coder-v2-lite-instruct-epp
+    spec:
+      containers:
+      - args:
+        - -poolName
+        - deepsk-ai-deepsk-coder-v2-lite-instruct-inference-pool
+        - -poolNamespace
+        - llmd-kalantar
+        - -v
+        - "5"
+        - --zap-encoder
+        - json
+        - -grpcPort
+        - "9002"
+        - -grpcHealthPort
+        - "9003"
+        env:
+        - name: PD_ENABLED
+          value: "true"
+        - name: PD_PROMPT_LEN_THRESHOLD
+          value: "10"
+        image: ghcr.io/llm-d/llm-d-inference-scheduler:0.0.3
+        livenessProbe:
+          failureThreshold: 3
+          grpc:
+            port: 9003
+            service: envoy.service.ext_proc.v3.ExternalProcessor
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        name: epp
+        ports:
+        - containerPort: 9002
+          protocol: TCP
+        - containerPort: 9003
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          grpc:
+            port: 9003
+            service: envoy.service.ext_proc.v3.ExternalProcessor
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources: {}
+      serviceAccountName: deepsk-ai-deepsk-coder-v2-lite-instruct-epp-sa
+status: {}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  creationTimestamp: null
+  name: deepsk-ai-deepsk-coder-v2-lite-instruct-epp-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: pod-read
+subjects:
+- kind: ServiceAccount
+  name: deepsk-ai-deepsk-coder-v2-lite-instruct-epp-sa
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    llm-d.ai/epp: deepsk-ai-deepsk-coder-v2-lite-instruct-epp
+  name: deepsk-ai-deepsk-coder-v2-lite-instruct-epp-service
+spec:
+  ports:
+  - appProtocol: http2
+    port: 9002
+    protocol: TCP
+    targetPort: 9002
+  selector:
+    llm-d.ai/epp: deepsk-ai-deepsk-coder-v2-lite-instruct-epp
+  type: ClusterIP
+status:
+  loadBalancer: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  creationTimestamp: null
+  name: deepsk-ai-deepsk-coder-v2-lite-instruct-epp-sa
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  creationTimestamp: null
+  name: deepsk-ai-deepsk-coder-v2-lite-instruct-http-route
+spec:
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: inference-gateway
+  rules:
+  - backendRefs:
+    - group: inference.networking.x-k8s.io
+      kind: InferencePool
+      name: deepsk-ai-deepsk-coder-v2-lite-instruct-inference-pool
+      port: 8080
+status:
+  parents: null
+---
+apiVersion: inference.networking.x-k8s.io/v1alpha2
+kind: InferenceModel
+metadata:
+  creationTimestamp: null
+  labels:
+    llm-d.ai/inferenceServing: "true"
+    llm-d.ai/model: deepseek-ai-deepseek-coder-v2-lite-instruct
+  name: deepsk-ai-deepsk-coder-v2-lite-instruct
+spec:
+  modelName: deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct
+  poolRef:
+    name: deepsk-ai-deepsk-coder-v2-lite-instruct-inference-pool
+status: {}
+---
+apiVersion: inference.networking.x-k8s.io/v1alpha2
+kind: InferencePool
+metadata:
+  creationTimestamp: null
+  name: deepsk-ai-deepsk-coder-v2-lite-instruct-inference-pool
+spec:
+  extensionRef:
+    failureMode: null
+    name: deepsk-ai-deepsk-coder-v2-lite-instruct-epp-service
+  selector:
+    leaderworkerset.sigs.k8s.io/worker-index: "0"
+    llm-d.ai/inferenceServing: "true"
+    llm-d.ai/model: deepseek-ai-deepseek-coder-v2-lite-instruct
+  targetPortNumber: 8080
+status: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  creationTimestamp: null
+  name: deepsk-ai-deepsk-coder-v2-lite-instruct-sa
+---
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  creationTimestamp: null
+  labels:
+    llm-d.ai/inferenceServing: "true"
+    llm-d.ai/model: deepseek-ai-deepseek-coder-v2-lite-instruct
+    llm-d.ai/role: prefill
+  name: deepsk-ai-deepsk-coder-v2-lite-instruct-prefill
+spec:
+  leaderWorkerTemplate:
+    leaderTemplate:
+      metadata:
+        creationTimestamp: null
+        labels:
+          llm-d.ai/inferenceServing: "true"
+          llm-d.ai/model: deepseek-ai-deepseek-coder-v2-lite-instruct
+          llm-d.ai/role: prefill
+      spec:
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: gpu.nvidia.com/model
+                  operator: In
+                  values:
+                  - H200
+        containers:
+        - args:
+          - |
+            # Squash a warning.
+            rm /etc/libibverbs.d/vmw_pvrdma.driver
+            #################
+            # Install vLLM
+            #################
+            /init-scripts/init-vllm.sh
+            #################
+            # RUN vLLM
+            #################
+            START_RANK=$(( ${LWS_WORKER_INDEX:-0} * DP_SIZE_LOCAL ))
+            if [ "${LWS_WORKER_INDEX:-0}" -eq 0 ]; then
+              #################
+              # Leader-only launch
+              #################
+              exec /app/venv/bin/vllm serve \
+                deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct \
+                --port 8080 \
+                --disable-log-requests \
+                --enable-expert-parallel \
+                --tensor-parallel-size $TP_SIZE \
+                --data-parallel-size $DP_SIZE \
+                --data-parallel-size-local $DP_SIZE_LOCAL \
+                --data-parallel-address $(LWS_LEADER_ADDRESS) \
+                --data-parallel-rpc-port 5555 \
+                --data-parallel-start-rank $START_RANK \
+                --trust-remote-code \
+                --kv-transfer-config \
+                  '{"kv_connector":"NixlConnector","kv_role":"kv_both"}' \
+                --enforce-eager
+            else
+              #################
+              # Worker-only launch
+              #################
+              exec /app/venv/bin/vllm serve \
+                deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct \
+                --port 8080 \
+                --disable-log-requests \
+                --enable-expert-parallel \
+                --tensor-parallel-size $TP_SIZE \
+                --data-parallel-size $DP_SIZE \
+                --data-parallel-size-local $DP_SIZE_LOCAL \
+                --data-parallel-address $(LWS_LEADER_ADDRESS) \
+                --data-parallel-rpc-port 5555 \
+                --data-parallel-start-rank $START_RANK \
+                --trust-remote-code \
+                --kv-transfer-config \
+                  '{"kv_connector":"NixlConnector","kv_role":"kv_both"}' \
+                --enforce-eager \
+                --headless
+            fi
+          command:
+          - /bin/sh
+          - -c
+          env:
+          - name: DP_SIZE
+            value: "2"
+          - name: TP_SIZE
+            value: "1"
+          - name: DP_SIZE_LOCAL
+            value: "1"
+          - name: VLLM_REPO_URL
+            value: https://github.com/vllm-project/vllm.git
+          - name: VLLM_BRANCH
+            value: main
+          - name: VLLM_ALL2ALL_BACKEND
+            value: pplx
+          - name: NVIDIA_GDRCOPY
+            value: enabled
+          - name: NCCL_DEBUG
+            value: INFO
+          - name: NVSHMEM_DEBUG
+            value: TRACE
+          - name: NVSHMEM_DEBUG_SUBSYS
+            value: TRANSPORT,INIT,MEM,COLL,BOOTSTRAP
+          - name: NVSHMEM_REMOTE_TRANSPORT
+            value: ibrc
+          - name: NVSHMEM_IB_ENABLE_IBGDA
+            value: "true"
+          - name: NVSHMEM_ENABLE_NIC_PE_MAPPING
+            value: "true"
+          - name: NVSHMEM_HCA_LIST
+            value: ibp0:1,ibp1:1,ibp2:1,ibp3:1,ibp4:1,ibp5:1,ibp6:1,ibp7:1
+          - name: NVSHMEM_BOOTSTRAP_UID_SOCK_IFNAME
+            value: eth0
+          - name: GLOO_SOCKET_IFNAME
+            value: eth0
+          - name: NCCL_SOCKET_IFNAME
+            value: eth0
+          - name: NCCL_IB_HCA
+            value: ibp
+          - name: VLLM_LOGGING_LEVEL
+            value: DEBUG
+          - name: HF_TOKEN
+            valueFrom:
+              secretKeyRef:
+                key: HF_TOKEN
+                name: hf-secret
+                optional: true
+          - name: GH_TOKEN_FROM_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: GH_TOKEN
+                name: gh-token-secret
+                optional: true
+          - name: VLLM_NIXL_SIDE_CHANNEL_PORT
+            value: "6555"
+          - name: VLLM_NIXL_SIDE_CHANNEL_HOST
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          image: quay.io/tms/vllm-dev-base:0.0.15
+          imagePullPolicy: Always
+          name: vllm-worker
+          resources:
+            limits:
+              ephemeral-storage: 256Gi
+              memory: 64Gi
+              nvidia.com/gpu: "1"
+              rdma/ib: "1"
+            requests:
+              cpu: "8"
+              ephemeral-storage: 256Gi
+              memory: 64Gi
+              nvidia.com/gpu: "1"
+              rdma/ib: "1"
+          securityContext:
+            capabilities:
+              add:
+              - IPC_LOCK
+          stdin: true
+          tty: true
+          volumeMounts:
+          - mountPath: /dev/shm
+            name: dshm
+          - mountPath: /init-scripts
+            name: init-scripts-volume
+          workingDir: /app
+        serviceAccountName: deepsk-ai-deepsk-coder-v2-lite-instruct-sa
+        volumes:
+        - configMap:
+            defaultMode: 493
+            name: vllm-init-scripts-config
+          name: init-scripts-volume
+        - emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+          name: dshm
+    restartPolicy: RecreateGroupOnPodRestart
+    size: 2
+    workerTemplate:
+      metadata:
+        creationTimestamp: null
+        labels:
+          llm-d.ai/inferenceServing: "true"
+          llm-d.ai/model: deepseek-ai-deepseek-coder-v2-lite-instruct
+          llm-d.ai/role: prefill
+      spec:
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: gpu.nvidia.com/model
+                  operator: In
+                  values:
+                  - H200
+        containers:
+        - args:
+          - |
+            # Squash a warning.
+            rm /etc/libibverbs.d/vmw_pvrdma.driver
+            #################
+            # Install vLLM
+            #################
+            /init-scripts/init-vllm.sh
+            #################
+            # RUN vLLM
+            #################
+            START_RANK=$(( ${LWS_WORKER_INDEX:-0} * DP_SIZE_LOCAL ))
+            if [ "${LWS_WORKER_INDEX:-0}" -eq 0 ]; then
+              #################
+              # Leader-only launch
+              #################
+              exec /app/venv/bin/vllm serve \
+                deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct \
+                --port 8080 \
+                --disable-log-requests \
+                --enable-expert-parallel \
+                --tensor-parallel-size $TP_SIZE \
+                --data-parallel-size $DP_SIZE \
+                --data-parallel-size-local $DP_SIZE_LOCAL \
+                --data-parallel-address $(LWS_LEADER_ADDRESS) \
+                --data-parallel-rpc-port 5555 \
+                --data-parallel-start-rank $START_RANK \
+                --trust-remote-code \
+                --kv-transfer-config \
+                  '{"kv_connector":"NixlConnector","kv_role":"kv_both"}' \
+                --enforce-eager
+            else
+              #################
+              # Worker-only launch
+              #################
+              exec /app/venv/bin/vllm serve \
+                deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct \
+                --port 8080 \
+                --disable-log-requests \
+                --enable-expert-parallel \
+                --tensor-parallel-size $TP_SIZE \
+                --data-parallel-size $DP_SIZE \
+                --data-parallel-size-local $DP_SIZE_LOCAL \
+                --data-parallel-address $(LWS_LEADER_ADDRESS) \
+                --data-parallel-rpc-port 5555 \
+                --data-parallel-start-rank $START_RANK \
+                --trust-remote-code \
+                --kv-transfer-config \
+                  '{"kv_connector":"NixlConnector","kv_role":"kv_both"}' \
+                --enforce-eager \
+                --headless
+            fi
+          command:
+          - /bin/sh
+          - -c
+          env:
+          - name: DP_SIZE
+            value: "2"
+          - name: TP_SIZE
+            value: "1"
+          - name: DP_SIZE_LOCAL
+            value: "1"
+          - name: VLLM_REPO_URL
+            value: https://github.com/vllm-project/vllm.git
+          - name: VLLM_BRANCH
+            value: main
+          - name: VLLM_ALL2ALL_BACKEND
+            value: pplx
+          - name: NVIDIA_GDRCOPY
+            value: enabled
+          - name: NCCL_DEBUG
+            value: INFO
+          - name: NVSHMEM_DEBUG
+            value: TRACE
+          - name: NVSHMEM_DEBUG_SUBSYS
+            value: TRANSPORT,INIT,MEM,COLL,BOOTSTRAP
+          - name: NVSHMEM_REMOTE_TRANSPORT
+            value: ibrc
+          - name: NVSHMEM_IB_ENABLE_IBGDA
+            value: "true"
+          - name: NVSHMEM_ENABLE_NIC_PE_MAPPING
+            value: "true"
+          - name: NVSHMEM_HCA_LIST
+            value: ibp0:1,ibp1:1,ibp2:1,ibp3:1,ibp4:1,ibp5:1,ibp6:1,ibp7:1
+          - name: NVSHMEM_BOOTSTRAP_UID_SOCK_IFNAME
+            value: eth0
+          - name: GLOO_SOCKET_IFNAME
+            value: eth0
+          - name: NCCL_SOCKET_IFNAME
+            value: eth0
+          - name: NCCL_IB_HCA
+            value: ibp
+          - name: VLLM_LOGGING_LEVEL
+            value: DEBUG
+          - name: HF_TOKEN
+            valueFrom:
+              secretKeyRef:
+                key: HF_TOKEN
+                name: hf-secret
+                optional: true
+          - name: GH_TOKEN_FROM_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: GH_TOKEN
+                name: gh-token-secret
+                optional: true
+          - name: VLLM_NIXL_SIDE_CHANNEL_PORT
+            value: "6555"
+          - name: VLLM_NIXL_SIDE_CHANNEL_HOST
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          image: quay.io/tms/vllm-dev-base:0.0.15
+          imagePullPolicy: Always
+          name: vllm-worker
+          resources:
+            limits:
+              ephemeral-storage: 256Gi
+              memory: 64Gi
+              nvidia.com/gpu: "1"
+              rdma/ib: "1"
+            requests:
+              cpu: "8"
+              ephemeral-storage: 256Gi
+              memory: 64Gi
+              nvidia.com/gpu: "1"
+              rdma/ib: "1"
+          securityContext:
+            capabilities:
+              add:
+              - IPC_LOCK
+          stdin: true
+          tty: true
+          volumeMounts:
+          - mountPath: /dev/shm
+            name: dshm
+          - mountPath: /init-scripts
+            name: init-scripts-volume
+          workingDir: /app
+        serviceAccountName: deepsk-ai-deepsk-coder-v2-lite-instruct-sa
+        volumes:
+        - configMap:
+            defaultMode: 493
+            name: vllm-init-scripts-config
+          name: init-scripts-volume
+        - emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+          name: dshm
+  replicas: 1
+  rolloutStrategy:
+    type: ""
+  startupPolicy: LeaderCreated
+status: {}
+

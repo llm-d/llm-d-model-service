@@ -162,7 +162,6 @@ data:
                 - {{ .InferencePoolName }}
                 - -poolNamespace
                 - {{ .ModelServiceNamespace }}
-                - serverless-workstream
                 - -v
                 - "4"
                 - --zap-encoder
@@ -214,6 +213,10 @@ data:
     apiVersion: gateway.networking.k8s.io/v1
     kind: HTTPRoute
     spec:
+      parentRefs:
+      - group: gateway.networking.k8s.io
+        kind: Gateway
+        name: inference-gateway
       rules:
       - backendRefs:
         - group: inference.networking.x-k8s.io
