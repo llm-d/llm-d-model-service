@@ -453,3 +453,22 @@ uninstall-rbac: check-kubectl check-kustomize check-envsubst ## Uninstall RBAC
 .PHONY: install-hooks
 install-hooks: ## Install git hooks
 	git config core.hooksPath hooks
+
+.PHONY: api-docs
+api-docs: ## Generate API documentation
+	@command -v crd-ref-docs >/dev/null 2>&1 || { \
+		echo "Installing crd-ref-docs..."; \
+		go install github.com/elastic/crd-ref-docs@latest; \
+	}
+	@command -v asciidoctor >/dev/null 2>&1 || { \
+		echo "Installing asciidoctor..."; \
+		sudo gem install asciidoctor; \
+	}
+	crd-ref-docs --source-path=./api/v1alpha1 \
+		--config=docs/api_reference/config.yaml \
+		--renderer=asciidoctor \
+		--output-path=docs/api_reference/out.asciidoc
+	asciidoctor docs/api_reference/out.asciidoc -o docs/api_reference/out.html
+	@echo "✅ API documentation generated in:"
+	@echo "  - docs/api_reference/out.asciidoc"
+	@echo "  - docs/api_reference/out.html"
