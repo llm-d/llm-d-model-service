@@ -119,6 +119,7 @@ endpointPicker:
     port: 9002
     targetPort: 9002
     appProtocol: http2
+  role: pod-read
   
   autoscaling:
     enabled: false

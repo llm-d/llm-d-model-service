@@ -14,6 +14,10 @@ routing:
     image: ghcr.io/llm-d/llm-d-routing-sidecar:0.0.6
     targetPort: 8200
     debugLevel: 5
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: inference-gateway
 
 modelArtifacts:
   # When specfying the URI with `hf` prefix, the <repo-id>/<model-id> string
@@ -30,14 +34,14 @@ decode:
   replicas: 1
 
   parallelism:  
-    tensor: 3
+    tensor: 2
     data: 2
     dataLocal: 1 
   
   acceleratorTypes:
-    labelKey: nvidia.com/gpu.product
+    labelKey: gpu.nvidia.com/model
     labelValues:
-      - NVIDIA-H200
+      - H200
 
   containers:
     - name: vllm-worker
@@ -64,8 +68,10 @@ decode:
             # Leader-only launch
             #################
             exec /app/venv/bin/vllm serve \
-              {{ .HFModelName }} \
-              --port {{ "internal_port" | getPort }} \
+              #### MK
+              deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct \
+              #### MK
+              --port 8200 \
               --disable-log-requests \
               --enable-expert-parallel \
               --tensor-parallel-size $TP_SIZE \
@@ -83,8 +89,10 @@ decode:
             # Worker-only launch
             #################
             exec /app/venv/bin/vllm serve \
-              {{ .HFModelName }} \
-              --port {{ "internal_port" | getPort }} \
+              #### MK
+              deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct \
+              #### MK
+              --port 8200 \
               --disable-log-requests \
               --enable-expert-parallel \
               --tensor-parallel-size $TP_SIZE \
@@ -201,14 +209,25 @@ prefill:
   replicas: 1
 
   parallelism:  
-    tensor: 3
+    tensor: 2
     data: 2
     dataLocal: 1 
   
   acceleratorTypes:
-    labelKey: nvidia.com/gpu.product
+    labelKey: gpu.nvidia.com/model
     labelValues:
-      - NVIDIA-H200
+      - H200
+
+  volumes:
+    - configMap:
+        defaultMode: 493
+        name: vllm-init-scripts-config
+      name: init-scripts-volume
+    - emptyDir:
+        medium: Memory
+        sizeLimit: 1Gi
+      name: dshm
+
 
   containers:
     - name: vllm-worker
@@ -235,8 +254,10 @@ prefill:
             # Leader-only launch
             #################
             exec /app/venv/bin/vllm serve \
-              {{ .HFModelName }} \
-              --port {{ "internal_port" | getPort }} \
+              #### MK
+              deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct \
+              #### MK
+              --port 8200 \
               --disable-log-requests \
               --enable-expert-parallel \
               --tensor-parallel-size $TP_SIZE \
@@ -254,8 +275,10 @@ prefill:
             # Worker-only launch
             #################
             exec /app/venv/bin/vllm serve \
-              {{ .HFModelName }} \
-              --port {{ "internal_port" | getPort }} \
+              #### MK
+              deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct \
+              #### MK
+              --port 8200 \
               --disable-log-requests \
               --enable-expert-parallel \
               --tensor-parallel-size $TP_SIZE \
@@ -366,6 +389,8 @@ prefill:
       mountModelVolume: true
     
 endpointPicker:
+  image: ghcr.io/llm-d/llm-d-inference-scheduler:0.0.3
+  debugLevel: 5
   # This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
   service:
     # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
@@ -380,54 +405,6 @@ endpointPicker:
   autoscaling:
     enabled: false
   replicas: 1
-  
-  containers:
-  - name: "epp"
-    image: "ghcr.io/llm-d/llm-d-inference-scheduler:0.0.3"  
-    # command: 
-    args:
-      # - -poolName
-      # - InferencePoolName
-      # - -poolNamespace
-      # - llmd-kalantar
-      - -v
-      - "5"
-      - --zap-encoder
-      - json
-      - -grpcPort
-      - "9002"
-      - -grpcHealthPort
-      - "9003"
-    env:
-      - name: PD_ENABLED
-        value: "true"
-      - name: PD_PROMPT_LEN_THRESHOLD
-        value: "10"
-    ports:
-      - containerPort: 9002
-        protocol: TCP
-      - containerPort: 9003
-        protocol: TCP
-      - containerPort: 9090
-        name: metrics
-        protocol: TCP
-    livenessProbe:
-      failureThreshold: 3
-      grpc:
-        port: 9003
-        service: envoy.service.ext_proc.v3.ExternalProcessor
-      initialDelaySeconds: 5
-      periodSeconds: 10
-    readinessProbe:
-      failureThreshold: 3
-      grpc:
-        port: 9003
-        service: envoy.service.ext_proc.v3.ExternalProcessor
-      initialDelaySeconds: 5
-      periodSeconds: 10
-
-
-
 
 # This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
 serviceAccount:

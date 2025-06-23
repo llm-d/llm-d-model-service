@@ -32,6 +32,7 @@ spec:
         - "9002"
         - --grpcHealthPort
         - "9003"
+        # using defaults from https://github.com/llm-d/llm-d-deployer/blob/main/charts/llm-d/values.yaml#L563-L603
         env:
         - name: ENABLE_KVCACHE_AWARE_SCORER
           value: "false"

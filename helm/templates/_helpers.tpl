@@ -59,7 +59,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/* Common P/D labels */}}
 {{- define "llm-d-modelservice.pdlabels" -}}
 llm-d.ai/inferenceServing: "true"
-llm-d.ai/model: {{ (include "llm-d-modelservice.sanitizedModelName" .) -}}
+llm-d.ai/model: {{ (include "llm-d-modelservice.fullname" .) -}}
 {{- end }}
 
 {{/* prefill labels */}}
@@ -116,7 +116,7 @@ initContainers:
 
 {{/* Desired P/D data parallelism -- user set or defaults to 1 */}}
 {{- define "llm-d-modelservice.dataParallelism" -}}
-{{- if and . .data }}{{ .data }}{{ else }}10{{ end }}
+{{- if and . .data }}{{ .data }}{{ else }}1{{ end }}
 {{- end }}
 
 {{/* P/D deployment container resources */}}
@@ -166,23 +166,29 @@ llm-d.ai/epp: {{ include "llm-d-modelservice.fullname" . }}-epp
 Volumes for PD containers based on model artifact prefix
 */}}
 {{- define "llm-d-modelservice.mountModelVolumeVolumes" -}}
-{{- $parsedArtifacts := regexSplit "://" .Values.modelArtifacts.uri -1 -}}
+{{- $parsedArtifacts := regexSplit "://" .uri -1 -}}
 {{- $protocol := first $parsedArtifacts -}}
 {{- $path := last $parsedArtifacts -}}
 {{- if eq $protocol "hf" -}}
 - name: model-storage
   emptyDir: 
-    sizeLimit: {{ default "0" .Values.modelArtifacts.size }}
+    sizeLimit: {{ default "0" .size }}
 {{- else if eq $protocol "pvc" }}
+{{- $parsedArtifacts := regexSplit "/" $path -1 -}}
+{{- $claim := first $parsedArtifacts -}}
 - name: model-storage
   persistentVolumeClaim:
-    claimName: {{ $path }}
+    claimName: {{ $claim }}
+    path: /{{ last $parsedArtifacts }}
     readOnly: true
 {{- else if eq $protocol "oci" }}
 - name: model-storage
   image:
     reference: {{ $path }}
-    pullPolicy: {{ default "Always" .Values.modelArtifacts.imagePullPolicy }}
+    pullPolicy: {{ default "Always" .imagePullPolicy }}
+{{- else }}
+- name: {{ $protocol }}
+  path: {{ $path }}
 {{- end }}
 {{- end }}
 
@@ -206,17 +212,22 @@ volumeMounts:
 {{- end }}
 
 {{- define "llm-d-modelservice.modelPod" -}}
-  {{- with .Values.decode.imagePullSecrets }}
+  {{- with .pdSpec.imagePullSecrets }}
   imagePullSecrets:
     {{- toYaml . | nindent 2 }}
   {{- end }}
   serviceAccountName: {{ include "llm-d-modelservice.pdServiceAccountName" . }}
-  {{- with .Values.podSecurityContext }}
+  {{- with .pdSpec.podSecurityContext }}
   securityContext:
-    {{- toYaml . | nindent 2 }}
+    {{- toYaml . | nindent 4 }}
   {{- end }}
-  {{- with .Values.decode.acceleratorTypes }}
+  {{- with .pdSpec.acceleratorTypes }}
   {{- include "llm-d-modelservice.acceleratorTypes" . | nindent 2 }}
+  {{- end }}
+  {{- if or .pdSpec.volumes .pdSpec.mountModelVolume }}
+  volumes:
+    {{- toYaml .pdSpec.volumes | nindent 4 }}
+    {{ include "llm-d-modelservice.mountModelVolumeVolumes" .Values.modelArtifacts | nindent 4}}
   {{- end }}
 {{- end }} {{- /* define "llm-d-modelservice.modelPod" */}}
 
@@ -225,7 +236,7 @@ volumeMounts:
   image: {{ required "image of container is required" .container.image }}
   {{- with .container.securityContext }}
   securityContext:
-    {{- toYaml . | nindent 2 }}
+    {{- toYaml . | nindent 4 }}
   {{- end }}
   {{- with .container.imagePullPolicy }}
   imagePullPolicy: {{ . }}
@@ -239,12 +250,18 @@ volumeMounts:
     {{- toYaml . | nindent 2 }}
   {{- end }}
   {{- /* insert user's env for this container */}}
-  {{- if or .container.env .container.mountModelVolume}}
+  {{- if or .container.env .container.mountModelVolume }}
   env:
   {{- end }}
   {{- with .container.env }}
     {{- toYaml . | nindent 2 }}
   {{- end }}
+  - name: DP_SIZE
+    value: {{ include "llm-d-modelservice.tensorParallelism" .parallelism | quote }}
+  - name: TP_SIZE
+    value: {{ include "llm-d-modelservice.dataParallelism" .parallelism | quote }}
+  - name: DP_SIZE_LOCAL
+    value: "1"
   {{- /* insert envs based on what modelArtifact prefix */}}
   {{- if .container.mountModelVolume }}
   - name: HF_HOME
@@ -252,9 +269,9 @@ volumeMounts:
   {{- with .authSecretName }}
   - name: HF_TOKEN
     valueFrom:
-    secretKeyRef:
-      name: {{ . }}
-      key: HF_TOKEN
+      secretKeyRef:
+        name: {{ . }}
+        key: HF_TOKEN
   {{- end }}
   {{- end }}
   {{- with .container.livenessProbe }}
