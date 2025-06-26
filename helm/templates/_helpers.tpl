@@ -154,16 +154,8 @@ resources:
 {{- end }}
 
 {{/*
-EPP selector labels
-*/}}
-{{- define "llm-d-modelservice.eppSelectorLabels" -}}
-app.kubernetes.io/name: {{ include "llm-d-modelservice.name" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
-llm-d.ai/epp: {{ include "llm-d-modelservice.fullname" . }}-epp
-{{- end }}
-
-{{/*
 Volumes for PD containers based on model artifact prefix
+Context is .Values.modelArtifacts
 */}}
 {{- define "llm-d-modelservice.mountModelVolumeVolumes" -}}
 {{- $parsedArtifacts := regexSplit "://" .uri -1 -}}
@@ -210,6 +202,10 @@ volumeMounts:
 {{- end }}
 {{- end }}
 
+{{/*
+Pod elements of deployment/lws spec template
+context is a pdSpec
+*/}}
 {{- define "llm-d-modelservice.modelPod" -}}
   {{- with .pdSpec.imagePullSecrets }}
   imagePullSecrets:
