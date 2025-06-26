@@ -119,7 +119,8 @@ endpointPicker:
     port: 9002
     targetPort: 9002
     appProtocol: http2
-  role: pod-read
+  # The name of cluster role containing permissions to be granted to endpointPicker (via a role binding to the service account)
+  permissions: pod-read
   
   autoscaling:
     enabled: false

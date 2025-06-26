@@ -5,7 +5,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ required "role for inference schedule required" .Values.endpointPicker.role }}
+  name: {{ required "role for inference schedule required" .Values.endpointPicker.permissions }}
 subjects:
 - kind: ServiceAccount
   name: {{ include "llm-d-modelservice.eppServiceAccountName" . }}

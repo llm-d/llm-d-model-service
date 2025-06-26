@@ -148,7 +148,10 @@ resources:
 {{ include "llm-d-modelservice.fullname" . }}-sa
 {{- end }}
 
-{{/* EPP service account name */}}
+{{/* 
+EPP service account name 
+Context is helm root context
+*/}}
 {{- define "llm-d-modelservice.eppServiceAccountName" -}}
 {{ include "llm-d-modelservice.fullname" . }}-epp-sa
 {{- end }}
@@ -177,9 +180,6 @@ Context is .Values.modelArtifacts
   image:
     reference: {{ $path }}
     pullPolicy: {{ default "Always" .imagePullPolicy }}
-{{- else }}
-- name: {{ $protocol }}
-  path: {{ $path }}
 {{- end }}
 {{- end }}
 
@@ -226,6 +226,13 @@ context is a pdSpec
   {{- end }}
 {{- end }} {{- /* define "llm-d-modelservice.modelPod" */}}
 
+{{/*
+Container elements of deployment/lws spec template
+context is a dict with
+   key - "container"; value - container spec
+   key - "authSecretName"; value - $.Values.modelArtifacts.authSecretName
+   key - "parallelism"; value - $.Values.decode.parallelism
+*/}}
 {{- define "llm-d-modelservice.container" -}}
 - name: {{ default "vllm" .container.name }}
   image: {{ required "image of container is required" .container.image }}
