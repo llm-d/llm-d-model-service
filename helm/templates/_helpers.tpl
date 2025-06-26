@@ -179,7 +179,6 @@ Volumes for PD containers based on model artifact prefix
 - name: model-storage
   persistentVolumeClaim:
     claimName: {{ $claim }}
-    path: /{{ last $parsedArtifacts }}
     readOnly: true
 {{- else if eq $protocol "oci" }}
 - name: model-storage
