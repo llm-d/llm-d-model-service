@@ -119,6 +119,14 @@ initContainers:
 {{- if and . .data }}{{ .data }}{{ else }}1{{ end }}
 {{- end }}
 
+{{/*
+Port on which vllm container should listen.
+Context is helm root context plus key "role" ("decode" or "prefill")
+*/}}
+{{- define "llm-d-modelservice.vllmPort" -}}
+{{- if eq .role "prefill" }}{{ .Values.routing.servicePort }}{{ else }}{{ .Values.routing.proxy.targetPort }}{{ end }}
+{{- end }}
+
 {{/* P/D deployment container resources */}}
 {{- define "llm-d-modelservice.resources" -}}
 {{- $tensorParallelism := int (include "llm-d-modelservice.tensorParallelism" .parallelism) -}}
@@ -228,9 +236,9 @@ context is a pdSpec
 
 {{/*
 Container elements of deployment/lws spec template
-context is a dict with
+context is a dict with helm root context plus:
    key - "container"; value - container spec
-   key - "authSecretName"; value - $.Values.modelArtifacts.authSecretName
+   key - "roll"; value - either "decode" or "prefill"
    key - "parallelism"; value - $.Values.decode.parallelism
 */}}
 {{- define "llm-d-modelservice.container" -}}
@@ -247,8 +255,11 @@ context is a dict with
   command:
     {{- toYaml . | nindent 2 }}
   {{- end }}
-  {{- with .container.args }}
   args:
+  - {{ .Values.routing.modelName | quote }}
+  - --port
+  - {{ (include "llm-d-modelservice.vllmPort" .) | quote }}
+  {{- with .container.args }}
     {{- toYaml . | nindent 2 }}
   {{- end }}
   {{- /* insert user's env for this container */}}
@@ -268,7 +279,7 @@ context is a dict with
   {{- if .container.mountModelVolume }}
   - name: HF_HOME
     value: /model-cache
-  {{- with .authSecretName }}
+  {{- with .Values.modelArtifacts.authSecretName }}
   - name: HF_TOKEN
     valueFrom:
       secretKeyRef:

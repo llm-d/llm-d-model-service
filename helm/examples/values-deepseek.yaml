@@ -364,11 +364,8 @@ prefill:
 endpointPicker:
   image: ghcr.io/llm-d/llm-d-inference-scheduler:0.0.3
   debugLevel: 5
-  # This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
   service:
-    # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
     type: ClusterIP
-    # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
     port: 9002
     targetPort: 9002
     appProtocol: http2

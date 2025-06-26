@@ -13,9 +13,7 @@ routing:
     image: ghcr.io/llm-d/llm-d-routing-sidecar:0.0.6
     targetPort: 8200
   parentRefs:
-  - group: gateway.networking.k8s.io
-    kind: Gateway
-    name: inference-gateway
+  - name: inference-gateway
 
 modelArtifacts:
   uri: "hf://facebook/opt-125m"
@@ -31,9 +29,6 @@ decode:
       - vllm
       - serve
     args:
-      - "facebook/opt-125m"
-      - "--port"
-      - "8200"  # internalPort
       - "--enforce-eager"
       - "--kv-transfer-config"
       - '{"kv_connector":"NixlConnector", "kv_role":"kv_both"}'
@@ -76,9 +71,6 @@ prefill:
       - vllm 
       - serve
     args:
-      - "facebook/opt-125m"
-      - "--port"
-      - "8000"  # servicePort
       - "--enforce-eager"
       - "--kv-transfer-config"
       - '{"kv_connector":"NixlConnector", "kv_role":"kv_both"}'
@@ -111,11 +103,8 @@ prefill:
         nvidia.com/gpu: "1"
     
 endpointPicker:
-  # This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
   service:
-    # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
     type: ClusterIP
-    # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
     port: 9002
     targetPort: 9002
     appProtocol: http2
