@@ -14,12 +14,14 @@ routing:
     image: ghcr.io/llm-d/llm-d-routing-sidecar:0.0.6
     targetPort: 8200
     debugLevel: 5
+  parentRefs:
+  - name: inference-gateway
 
 modelArtifacts:
   # When specfying the URI with `hf` prefix, the <repo-id>/<model-id> string
   # is extracted and exposed as a template variable that can be used as {{ .HFModelName }}
   
-  uri: "hf://deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct"
+  uri: "pvc://tms-hf-cache/model-cache"
   authSecretName: "hf-secret"
   size: 5Mi 
 
@@ -30,18 +32,36 @@ decode:
   replicas: 1
 
   parallelism:  
-    tensor: 3
-    data: 2
+    tensor: 1
+    data: 1
     dataLocal: 1 
   
   acceleratorTypes:
-    labelKey: nvidia.com/gpu.product
+    labelKey: gpu.nvidia.com/model
     labelValues:
-      - NVIDIA-H200
+      - H200
+
+  volumes:
+    # Volume for the init script from ConfigMap
+    - name: init-scripts-volume
+      configMap:
+        defaultMode: 0755
+        name: vllm-init-scripts-config
+    # Needed for NCCL to function
+    - name: dshm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 1Gi
+    # - name: hf-cache
+    #   persistentVolumeClaim:
+    #     claimName: tms-hf-cache
+    - name: vllm
+      persistentVolumeClaim:
+        claimName: tms-vllm
 
   containers:
     - name: vllm-worker
-      image: "quay.io/tms/vllm-dev-base:0.0.15"
+      image: "quay.io/tms/vllm-dev-pplx:0.1.0"
       imagePullPolicy: Always
       workingDir: /app
       stdin: true
@@ -49,12 +69,10 @@ decode:
       command: ["/bin/sh","-c"]
       args:
         - |
-          # Squash a warning.
-          rm /etc/libibverbs.d/vmw_pvrdma.driver
           #################
           # Install vLLM
           #################
-          /init-scripts/init-vllm.sh
+          VLLM_USE_PRECOMPILED=1 /init-scripts/vllm.sh
           #################
           # RUN vLLM
           #################
@@ -64,8 +82,8 @@ decode:
             # Leader-only launch
             #################
             exec /app/venv/bin/vllm serve \
-              {{ .HFModelName }} \
-              --port {{ "internal_port" | getPort }} \
+              deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct \
+              --port 8200 \
               --disable-log-requests \
               --enable-expert-parallel \
               --tensor-parallel-size $TP_SIZE \
@@ -75,16 +93,14 @@ decode:
               --data-parallel-rpc-port 5555 \
               --data-parallel-start-rank $START_RANK \
               --trust-remote-code \
-              --kv-transfer-config \
-                '{"kv_connector":"NixlConnector","kv_role":"kv_both"}' \
               --enforce-eager
           else
             #################
             # Worker-only launch
             #################
             exec /app/venv/bin/vllm serve \
-              {{ .HFModelName }} \
-              --port {{ "internal_port" | getPort }} \
+              deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct \
+              --port 8200 \
               --disable-log-requests \
               --enable-expert-parallel \
               --tensor-parallel-size $TP_SIZE \
@@ -94,55 +110,36 @@ decode:
               --data-parallel-rpc-port 5555 \
               --data-parallel-start-rank $START_RANK \
               --trust-remote-code \
-              --kv-transfer-config \
-                '{"kv_connector":"NixlConnector","kv_role":"kv_both"}' \
               --enforce-eager \
               --headless
           fi
       env:
-        - name: DP_SIZE
-          value: "{{ .DecodeDataParallelism }}"
-        - name: TP_SIZE
-          value: "{{ .DecodeTensorParallelism }}"
-        - name: DP_SIZE_LOCAL
+        - name: CUDA_LAUNCH_BLOCKING
           value: "1"
         - name: VLLM_REPO_URL
           value: "https://github.com/vllm-project/vllm.git"
         - name: VLLM_BRANCH
           value: "main"
+        #- name: VLLM_USE_DEEP_GEMM
+        #  value: "1"
         - name: VLLM_ALL2ALL_BACKEND
-#                    value: "naive"
+        #  value: "naive"
           value: "pplx"
-#                    value: "deepep_high_throughput"
-#                    value: "deepep_low_latency"
-#
-          # Needed for GDRCOPY to be used.
-          # See: https://github.com/NVIDIA/nvidia-container-toolkit/releases/tag/v1.15.0
+        #  value: "deepep_high_throughput"
+        #  value: "deepep_low_latency"
+        # Needed for GDRCOPY to be used.
+        # See: https://github.com/NVIDIA/nvidia-container-toolkit/releases/tag/v1.15.0
         - name: NVIDIA_GDRCOPY
           value: "enabled"
-#                  - name: NVIDIA_NVSWITCH
-#                    value: "enabled"
-#                  - name: NVIDIA_GDS
-#                    value: "enabled"
-
-        # NVIDIA_MOFED is likely needed for using IBGDA but causes crashes
-#                  - name: NVIDIA_MOFED
-#                    value: "enabled"
-#
-        - name: NCCL_DEBUG
-          value: "INFO"
         - name: NVSHMEM_DEBUG
-          value: "TRACE"
-        - name: NVSHMEM_DEBUG_SUBSYS
-          value: "TRANSPORT,INIT,MEM,COLL,BOOTSTRAP"
+          value: "INFO"
+        # Uncomment for debugging
+        #- name: NVSHMEM_DEBUG_SUBSYS
+        #  value: "TRANSPORT,INIT,MEM,COLL,BOOTSTRAP"
         - name: NVSHMEM_REMOTE_TRANSPORT
-          value: "ibrc"
+          value: "ibgda"
         - name: NVSHMEM_IB_ENABLE_IBGDA
           value: "true"
-        - name: NVSHMEM_ENABLE_NIC_PE_MAPPING
-          value: "true"
-        - name: NVSHMEM_HCA_LIST
-          value: "ibp0:1,ibp1:1,ibp2:1,ibp3:1,ibp4:1,ibp5:1,ibp6:1,ibp7:1"
         - name: NVSHMEM_BOOTSTRAP_UID_SOCK_IFNAME
           value: "eth0"
         - name: GLOO_SOCKET_IFNAME
@@ -153,12 +150,8 @@ decode:
           value: "ibp"
         - name: VLLM_LOGGING_LEVEL
           value: "DEBUG"
-        - name: HF_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: hf-secret
-              key: HF_TOKEN
-              optional: true
+        #MK - name: HF_HUB_CACHE
+        #MK   value: /huggingface-cache
         - name: GH_TOKEN_FROM_SECRET
           valueFrom:
             secretKeyRef:
@@ -174,17 +167,19 @@ decode:
 
       securityContext:
         capabilities:
-          add: [ "IPC_LOCK" ]
+          add:
+          - "IPC_LOCK"
+          - "SYS_RAWIO"
       resources:
         limits:
           nvidia.com/gpu: 1
           memory: 64Gi
-          ephemeral-storage: 256Gi
+          ephemeral-storage: 64Gi
           rdma/ib: 1
         requests:
           cpu: 8
           memory: 64Gi
-          ephemeral-storage: 256Gi
+          ephemeral-storage: 64Gi
           nvidia.com/gpu: 1
           rdma/ib: 1
       volumeMounts:
@@ -192,6 +187,10 @@ decode:
           name: dshm
         - name: init-scripts-volume
           mountPath: /init-scripts
+        #MK - name: hf-cache
+        #MK   mountPath: /huggingface-cache
+        - name: vllm
+          mountPath: /code
       mountModelVolume: true
 
 # describe prefill pods
@@ -201,18 +200,37 @@ prefill:
   replicas: 1
 
   parallelism:  
-    tensor: 3
-    data: 2
+    tensor: 1
+    data: 1
     dataLocal: 1 
   
   acceleratorTypes:
-    labelKey: nvidia.com/gpu.product
+    labelKey: gpu.nvidia.com/model
     labelValues:
-      - NVIDIA-H200
+      - H200
+
+  volumes:
+    # Volume for the init script from ConfigMap
+    - name: init-scripts-volume
+      configMap:
+        defaultMode: 0755
+        name: vllm-init-scripts-config
+    # Needed for NCCL to function
+    - name: dshm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 1Gi
+    # - name: hf-cache
+    #   persistentVolumeClaim:
+    #     claimName: tms-hf-cache
+    - name: vllm
+      persistentVolumeClaim:
+        claimName: tms-vllm
+
 
   containers:
     - name: vllm-worker
-      image: "quay.io/tms/vllm-dev-base:0.0.15"
+      image: "quay.io/tms/vllm-dev-pplx:0.1.0"
       imagePullPolicy: Always
       workingDir: /app
       stdin: true
@@ -220,12 +238,10 @@ prefill:
       command: ["/bin/sh","-c"]
       args:
         - |
-          # Squash a warning.
-          rm /etc/libibverbs.d/vmw_pvrdma.driver
           #################
           # Install vLLM
           #################
-          /init-scripts/init-vllm.sh
+          VLLM_USE_PRECOMPILED=1 /init-scripts/vllm.sh
           #################
           # RUN vLLM
           #################
@@ -235,8 +251,8 @@ prefill:
             # Leader-only launch
             #################
             exec /app/venv/bin/vllm serve \
-              {{ .HFModelName }} \
-              --port {{ "internal_port" | getPort }} \
+              deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct \
+              --port 8080 \
               --disable-log-requests \
               --enable-expert-parallel \
               --tensor-parallel-size $TP_SIZE \
@@ -246,16 +262,14 @@ prefill:
               --data-parallel-rpc-port 5555 \
               --data-parallel-start-rank $START_RANK \
               --trust-remote-code \
-              --kv-transfer-config \
-                '{"kv_connector":"NixlConnector","kv_role":"kv_both"}' \
               --enforce-eager
           else
             #################
             # Worker-only launch
             #################
             exec /app/venv/bin/vllm serve \
-              {{ .HFModelName }} \
-              --port {{ "internal_port" | getPort }} \
+              deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct \
+              --port 8080 \
               --disable-log-requests \
               --enable-expert-parallel \
               --tensor-parallel-size $TP_SIZE \
@@ -265,55 +279,35 @@ prefill:
               --data-parallel-rpc-port 5555 \
               --data-parallel-start-rank $START_RANK \
               --trust-remote-code \
-              --kv-transfer-config \
-                '{"kv_connector":"NixlConnector","kv_role":"kv_both"}' \
-              --enforce-eager \
               --headless
           fi
       env:
-        - name: DP_SIZE
-          value: "{{ .DecodeDataParallelism }}"
-        - name: TP_SIZE
-          value: "{{ .DecodeTensorParallelism }}"
-        - name: DP_SIZE_LOCAL
+        - name: CUDA_LAUNCH_BLOCKING
           value: "1"
         - name: VLLM_REPO_URL
           value: "https://github.com/vllm-project/vllm.git"
         - name: VLLM_BRANCH
           value: "main"
+        #- name: VLLM_USE_DEEP_GEMM
+        #  value: "1"
         - name: VLLM_ALL2ALL_BACKEND
-#                    value: "naive"
+        #  value: "naive"
           value: "pplx"
-#                    value: "deepep_high_throughput"
-#                    value: "deepep_low_latency"
-#
-          # Needed for GDRCOPY to be used.
-          # See: https://github.com/NVIDIA/nvidia-container-toolkit/releases/tag/v1.15.0
+        #  value: "deepep_high_throughput"
+        #  value: "deepep_low_latency"
+        # Needed for GDRCOPY to be used.
+        # See: https://github.com/NVIDIA/nvidia-container-toolkit/releases/tag/v1.15.0
         - name: NVIDIA_GDRCOPY
           value: "enabled"
-#                  - name: NVIDIA_NVSWITCH
-#                    value: "enabled"
-#                  - name: NVIDIA_GDS
-#                    value: "enabled"
-
-        # NVIDIA_MOFED is likely needed for using IBGDA but causes crashes
-#                  - name: NVIDIA_MOFED
-#                    value: "enabled"
-#
-        - name: NCCL_DEBUG
-          value: "INFO"
         - name: NVSHMEM_DEBUG
-          value: "TRACE"
-        - name: NVSHMEM_DEBUG_SUBSYS
-          value: "TRANSPORT,INIT,MEM,COLL,BOOTSTRAP"
+          value: "INFO"
+        # Uncomment for debugging
+        #- name: NVSHMEM_DEBUG_SUBSYS
+        #  value: "TRANSPORT,INIT,MEM,COLL,BOOTSTRAP"
         - name: NVSHMEM_REMOTE_TRANSPORT
-          value: "ibrc"
+          value: "ibgda"
         - name: NVSHMEM_IB_ENABLE_IBGDA
           value: "true"
-        - name: NVSHMEM_ENABLE_NIC_PE_MAPPING
-          value: "true"
-        - name: NVSHMEM_HCA_LIST
-          value: "ibp0:1,ibp1:1,ibp2:1,ibp3:1,ibp4:1,ibp5:1,ibp6:1,ibp7:1"
         - name: NVSHMEM_BOOTSTRAP_UID_SOCK_IFNAME
           value: "eth0"
         - name: GLOO_SOCKET_IFNAME
@@ -324,12 +318,8 @@ prefill:
           value: "ibp"
         - name: VLLM_LOGGING_LEVEL
           value: "DEBUG"
-        - name: HF_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: hf-secret
-              key: HF_TOKEN
-              optional: true
+        #MK - name: HF_HUB_CACHE
+        #MK   value: /huggingface-cache
         - name: GH_TOKEN_FROM_SECRET
           valueFrom:
             secretKeyRef:
@@ -345,17 +335,19 @@ prefill:
 
       securityContext:
         capabilities:
-          add: [ "IPC_LOCK" ]
+          add:
+          - "IPC_LOCK"
+          - "SYS_RAWIO"
       resources:
         limits:
           nvidia.com/gpu: 1
           memory: 64Gi
-          ephemeral-storage: 256Gi
+          ephemeral-storage: 64Gi
           rdma/ib: 1
         requests:
           cpu: 8
           memory: 64Gi
-          ephemeral-storage: 256Gi
+          ephemeral-storage: 64Gi
           nvidia.com/gpu: 1
           rdma/ib: 1
       volumeMounts:
@@ -363,87 +355,23 @@ prefill:
           name: dshm
         - name: init-scripts-volume
           mountPath: /init-scripts
+        #MK - name: hf-cache
+        #MK   mountPath: /huggingface-cache
+        - name: vllm
+          mountPath: /code
       mountModelVolume: true
     
 endpointPicker:
-  # This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
+  image: ghcr.io/llm-d/llm-d-inference-scheduler:0.0.3
+  debugLevel: 5
   service:
-    # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
     type: ClusterIP
-    # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
     port: 9002
     targetPort: 9002
     appProtocol: http2
-
-  # enableService: true
+  # The name of cluster role containing permissions to be granted to endpointPicker (via a role binding to the service account)
+  permissions: pod-read
 
   autoscaling:
     enabled: false
   replicas: 1
-  
-  containers:
-  - name: "epp"
-    image: "ghcr.io/llm-d/llm-d-inference-scheduler:0.0.3"  
-    # command: 
-    args:
-      # - -poolName
-      # - InferencePoolName
-      # - -poolNamespace
-      # - llmd-kalantar
-      - -v
-      - "5"
-      - --zap-encoder
-      - json
-      - -grpcPort
-      - "9002"
-      - -grpcHealthPort
-      - "9003"
-    env:
-      - name: PD_ENABLED
-        value: "true"
-      - name: PD_PROMPT_LEN_THRESHOLD
-        value: "10"
-    ports:
-      - containerPort: 9002
-        protocol: TCP
-      - containerPort: 9003
-        protocol: TCP
-      - containerPort: 9090
-        name: metrics
-        protocol: TCP
-    livenessProbe:
-      failureThreshold: 3
-      grpc:
-        port: 9003
-        service: envoy.service.ext_proc.v3.ExternalProcessor
-      initialDelaySeconds: 5
-      periodSeconds: 10
-    readinessProbe:
-      failureThreshold: 3
-      grpc:
-        port: 9003
-        service: envoy.service.ext_proc.v3.ExternalProcessor
-      initialDelaySeconds: 5
-      periodSeconds: 10
-
-
-
-
-# This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
-serviceAccount:
-  # Specifies whether a service account should be created
-  create: true
-  # Automatically mount a ServiceAccount's API credentials?
-  automount: true
-  # Annotations to add to the service account
-  annotations: {}
-
-# This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
-eppServiceAccount:
-  # Specifies whether a service account should be created
-  create: true
-  # Automatically mount a ServiceAccount's API credentials?
-  automount: true
-  # Annotations to add to the service account
-  annotations: {}
-

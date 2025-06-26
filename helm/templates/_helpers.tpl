@@ -59,7 +59,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/* Common P/D labels */}}
 {{- define "llm-d-modelservice.pdlabels" -}}
 llm-d.ai/inferenceServing: "true"
-llm-d.ai/model: {{ (include "llm-d-modelservice.sanitizedModelName" .) -}}
+llm-d.ai/model: {{ (include "llm-d-modelservice.fullname" .) -}}
 {{- end }}
 
 {{/* prefill labels */}}
@@ -116,7 +116,15 @@ initContainers:
 
 {{/* Desired P/D data parallelism -- user set or defaults to 1 */}}
 {{- define "llm-d-modelservice.dataParallelism" -}}
-{{- if and . .data }}{{ .data }}{{ else }}10{{ end }}
+{{- if and . .data }}{{ .data }}{{ else }}1{{ end }}
+{{- end }}
+
+{{/*
+Port on which vllm container should listen.
+Context is helm root context plus key "role" ("decode" or "prefill")
+*/}}
+{{- define "llm-d-modelservice.vllmPort" -}}
+{{- if eq .role "prefill" }}{{ .Values.routing.servicePort }}{{ else }}{{ .Values.routing.proxy.targetPort }}{{ end }}
 {{- end }}
 
 {{/* P/D deployment container resources */}}
@@ -148,41 +156,38 @@ resources:
 {{ include "llm-d-modelservice.fullname" . }}-sa
 {{- end }}
 
-{{/* EPP service account name */}}
+{{/* 
+EPP service account name 
+Context is helm root context
+*/}}
 {{- define "llm-d-modelservice.eppServiceAccountName" -}}
 {{ include "llm-d-modelservice.fullname" . }}-epp-sa
 {{- end }}
 
 {{/*
-EPP selector labels
-*/}}
-{{- define "llm-d-modelservice.eppSelectorLabels" -}}
-app.kubernetes.io/name: {{ include "llm-d-modelservice.name" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
-llm-d.ai/epp: {{ include "llm-d-modelservice.fullname" . }}-epp
-{{- end }}
-
-{{/*
 Volumes for PD containers based on model artifact prefix
+Context is .Values.modelArtifacts
 */}}
 {{- define "llm-d-modelservice.mountModelVolumeVolumes" -}}
-{{- $parsedArtifacts := regexSplit "://" .Values.modelArtifacts.uri -1 -}}
+{{- $parsedArtifacts := regexSplit "://" .uri -1 -}}
 {{- $protocol := first $parsedArtifacts -}}
 {{- $path := last $parsedArtifacts -}}
 {{- if eq $protocol "hf" -}}
 - name: model-storage
   emptyDir: 
-    sizeLimit: {{ default "0" .Values.modelArtifacts.size }}
+    sizeLimit: {{ default "0" .size }}
 {{- else if eq $protocol "pvc" }}
+{{- $parsedArtifacts := regexSplit "/" $path -1 -}}
+{{- $claim := first $parsedArtifacts -}}
 - name: model-storage
   persistentVolumeClaim:
-    claimName: {{ $path }}
+    claimName: {{ $claim }}
     readOnly: true
 {{- else if eq $protocol "oci" }}
 - name: model-storage
   image:
     reference: {{ $path }}
-    pullPolicy: {{ default "Always" .Values.modelArtifacts.imagePullPolicy }}
+    pullPolicy: {{ default "Always" .imagePullPolicy }}
 {{- end }}
 {{- end }}
 
@@ -205,27 +210,43 @@ volumeMounts:
 {{- end }}
 {{- end }}
 
+{{/*
+Pod elements of deployment/lws spec template
+context is a pdSpec
+*/}}
 {{- define "llm-d-modelservice.modelPod" -}}
-  {{- with .Values.decode.imagePullSecrets }}
+  {{- with .pdSpec.imagePullSecrets }}
   imagePullSecrets:
     {{- toYaml . | nindent 2 }}
   {{- end }}
   serviceAccountName: {{ include "llm-d-modelservice.pdServiceAccountName" . }}
-  {{- with .Values.podSecurityContext }}
+  {{- with .pdSpec.podSecurityContext }}
   securityContext:
-    {{- toYaml . | nindent 2 }}
+    {{- toYaml . | nindent 4 }}
   {{- end }}
-  {{- with .Values.decode.acceleratorTypes }}
+  {{- with .pdSpec.acceleratorTypes }}
   {{- include "llm-d-modelservice.acceleratorTypes" . | nindent 2 }}
+  {{- end }}
+  {{- if or .pdSpec.volumes .pdSpec.mountModelVolume }}
+  volumes:
+    {{- toYaml .pdSpec.volumes | nindent 4 }}
+    {{ include "llm-d-modelservice.mountModelVolumeVolumes" .Values.modelArtifacts | nindent 4}}
   {{- end }}
 {{- end }} {{- /* define "llm-d-modelservice.modelPod" */}}
 
+{{/*
+Container elements of deployment/lws spec template
+context is a dict with helm root context plus:
+   key - "container"; value - container spec
+   key - "roll"; value - either "decode" or "prefill"
+   key - "parallelism"; value - $.Values.decode.parallelism
+*/}}
 {{- define "llm-d-modelservice.container" -}}
 - name: {{ default "vllm" .container.name }}
   image: {{ required "image of container is required" .container.image }}
   {{- with .container.securityContext }}
   securityContext:
-    {{- toYaml . | nindent 2 }}
+    {{- toYaml . | nindent 4 }}
   {{- end }}
   {{- with .container.imagePullPolicy }}
   imagePullPolicy: {{ . }}
@@ -234,27 +255,36 @@ volumeMounts:
   command:
     {{- toYaml . | nindent 2 }}
   {{- end }}
-  {{- with .container.args }}
   args:
+  - {{ .Values.routing.modelName | quote }}
+  - --port
+  - {{ (include "llm-d-modelservice.vllmPort" .) | quote }}
+  {{- with .container.args }}
     {{- toYaml . | nindent 2 }}
   {{- end }}
   {{- /* insert user's env for this container */}}
-  {{- if or .container.env .container.mountModelVolume}}
+  {{- if or .container.env .container.mountModelVolume }}
   env:
   {{- end }}
   {{- with .container.env }}
     {{- toYaml . | nindent 2 }}
   {{- end }}
+  - name: DP_SIZE
+    value: {{ include "llm-d-modelservice.tensorParallelism" .parallelism | quote }}
+  - name: TP_SIZE
+    value: {{ include "llm-d-modelservice.dataParallelism" .parallelism | quote }}
+  - name: DP_SIZE_LOCAL
+    value: "1"
   {{- /* insert envs based on what modelArtifact prefix */}}
   {{- if .container.mountModelVolume }}
   - name: HF_HOME
     value: /model-cache
-  {{- with .authSecretName }}
+  {{- with .Values.modelArtifacts.authSecretName }}
   - name: HF_TOKEN
     valueFrom:
-    secretKeyRef:
-      name: {{ . }}
-      key: HF_TOKEN
+      secretKeyRef:
+        name: {{ . }}
+        key: HF_TOKEN
   {{- end }}
   {{- end }}
   {{- with .container.livenessProbe }}

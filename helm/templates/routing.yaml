@@ -12,8 +12,11 @@ spec:
     kind: Service
     name: {{ include "llm-d-modelservice.fullname" . }}-epp-service
   selector:
+    {{- if .Values.multinode }}
+    leaderworkerset.sigs.k8s.io/worker-index: "0"
+    {{- end }}
     {{- include "llm-d-modelservice.pdlabels" . | nindent 4 }}
-  targetPortNumber: 8000
+  targetPortNumber: {{ .Values.routing.servicePort }}
 {{- end }}
 --- 
 {{- if .Values.inferenceModel }}
@@ -53,11 +56,11 @@ spec:
       port: {{ .Values.routing.servicePort  }}
       weight: 1
     matches:
-    - headers:
+    - path:
+        type: PathPrefix
+        value: /
+      headers:
       - name: x-model-name
         type: Exact
         value: {{ .Values.routing.modelName }}
-      path:
-        type: PathPrefix
-        value: /
 {{- end }}
