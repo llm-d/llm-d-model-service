@@ -1,10 +1,10 @@
 # ModelService
 
-> ❗ `llm-d-model-service` is a Kubernetes operator that manages ModelService objects in `llm-d-deployer`. This project is now deprecated and no longer under active maintenance. The core functionality previously handled by llm-d-model-service is now provided by a Helm chart.
+> ❗ `llm-d-model-service` is a Kubernetes operator that manages ModelService objects in `llm-d-deployer`. This project is now deprecated and no longer under active maintenance. The [ModelService helm chart proposal](https://github.com/llm-d/llm-d/blob/dev/docs/proposals/modelservice.md) was accepted by llm-d on June 10, 2025. In summary, the core functionality previously handled by llm-d-model-service is now provided by a Helm chart.
 
 > For the latest updates and continued development, please refer to:
 
-👉 [llm-d-incuation/llm-d-modelservice](https://github.com/llm-d-incubation/llm-d-modelservice)
+👉 [llm-d-incubation/llm-d-modelservice](https://github.com/llm-d-incubation/llm-d-modelservice)
 
 > *ModelService* declaratively provisions and maintains the Kubernetes resources needed to serve a base model for inference.
 
