@@ -1,5 +1,11 @@
 # ModelService
 
+> ❗ `llm-d-model-service` is a Kubernetes operator that manages ModelService objects in `llm-d-deployer`. This project is now deprecated and no longer under active maintenance. The core functionality previously handled by llm-d-model-service is now provided by a Helm chart.
+
+> For the latest updates and continued development, please refer to:
+
+👉 [llm-d-incuation/llm-d-modelservice](https://github.com/llm-d-incubation/llm-d-modelservice)
+
 > *ModelService* declaratively provisions and maintains the Kubernetes resources needed to serve a base model for inference.
 
 A *ModelService* custom resource encapsulates the desired state of workloads and routing associated with a single base model. It automates the management of Kubernetes resources, including:
@@ -91,3 +97,4 @@ The result is a fully managed inference stack for the base model.
 7. Prometheus metrics exporter: Emit controller metrics
 
 8. Enable multi-node inferencing: for instance, using LWS integration
+# llm-d-modelservice
